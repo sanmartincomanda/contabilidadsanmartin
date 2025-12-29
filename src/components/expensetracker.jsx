@@ -46,7 +46,7 @@ const fmt = (n, currency = 'C$') =>
 const branchName = (id) => BRANCHES.find(b => b.id === id)?.name || id;
 
 // --- Componente Principal (con corrección de prop) ---
-export default function ExpenseTracker({ currentExpenses = [], isLoading }) {
+export default function expensetracker({ currentExpenses = [], isLoading }) {
     //                                  ^^^^^^^^^^^^^^^^^ <-- CORRECCIÓN
 
     const [description, setDescription] = useState('');
