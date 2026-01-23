@@ -103,6 +103,8 @@ function App() {
     const { data: appData, loading: dataLoading, dataIsPopulated } = useAppData();
 
     const categoriesList = appData.categorias || [];
+  
+
     
     const branchesList = (appData.branches && appData.branches.length > 0) 
         ? appData.branches 
@@ -197,6 +199,66 @@ function App() {
             </AuthProvider>
         </Router>
     );
+    const isLimitedUser = user?.email === "adriandiazc95@gmail.com";
+
+    if (dataLoading) return <div className="p-10 text-center">Cargando...</div>;
+
+    return (
+        <Router>
+            <AuthProvider> 
+                <Header /> 
+                <main className="p-4">
+                    <Routes>
+                        <Route path="/login" element={<Login />} />
+
+                        <Route 
+                            path="/" 
+                            element={<PrivateRoute element={<Dashboard />} />} 
+                        />
+                        
+                        {/* RESTRICCIÓN: Si es el usuario limitado, lo mandamos a Cuentas por Pagar */}
+                        <Route 
+                            path="/ingresar" 
+                            element={<PrivateRoute 
+                                element={!isLimitedUser ? <DataEntry data={appData} /> : <Navigate to="/cuentas-pagar" />} 
+                            />} 
+                        />
+                        
+                        <Route 
+                            path="/conciliacion" 
+                            element={<PrivateRoute 
+                                element={!isLimitedUser ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} 
+                            />} 
+                        />
+
+                        <Route 
+                            path="/cuentas-pagar" 
+                            element={<PrivateRoute 
+                                element={<AccountsPayable data={appData} />} 
+                            />} 
+                        />
+
+                        <Route 
+                            path="/reportes" 
+                            element={<PrivateRoute 
+                                element={!isLimitedUser ? <Reports data={appData} /> : <Navigate to="/cuentas-pagar" />} 
+                            />} 
+                        />
+
+                        <Route 
+                            path="/maestros/categorias" 
+                            element={<PrivateRoute 
+                                element={!isLimitedUser ? <CategoryManager /> : <Navigate to="/cuentas-pagar" />} 
+                            />} 
+                        />
+                        
+                        <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                </main>
+            </AuthProvider>
+        </Router>
+    );
 }
+
 
 export default App;
