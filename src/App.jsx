@@ -32,7 +32,18 @@ const Dashboard = () => (
 // --- Hook para cargar datos y proveerlos a la App ---
 const useAppData = (
     // SE AÑADIERON 'cuentas_por_pagar' y 'abonos_pagar'
-    collections = ['ingresos', 'gastos', 'categorias', 'branches', 'inventarios', 'compras', 'presupuestos', 'cuentas_por_pagar', 'abonos_pagar']
+    collections = [
+        'ingresos', 
+        'gastos', 
+        'categorias', 
+        'branches', 
+        'inventarios', 
+        'compras', 
+        'presupuestos', 
+        'cuentas_por_pagar', 
+        'abonos_pagar',
+        'proveedores' // <--- ESTA ES LA LÍNEA QUE TE FALTA AGREGAR
+    ]
 ) => {
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(true);
