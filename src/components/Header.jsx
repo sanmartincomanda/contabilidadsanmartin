@@ -27,11 +27,8 @@ export default function Header() {
         </Link>
     );
 
-    // DropdownItem ahora solo navega a la ruta principal de DataEntry,
-    // y DataEntry usará el estado de React para mostrar la pestaña correcta.
     const DropdownItem = ({ to, children }) => (
         <Link 
-            // La ruta base es '/ingresar' (definida en App.jsx)
             to={to} 
             onClick={() => setIsMenuOpen(false)} 
             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
@@ -66,7 +63,6 @@ export default function Header() {
                                     className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20"
                                     onMouseLeave={() => setIsMenuOpen(false)} 
                                 >
-                                    {/* MANTENEMOS LAS RUTAS PERO AHORA SOLO CARGAN EL COMPONENTE DATAENTRY */}
                                     <DropdownItem to="/ingresar?tab=Ingresos">Ingresos</DropdownItem>
                                     <DropdownItem to="/ingresar?tab=Gastos">Gastos</DropdownItem>
                                     <DropdownItem to="/ingresar?tab=Inventario">Inventario</DropdownItem>
@@ -76,6 +72,10 @@ export default function Header() {
                         {/* FIN DEL MENÚ DESPLEGABLE 'INGRESAR' */}
 
                         <NavLink to="/conciliacion">Conciliación</NavLink>
+                        
+                        {/* NUEVO LINK: CUENTAS POR PAGAR */}
+                        <NavLink to="/cuentas-pagar">Cuentas por Pagar</NavLink>
+                        
                         <NavLink to="/reportes">Reportes</NavLink>
                         
                         <NavLink to="/maestros/categorias">Categorías</NavLink>

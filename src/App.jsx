@@ -1,4 +1,4 @@
-// src/App.jsx (VERSIÓN ROBUSTA COMPLETA)
+// src/App.jsx (VERSIÓN ROBUSTA ACTUALIZADA)
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -19,6 +19,7 @@ import { DataEntry } from './components/DataEntry';
 import { BankReconciliation } from './components/BankReconciliation'; 
 import Reports from './components/Reports';
 import CategoryManager from './components/CategoryManager';
+import { AccountsPayable } from './components/AccountsPayable'; // <-- NUEVO IMPORT
 
 // --- Componentes Placeholders ---
 const Dashboard = () => (
@@ -30,8 +31,8 @@ const Dashboard = () => (
 
 // --- Hook para cargar datos y proveerlos a la App ---
 const useAppData = (
-    // SE AÑADIÓ 'presupuestos' A LA LISTA DE COLECCIONES
-    collections = ['ingresos', 'gastos', 'categorias', 'branches', 'inventarios', 'compras', 'presupuestos']
+    // SE AÑADIERON 'cuentas_por_pagar' y 'abonos_pagar'
+    collections = ['ingresos', 'gastos', 'categorias', 'branches', 'inventarios', 'compras', 'presupuestos', 'cuentas_por_pagar', 'abonos_pagar']
 ) => {
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(true);
@@ -153,6 +154,14 @@ function App() {
                         <Route 
                             path="/conciliacion" 
                             element={<PrivateRoute element={<BankReconciliation />} />} 
+                        />
+
+                        {/* NUEVA RUTA DE CUENTAS POR PAGAR */}
+                        <Route 
+                            path="/cuentas-pagar" 
+                            element={<PrivateRoute 
+                                element={<AccountsPayable data={appData} />} 
+                            />} 
                         />
 
                         <Route 
