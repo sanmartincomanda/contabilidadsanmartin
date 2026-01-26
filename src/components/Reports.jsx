@@ -1,47 +1,37 @@
-// src/components/Reports.jsx
-
 import React, { useMemo, useState } from 'react';
-// Asumimos que estas funciones y constantes están correctamente definidas en '../constants'
 import { BRANCHES, fmt, peso, branchName } from '../constants'; 
 
-const Card = ({ title, children, className = '' }) => (
+const Card = ({ title, children, className = '', extraHeader }) => (
     <div className={`rounded-2xl shadow-sm border border-neutral-200 bg-white p-4 ${className}`}>
-        <div className="text-lg font-semibold text-neutral-700 mb-3">{title}</div>
+        <div className="flex justify-between items-center mb-3">
+            <div className="text-lg font-semibold text-neutral-700">{title}</div>
+            {extraHeader}
+        </div>
         {children}
     </div>
 );
 
-// Función de Agregación: Transforma los datos crudos en la estructura del Estado de Resultados
 const aggregateData = (data) => {
-    const results = {}; // Key: YYYY-MM
-    // MODIFICACIÓN: Extraemos también 'presupuestos' del objeto data
+    const results = {}; 
     const { ingresos = [], gastos = [], inventarios = [], compras = [], presupuestos = [] } = data;
 
-    // --- UTILITY: Convierte Timestamp a Date String (YYYY-MM-DD) ---
     const getDateString = (firestoreDate) => {
-        if (typeof firestoreDate === 'string') {
-            return firestoreDate;
-        }
-        if (firestoreDate && firestoreDate.toDate) {
-            return firestoreDate.toDate().toISOString().substring(0, 10);
-        }
+        if (typeof firestoreDate === 'string') return firestoreDate;
+        if (firestoreDate && firestoreDate.toDate) return firestoreDate.toDate().toISOString().substring(0, 10);
         return new Date().toISOString().substring(0, 10);
     };
 
-    // 1. Agrupar Compras por Mes
     const purchasesByMonth = compras.reduce((acc, c) => {
         acc[c.month] = (acc[c.month] || 0) + peso(c.amount); 
         return acc;
     }, {});
 
-    // 1.1 Agrupar Presupuestos por Mes (Nueva lógica)
     const budgetsByMonth = presupuestos.reduce((acc, p) => {
         acc[p.month] = acc[p.month] || {};
         acc[p.month][p.category] = (acc[p.month][p.category] || 0) + peso(p.amount);
         return acc;
     }, {});
     
-    // 2. Agrupar Ingresos y Gastos por Mes y Sucursal
     [...ingresos, ...gastos].forEach(item => {
         const dateString = getDateString(item.date); 
         const month = dateString.substring(0, 7); 
@@ -51,20 +41,23 @@ const aggregateData = (data) => {
         results[month][branchId] = results[month][branchId] || { 
             totalIncome: 0, 
             totalExpense: 0, 
-            expenseDetails: {} 
+            expenseDetails: {},
+            // AGREGADO: Guardamos los items originales aquí
+            rawExpenses: [] 
         };
 
         const branchData = results[month][branchId];
 
-        if (item.category) { // Es un Gasto
+        if (item.category) { 
             branchData.totalExpense += peso(item.amount);
             branchData.expenseDetails[item.category] = (branchData.expenseDetails[item.category] || 0) + peso(item.amount);
-        } else { // Es un Ingreso
+            // Guardamos el item con su fecha formateada
+            branchData.rawExpenses.push({ ...item, dateStr: dateString });
+        } else { 
             branchData.totalIncome += peso(item.amount);
         }
     });
 
-    // 3. Integrar Inventarios
     inventarios.forEach(item => {
         const month = item.month;
         const branchId = item.branch;
@@ -72,7 +65,7 @@ const aggregateData = (data) => {
 
         results[month] = results[month] || {};
         results[month][branchId] = results[month][branchId] || {
-            totalIncome: 0, totalExpense: 0, expenseDetails: {} 
+            totalIncome: 0, totalExpense: 0, expenseDetails: {}, rawExpenses: [] 
         };
         const branchData = results[month][branchId];
         
@@ -80,25 +73,18 @@ const aggregateData = (data) => {
         else if (item.type === 'final') branchData.finalInventory = peso(item.amount);
     });
 
-    // 4. Transformar a array final y calcular costos
     return Object.entries(results).map(([month, branchesData]) => {
         const branchEntriesArray = Object.values(branchesData);
         const totalIncomeMonth = branchEntriesArray.reduce((sum, data) => sum + data.totalIncome, 0);
         const totalPurchasesGlobal = purchasesByMonth[month] || 0; 
-        const monthlyBudget = budgetsByMonth[month] || {}; // Presupuesto de este mes
+        const monthlyBudget = budgetsByMonth[month] || {}; 
         
-        let totalInitialInv = 0;
-        let totalFinalInv = 0;
-
         const branchEntries = Object.entries(branchesData).map(([branchId, data]) => {
             const salesPercentage = totalIncomeMonth > 0 ? (data.totalIncome / totalIncomeMonth) : 0;
             const distributedPurchases = totalPurchasesGlobal * salesPercentage;
             const initialInv = data.initialInventory || 0;
             const finalInv = data.finalInventory || 0;
             
-            totalInitialInv += initialInv;
-            totalFinalInv += finalInv;
-
             const COGS = initialInv + distributedPurchases - finalInv;
             const grossProfit = data.totalIncome - COGS;
             const netProfit = grossProfit - data.totalExpense;
@@ -120,11 +106,12 @@ const aggregateData = (data) => {
                 grossProfit: grossProfit,
                 netProfit: netProfit,
                 expenseDetails: expenseDetails,
-                budgets: monthlyBudget // Adjuntamos presupuesto al objeto
+                rawExpenses: data.rawExpenses, // Pasamos los items
+                budgets: monthlyBudget 
             };
         });
         
-        const COGS_consolidado = totalInitialInv + totalPurchasesGlobal - totalFinalInv;
+        const COGS_consolidado = branchEntries.reduce((sum, b) => sum + b.initialInventory, 0) + totalPurchasesGlobal - branchEntries.reduce((sum, b) => sum + b.finalInventory, 0);
         const totalExpenseMonth = branchEntries.reduce((sum, b) => sum + b.totalExpense, 0);
 
         branchEntries.push({
@@ -134,13 +121,8 @@ const aggregateData = (data) => {
             isConsolidated: true,
             totalIncome: totalIncomeMonth,
             totalExpense: totalExpenseMonth,
-            initialInventory: totalInitialInv,
-            finalInventory: totalFinalInv,
-            totalPurchases: totalPurchasesGlobal, 
-            COGS: COGS_consolidado,
-            grossProfit: totalIncomeMonth - COGS_consolidado,
-            netProfit: (totalIncomeMonth - COGS_consolidado) - totalExpenseMonth,
             expenseDetails: {}, 
+            rawExpenses: branchEntries.reduce((acc, b) => [...acc, ...b.rawExpenses], []), // Consolidamos items
             budgets: monthlyBudget 
         });
 
@@ -151,6 +133,8 @@ const aggregateData = (data) => {
 export default function Reports({ data }) {
     const [selectedMonth, setSelectedMonth] = useState(null);
     const [selectedBranch, setSelectedBranch] = useState(null);
+    // NUEVO: Estado para controlar qué categorías están expandidas
+    const [expandedCategories, setExpandedCategories] = useState([]);
 
     const aggregatedData = useMemo(() => aggregateData(data), [data]);
     
@@ -172,14 +156,14 @@ export default function Reports({ data }) {
         });
     }, [aggregatedData, selectedMonth, selectedBranch]);
 
-    // ** LOGICA DE CÁLCULO DE TOTALES (Tu estructura intacta) **
     let totalIncome = 0;
     let totalExpenses = 0;
     let totalCOGS = 0;
     let totalGrossProfit = 0;
     let totalNetProfit = 0;
     let expenseDetails = []; 
-    let currentBudgets = {}; // Para comparar en la tabla
+    let currentBudgets = {};
+    let filteredRawExpenses = []; // Para el desglose
 
     if (filteredReport.length > 0) {
         if (selectedBranch) {
@@ -189,6 +173,7 @@ export default function Reports({ data }) {
             totalCOGS = d.COGS;
             expenseDetails = d.expenseDetails; 
             currentBudgets = d.budgets || {};
+            filteredRawExpenses = d.rawExpenses;
         } else {
             const consolidated = filteredReport.find(d => d.branchId === 'consolidado' && (selectedMonth ? d.month === selectedMonth : true));
             if (consolidated) {
@@ -196,12 +181,13 @@ export default function Reports({ data }) {
                 totalExpenses = consolidated.totalExpense;
                 totalCOGS = consolidated.COGS;
                 currentBudgets = consolidated.budgets || {};
+                filteredRawExpenses = consolidated.rawExpenses;
             } else {
                 const nonConsolidated = filteredReport.filter(d => d.branchId !== 'consolidado');
                 totalIncome = nonConsolidated.reduce((acc, d) => acc + d.totalIncome, 0);
                 totalExpenses = nonConsolidated.reduce((acc, d) => acc + d.totalExpense, 0);
                 totalCOGS = nonConsolidated.reduce((acc, d) => acc + d.COGS, 0);
-                // Si no hay mes seleccionado, no mostramos presupuesto (o sumamos todos, pero es confuso)
+                filteredRawExpenses = nonConsolidated.reduce((acc, d) => [...acc, ...d.rawExpenses], []);
             }
             
             const expenseDetailsMap = filteredReport
@@ -218,20 +204,26 @@ export default function Reports({ data }) {
         totalNetProfit = totalGrossProfit - totalExpenses;
     }
 
+    // Funciones de control de expansión
+    const toggleCategory = (cat) => {
+        setExpandedCategories(prev => 
+            prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+        );
+    };
+
     return (
         <Card title="Reporte de Estado de Resultados">
-            {/* Controles de Filtro */}
             <div className="flex space-x-4 mb-6">
                 <div className="flex items-center space-x-2">
                     <label className="text-sm font-medium">Mes:</label>
-                    <select value={selectedMonth || ''} onChange={(e) => setSelectedMonth(e.target.value)} className="p-2 border rounded-lg text-sm">
+                    <select value={selectedMonth || ''} onChange={(e) => {setSelectedMonth(e.target.value); setExpandedCategories([]);}} className="p-2 border rounded-lg text-sm">
                         <option value="">Todos</option>
                         {availableMonths.map(month => <option key={month} value={month}>{month}</option>)}
                     </select>
                 </div>
                 <div className="flex items-center space-x-2">
                     <label className="text-sm font-medium">Sucursal:</label>
-                    <select value={selectedBranch || ''} onChange={(e) => setSelectedBranch(e.target.value)} className="p-2 border rounded-lg text-sm">
+                    <select value={selectedBranch || ''} onChange={(e) => {setSelectedBranch(e.target.value); setExpandedCategories([]);}} className="p-2 border rounded-lg text-sm">
                         <option value="">Todas (Consolidado)</option>
                         {availableBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                     </select>
@@ -240,7 +232,6 @@ export default function Reports({ data }) {
 
             {filteredReport.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Tarjeta de Resumen */}
                     <Card title="Resultado Operacional" className="md:col-span-1 border-4 border-green-200 bg-neutral-50">
                         <div className="space-y-1 text-sm">
                             <div className="flex justify-between border-b pb-1"><span>(+) Ingresos Totales:</span><span className="font-semibold text-green-600">{fmt(totalIncome)}</span></div>
@@ -251,8 +242,17 @@ export default function Reports({ data }) {
                         </div>
                     </Card>
 
-                    {/* Detalle de Gastos con COMPARACIÓN */}
-                    <Card title="Control de Presupuesto" className="md:col-span-2">
+                    <Card 
+                        title="Control de Presupuesto" 
+                        className="md:col-span-2"
+                        extraHeader={
+                            expandedCategories.length > 0 && (
+                                <button onClick={() => setExpandedCategories([])} className="text-xs text-blue-600 hover:underline font-normal">
+                                    Esconder todos
+                                </button>
+                            )
+                        }
+                    >
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="text-left text-neutral-500 sticky top-0 bg-white border-b">
@@ -266,15 +266,42 @@ export default function Reports({ data }) {
                                 {expenseDetails.map(([category, amount]) => {
                                     const budget = currentBudgets[category] || 0;
                                     const diff = budget - amount;
+                                    const isExpanded = expandedCategories.includes(category);
+                                    
                                     return (
-                                        <tr key={category} className="border-t border-neutral-100 hover:bg-neutral-50">
-                                            <td className="py-2 pr-3 font-medium">{category}</td>
-                                            <td className="py-2 pr-3 text-right font-semibold">{fmt(amount)}</td>
-                                            <td className="py-2 pr-3 text-right text-neutral-500 italic">{budget > 0 ? fmt(budget) : '---'}</td>
-                                            <td className={`py-2 pr-3 text-right font-bold ${diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                {budget > 0 ? (diff < 0 ? `▲ ${fmt(Math.abs(diff))}` : `▼ ${fmt(diff)}`) : '---'}
-                                            </td>
-                                        </tr>
+                                        <React.Fragment key={category}>
+                                            <tr 
+                                                className="border-t border-neutral-100 hover:bg-neutral-50 cursor-pointer"
+                                                onClick={() => toggleCategory(category)}
+                                            >
+                                                <td className="py-2 pr-3 font-medium">
+                                                    <span className="mr-2 inline-block w-2">{isExpanded ? '▾' : '▸'}</span>
+                                                    {category}
+                                                </td>
+                                                <td className="py-2 pr-3 text-right font-semibold">{fmt(amount)}</td>
+                                                <td className="py-2 pr-3 text-right text-neutral-500 italic">{budget > 0 ? fmt(budget) : '---'}</td>
+                                                <td className={`py-2 pr-3 text-right font-bold ${diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {budget > 0 ? (diff < 0 ? `▲ ${fmt(Math.abs(diff))}` : `▼ ${fmt(diff)}`) : '---'}
+                                                </td>
+                                            </tr>
+                                            {isExpanded && (
+                                                <tr>
+                                                    <td colSpan="4" className="bg-neutral-50 p-0">
+                                                        <div className="px-6 py-2 border-l-4 border-blue-200 ml-2">
+                                                            {filteredRawExpenses
+                                                                .filter(item => item.category === category)
+                                                                .map((item, idx) => (
+                                                                    <div key={idx} className="flex justify-between py-1 border-b border-neutral-200 last:border-0 text-xs">
+                                                                        <span className="text-neutral-500">{item.dateStr}</span>
+                                                                        <span className="flex-1 px-4">{item.description}</span>
+                                                                        <span className="font-medium">{fmt(peso(item.amount))}</span>
+                                                                    </div>
+                                                                ))}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>

@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { fmt } from '../constants';
 
+
 const Card = ({ title, children, className = '' }) => (
     <div className={`rounded-2xl shadow-sm border border-neutral-200 bg-white p-4 ${className}`}>
         <div className="text-lg font-semibold text-neutral-700 mb-3">{title}</div>
