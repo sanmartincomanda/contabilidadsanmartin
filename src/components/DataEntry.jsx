@@ -314,7 +314,7 @@ const PurchasesForm = ({ loading, setLoading }) => {
 };
 
 // -------------------------------------------------------------------------
-// --- 5. NUEVO: Formulario de Presupuestos ---
+// --- 5. Formulario de Presupuestos ---
 // -------------------------------------------------------------------------
 const BudgetForm = ({ categories, loading, setLoading }) => {
     const [month, setMonth] = useState(getCurrentMonth());
@@ -370,6 +370,92 @@ const BudgetForm = ({ categories, loading, setLoading }) => {
 };
 
 // -------------------------------------------------------------------------
+// --- 6. NUEVO: Formulario Cuentas por Cobrar ---
+// -------------------------------------------------------------------------
+const ReceivableForm = ({ loading, setLoading }) => {
+    const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [description, setDescription] = useState('');
+    const [amount, setAmount] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const numAmount = Number(amount);
+        if (!description || isNaN(numAmount) || numAmount <= 0) return alert('Datos inválidos.');
+
+        setLoading(true);
+        try {
+            await addDoc(collection(db, 'cuentasPorCobrar'), {
+                date, description, amount: numAmount, timestamp: Timestamp.now(),
+            });
+            setDescription(''); setAmount('');
+        } catch (error) { console.error(error); } finally { setLoading(false); }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+                <label className="text-sm font-medium block">Fecha</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm" required />
+            </div>
+            <div className="space-y-1">
+                <label className="text-sm font-medium block">Cliente/Concepto</label>
+                <TextInput value={description} onChange={setDescription} placeholder="Nombre del deudor..." />
+            </div>
+            <div className="space-y-1">
+                <label className="text-sm font-medium block">Monto</label>
+                <NumberInput value={amount} onChange={setAmount} />
+            </div>
+            <button type="submit" disabled={loading} className="w-full rounded-lg text-white px-3 py-2 font-medium bg-sky-600 hover:bg-sky-700">
+                {loading ? 'Guardando...' : 'Registrar Cuenta por Cobrar'}
+            </button>
+        </form>
+    );
+};
+
+// -------------------------------------------------------------------------
+// --- 7. NUEVO: Formulario Patrimonio ---
+// -------------------------------------------------------------------------
+const EquityForm = ({ loading, setLoading }) => {
+    const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [description, setDescription] = useState('');
+    const [amount, setAmount] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const numAmount = Number(amount);
+        if (!description || isNaN(numAmount)) return alert('Datos inválidos.');
+
+        setLoading(true);
+        try {
+            await addDoc(collection(db, 'patrimonio'), {
+                date, description, amount: numAmount, timestamp: Timestamp.now(),
+            });
+            setDescription(''); setAmount('');
+        } catch (error) { console.error(error); } finally { setLoading(false); }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+                <label className="text-sm font-medium block">Fecha</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm" required />
+            </div>
+            <div className="space-y-1">
+                <label className="text-sm font-medium block">Descripción</label>
+                <TextInput value={description} onChange={setDescription} placeholder="Capital inicial, aporte socio..." />
+            </div>
+            <div className="space-y-1">
+                <label className="text-sm font-medium block">Monto</label>
+                <NumberInput value={amount} onChange={setAmount} />
+            </div>
+            <button type="submit" disabled={loading} className="w-full rounded-lg text-white px-3 py-2 font-medium bg-emerald-600 hover:bg-emerald-700">
+                {loading ? 'Guardando...' : 'Registrar Capital/Patrimonio'}
+            </button>
+        </form>
+    );
+};
+
+// -------------------------------------------------------------------------
 // --- COMPONENTE PRINCIPAL ---
 // -------------------------------------------------------------------------
 export function DataEntry({ categories, branches, data, onDataChange }) {
@@ -381,9 +467,11 @@ export function DataEntry({ categories, branches, data, onDataChange }) {
         Inventario: getCurrentMonth(),
         Compras: getCurrentMonth(),
         Presupuesto: getCurrentMonth(),
+        "Cuentas por Cobrar": getCurrentMonth(),
+        Patrimonio: getCurrentMonth(),
     });
 
-    const tabs = ['Ingresos', 'Gastos', 'Inventario', 'Compras', 'Presupuesto'];
+    const tabs = ['Ingresos', 'Gastos', 'Inventario', 'Compras', 'Presupuesto', 'Cuentas por Cobrar', 'Patrimonio'];
 
     const forms = {
         Ingresos: <IncomeForm branches={branches} loading={loading} setLoading={setLoading} />,
@@ -391,6 +479,8 @@ export function DataEntry({ categories, branches, data, onDataChange }) {
         Inventario: <InventoryForm branches={branches} loading={loading} setLoading={setLoading} />,
         Compras: <PurchasesForm loading={loading} setLoading={setLoading} />,
         Presupuesto: <BudgetForm categories={categories} loading={loading} setLoading={setLoading} />,
+        "Cuentas por Cobrar": <ReceivableForm loading={loading} setLoading={setLoading} />,
+        Patrimonio: <EquityForm loading={loading} setLoading={setLoading} />,
     };
 
     const fields = {
@@ -399,15 +489,16 @@ export function DataEntry({ categories, branches, data, onDataChange }) {
         Inventario: { month: { label: 'Mes', type: 'text' }, type: { label: 'Tipo', type: 'text' }, branch: { label: 'Sucursal', type: 'text' }, amount: { label: 'Monto', type: 'currency' } },
         Compras: { month: { label: 'Mes', type: 'text' }, amount: { label: 'Total', type: 'currency' } },
         Presupuesto: { month: { label: 'Mes', type: 'text' }, category: { label: 'Categoría', type: 'text' }, amount: { label: 'Presupuesto', type: 'currency' } },
+        "Cuentas por Cobrar": { date: { label: 'Fecha', type: 'date' }, description: { label: 'Concepto', type: 'text' }, amount: { label: 'Monto', type: 'currency' } },
+        Patrimonio: { date: { label: 'Fecha', type: 'date' }, description: { label: 'Descripción', type: 'text' }, amount: { label: 'Monto', type: 'currency' } },
     };
 
     const handleFilterChange = (tab, value) => {
         setFilterMonth(prev => ({ ...prev, [tab]: value }));
     };
 
-    // 🚨 LÓGICA DE FILTRADO Y ORDENAMIENTO (EL MÁS RECIENTE PRIMERO)
     const filteredListData = useMemo(() => {
-        let finalCol = activeTab.toLowerCase();
+        let finalCol = activeTab === 'Cuentas por Cobrar' ? 'cuentasPorCobrar' : activeTab.toLowerCase();
         if (finalCol === 'inventario') finalCol = 'inventarios';
         if (finalCol === 'presupuesto') finalCol = 'presupuestos';
 
@@ -415,19 +506,15 @@ export function DataEntry({ categories, branches, data, onDataChange }) {
         const filterValue = filterMonth[activeTab];
         const filterKey = (activeTab === 'Inventario' || activeTab === 'Compras' || activeTab === 'Presupuesto') ? 'month' : 'date';
 
-        // 1. Filtrar
         const filtered = records.filter(item => {
             if (!filterValue) return true;
             return item[filterKey]?.substring(0, 7) === filterValue;
         });
 
-        // 2. Ordenar Descendente (Recientes arriba)
         return filtered.sort((a, b) => {
             const valA = a[filterKey] || "";
             const valB = b[filterKey] || "";
             if (valA !== valB) return valB.localeCompare(valA);
-            
-            // Desempate por timestamp exacto
             const timeA = a.timestamp?.seconds || 0;
             const timeB = b.timestamp?.seconds || 0;
             return timeB - timeA;
@@ -460,7 +547,7 @@ export function DataEntry({ categories, branches, data, onDataChange }) {
                     <EditableList 
                         title={`Registros de ${activeTab} (Recientes primero)`}
                         data={filteredListData} 
-                        collectionName={activeTab === 'Inventario' ? 'inventarios' : activeTab === 'Presupuesto' ? 'presupuestos' : activeTab.toLowerCase()}
+                        collectionName={activeTab === 'Inventario' ? 'inventarios' : activeTab === 'Presupuesto' ? 'presupuestos' : activeTab === 'Cuentas por Cobrar' ? 'cuentasPorCobrar' : activeTab.toLowerCase()}
                         fields={fields[activeTab]}
                         showMonthFilter={true} 
                         filterMonth={filterMonth[activeTab]}
