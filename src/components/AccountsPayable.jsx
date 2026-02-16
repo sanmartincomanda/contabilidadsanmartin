@@ -18,7 +18,7 @@ const Card = ({ title, children, className = '', right }) => (
 );
 
 export function AccountsPayable({ data }) {
-    const [activeTab, setActiveTab] = useState('Ingresar Factura');
+    const [activeTab, setActiveTab] = useState('Estado de Cuenta');
     const [loading, setLoading] = useState(false);
     const [nuevoProveedor, setNuevoProveedor] = useState('');
     
@@ -58,146 +58,114 @@ export function AccountsPayable({ data }) {
         setLoading(false);
     };
 
-    // --- 2. LÓGICA DE ABONOS (DISTRIBUCIÓN AUTOMÁTICA) ---
+    // --- 2. LÓGICA DE ABONOS (CORREGIDA PARA EVITAR ERROR DE TRANSACCIÓN) ---
     const [showModalAbono, setShowModalAbono] = useState(false);
     const [selectedFacturas, setSelectedFacturas] = useState([]);
     const [montoAbono, setMontoAbono] = useState('');
     const [proveedorSeleccionado, setProveedorSeleccionado] = useState('');
 
-const handleRealizarAbono = async () => {
-    const montoTotalAbono = parseFloat(montoAbono);
-    if (isNaN(montoTotalAbono) || montoTotalAbono <= 0 || selectedFacturas.length === 0) return;
+    const handleRealizarAbono = async () => {
+        const montoTotalAbono = parseFloat(montoAbono);
+        if (isNaN(montoTotalAbono) || montoTotalAbono <= 0 || selectedFacturas.length === 0) return;
 
-    setLoading(true);
-    try {
-        // 1. LEER FUERA: Obtenemos la secuencia antes de entrar a la transacción
-        const q = query(collection(db, 'abonos_pagar'), orderBy('secuencia', 'desc'), limit(1));
-        const snap = await getDocs(q);
-        const nuevaSecuencia = snap.empty ? 1 : (snap.docs[0].data().secuencia + 1);
+        setLoading(true);
+        try {
+            const q = query(collection(db, 'abonos_pagar'), orderBy('secuencia', 'desc'), limit(1));
+            const snap = await getDocs(q);
+            const nuevaSecuencia = snap.empty ? 1 : (snap.docs[0].data().secuencia + 1);
 
-        await runTransaction(db, async (transaction) => {
-            let restante = montoTotalAbono;
-            const facturasAfectadas = [];
+            await runTransaction(db, async (transaction) => {
+                let restante = montoTotalAbono;
+                const facturasAfectadas = [];
+                const refsYDocs = [];
 
-            // 2. LEER DENTRO: Primero obtenemos todos los documentos de las facturas (READS)
-            const refsYDocs = [];
-            for (const fId of selectedFacturas) {
-                const ref = doc(db, 'cuentas_por_pagar', fId);
-                const snapshot = await transaction.get(ref); // Lectura
-                if (!snapshot.exists()) throw "Una de las facturas no existe";
-                refsYDocs.push({ ref, snapshot, data: snapshot.data() });
-            }
+                // LECTURAS PRIMERO
+                for (const fId of selectedFacturas) {
+                    const ref = doc(db, 'cuentas_por_pagar', fId);
+                    const snapshot = await transaction.get(ref);
+                    if (!snapshot.exists()) throw "Una factura no existe";
+                    refsYDocs.push({ ref, snapshot, data: snapshot.data() });
+                }
 
-            // 3. PROCESAR Y ESCRIBIR (WRITES)
-            // Ordenamos por fecha para aplicar el pago a la más antigua
-            refsYDocs.sort((a, b) => new Date(a.data.fecha) - new Date(b.data.fecha));
+                // ORDENAR CRONOLÓGICAMENTE
+                refsYDocs.sort((a, b) => new Date(a.data.fecha) - new Date(b.data.fecha));
 
-            for (const item of refsYDocs) {
-                if (restante <= 0) break;
+                // ESCRITURAS DESPUÉS
+                for (const item of refsYDocs) {
+                    if (restante <= 0) break;
+                    const pagoParaEstaFactura = Math.min(item.data.saldo, restante);
+                    const nuevoSaldo = Number((item.data.saldo - pagoParaEstaFactura).toFixed(2));
 
-                const pagoParaEstaFactura = Math.min(item.data.saldo, restante);
-                const nuevoSaldo = Number((item.data.saldo - pagoParaEstaFactura).toFixed(2));
+                    transaction.update(item.ref, {
+                        saldo: nuevoSaldo,
+                        estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial'
+                    });
 
-                // Realizamos la actualización (Escritura)
-                transaction.update(item.ref, {
-                    saldo: nuevoSaldo,
-                    estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial'
+                    facturasAfectadas.push({ id: item.snapshot.id, montoAbonado: pagoParaEstaFactura });
+                    restante = Number((restante - pagoParaEstaFactura).toFixed(2));
+                }
+
+                transaction.set(doc(collection(db, 'abonos_pagar')), {
+                    fecha: new Date().toISOString().substring(0, 10),
+                    montoTotal: montoTotalAbono,
+                    proveedor: proveedorSeleccionado,
+                    secuencia: nuevaSecuencia,
+                    detalleAfectado: facturasAfectadas,
+                    timestamp: Timestamp.now()
                 });
-
-                facturasAfectadas.push({ id: item.snapshot.id, montoAbonado: pagoParaEstaFactura });
-                restante = Number((restante - pagoParaEstaFactura).toFixed(2));
-            }
-
-            // Guardar el abono (Escritura)
-            const nuevoAbonoRef = doc(collection(db, 'abonos_pagar'));
-            transaction.set(nuevoAbonoRef, {
-                fecha: new Date().toISOString().substring(0, 10),
-                montoTotal: montoTotalAbono,
-                proveedor: proveedorSeleccionado,
-                secuencia: nuevaSecuencia,
-                detalleAfectado: facturasAfectadas,
-                timestamp: Timestamp.now()
             });
-        });
+            setShowModalAbono(false);
+            setMontoAbono('');
+            setSelectedFacturas([]);
+        } catch (e) { alert("Error: " + e.message); }
+        setLoading(false);
+    };
 
-        alert(`✅ Abono #${nuevaSecuencia} procesado.`);
-        setShowModalAbono(false);
-        setMontoAbono('');
-        setSelectedFacturas([]);
-    } catch (e) {
-        console.error("Error en abono:", e);
-        alert("Error: " + e);
-    }
-    setLoading(false);
-};
-
-    // --- 3. ANULAR ABONO (REVERTIR EXACTAMENTE) ---
-    // --- 3. ANULAR ABONO (CORREGIDO: LECTURAS ANTES QUE ESCRITURAS) ---
-const handleDeleteAbono = async (abonoDoc) => {
-    if (!window.confirm(`¿Anular abono #${abonoDoc.secuencia}? Las facturas recuperarán su saldo anterior.`)) return;
-    
-    setLoading(true);
-    try {
-        await runTransaction(db, async (transaction) => {
-            // 1. PRIMERO TODAS LAS LECTURAS (READS)
-            // Creamos un array con los datos actuales de las facturas antes de modificar nada
-            const facturasParaActualizar = [];
-            
-            for (const item of abonoDoc.detalleAfectado || []) {
-                const fRef = doc(db, 'cuentas_por_pagar', item.id);
-                const fDoc = await transaction.get(fRef); // Lectura
-                
-                if (fDoc.exists()) {
-                    facturasParaActualizar.push({
-                        ref: fRef,
-                        snapshot: fDoc,
-                        montoAbonado: item.montoAbonado
+    // --- 3. ANULAR ABONO (CORREGIDA PARA LECTURAS/ESCRITURAS) ---
+    const handleDeleteAbono = async (abonoDoc) => {
+        if (!window.confirm(`¿Anular abono #${abonoDoc.secuencia}?`)) return;
+        setLoading(true);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const facturasParaActualizar = [];
+                for (const item of abonoDoc.detalleAfectado || []) {
+                    const fRef = doc(db, 'cuentas_por_pagar', item.id);
+                    const fDoc = await transaction.get(fRef);
+                    if (fDoc.exists()) {
+                        facturasParaActualizar.push({ ref: fRef, snapshot: fDoc, abonado: item.montoAbonado });
+                    }
+                }
+                for (const fObj of facturasParaActualizar) {
+                    const dataF = fObj.snapshot.data();
+                    const nuevoSaldo = Number((dataF.saldo + fObj.abonado).toFixed(2));
+                    transaction.update(fObj.ref, {
+                        saldo: nuevoSaldo,
+                        estado: nuevoSaldo >= dataF.monto ? 'pendiente' : 'parcial'
                     });
                 }
-            }
+                transaction.delete(doc(db, 'abonos_pagar', abonoDoc.id));
+            });
+        } catch (e) { alert("Error: " + e.message); }
+        setLoading(false);
+    };
 
-            // 2. LUEGO TODAS LAS ESCRITURAS (WRITES)
-            for (const fObj of facturasParaActualizar) {
-                const dataF = fObj.snapshot.data();
-                const nuevoSaldo = Number((dataF.saldo + fObj.montoAbonado).toFixed(2));
-                
-                transaction.update(fObj.ref, {
-                    saldo: nuevoSaldo,
-                    // Si el nuevo saldo es igual o mayor al monto original, vuelve a 'pendiente'
-                    estado: nuevoSaldo >= dataF.monto ? 'pendiente' : 'parcial'
-                });
-            }
-
-            // Borrar el documento del abono (Escritura)
-            transaction.delete(doc(db, 'abonos_pagar', abonoDoc.id));
-        });
-        
-        alert("✅ Abono anulado y saldos restaurados.");
-    } catch (e) { 
-        console.error(e);
-        alert("Error al anular: " + e.message); 
-    }
-    setLoading(false);
-};
-
-    // --- 4. CÁLCULOS FILTRANDO PAGADAS Y ORDENANDO POR FECHA ---
+    // --- 4. CÁLCULOS (MEJORA: COLUMNA ABONADO) ---
     const { facturasPorProveedor, saldoTotalGeneral } = useMemo(() => {
         const groups = {};
         let totalGeneral = 0;
-
-        // Ordenar todas las facturas por fecha (Mejora 3)
         const facturasOrdenadas = [...facturas].sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
 
         facturasOrdenadas.forEach(f => {
-            // Esconder las pagadas (Solo mostrar pendiente o parcial)
             if (f.estado !== 'pagado') {
                 if (!groups[f.proveedor]) groups[f.proveedor] = { saldoTotal: 0, items: [] };
-                groups[f.proveedor].items.push(f);
+                // Calculamos cuánto se ha abonado ya a esta factura
+                const yaAbonado = Number((f.monto - (f.saldo || 0)).toFixed(2));
+                
+                groups[f.proveedor].items.push({ ...f, yaAbonado });
                 groups[f.proveedor].saldoTotal += (f.saldo || 0);
                 totalGeneral += (f.saldo || 0);
             }
         });
-
         return { facturasPorProveedor: groups, saldoTotalGeneral: totalGeneral };
     }, [facturas]);
 
@@ -206,9 +174,8 @@ const handleDeleteAbono = async (abonoDoc) => {
         const hoy = new Date(new Date().toISOString().substring(0, 10));
         const venc = new Date(fechaVenc);
         const diffDays = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0) return "bg-red-500 text-white font-bold px-2 rounded"; // Vencida
-        if (diffDays <= 3) return "bg-yellow-400 text-black font-bold px-2 rounded"; // Por vencer
+        if (diffDays < 0) return "bg-red-500 text-white font-bold px-2 rounded"; 
+        if (diffDays <= 3) return "bg-yellow-400 text-black font-bold px-2 rounded"; 
         return "text-slate-600";
     };
 
@@ -233,9 +200,8 @@ const handleDeleteAbono = async (abonoDoc) => {
                 ))}
             </div>
 
-            {/* TAB: INGRESAR FACTURA */}
             {activeTab === 'Ingresar Factura' && (
-                <div className="max-w-md mx-auto">
+                <div className="max-w-md mx-auto py-4">
                     <Card title="Nueva Factura de Compra">
                         <form onSubmit={handleSaveFactura} className="space-y-4">
                             <div>
@@ -263,7 +229,6 @@ const handleDeleteAbono = async (abonoDoc) => {
                 </div>
             )}
 
-            {/* TAB: ESTADO DE CUENTA */}
             {activeTab === 'Estado de Cuenta' && (
                 <div className="space-y-6">
                     <div className="bg-slate-900 rounded-2xl p-6 text-center shadow-xl border-b-4 border-red-500">
@@ -276,7 +241,7 @@ const handleDeleteAbono = async (abonoDoc) => {
                     ) : Object.keys(facturasPorProveedor).map(prov => (
                         <Card key={prov} title={prov} right={<span className="font-black text-red-600 text-xl">{fmt(facturasPorProveedor[prov].saldoTotal)}</span>}>
                             <div className="flex justify-end mb-4">
-                                <button onClick={() => { setProveedorSeleccionado(prov); setShowModalAbono(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase hover:bg-emerald-700 transition-all">Realizar Abono</button>
+                                <button onClick={() => { setProveedorSeleccionado(prov); setShowModalAbono(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase hover:bg-emerald-700">Realizar Abono</button>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-[11px]">
@@ -285,6 +250,8 @@ const handleDeleteAbono = async (abonoDoc) => {
                                             <th className="p-2">Fecha</th>
                                             <th className="p-2">Factura</th>
                                             <th className="p-2">Vencimiento</th>
+                                            <th className="p-2 text-right">Monto</th>
+                                            <th className="p-2 text-right">Abonado</th>
                                             <th className="p-2 text-right">Saldo</th>
                                             <th className="p-2 text-right">Acción</th>
                                         </tr>
@@ -296,6 +263,10 @@ const handleDeleteAbono = async (abonoDoc) => {
                                                 <td className="p-2 font-bold text-slate-800">{f.numero}</td>
                                                 <td className="p-2">
                                                     <span className={getVencimientoStyle(f.vencimiento)}>{f.vencimiento || '---'}</span>
+                                                </td>
+                                                <td className="p-2 text-right text-slate-500">{fmt(f.monto)}</td>
+                                                <td className="p-2 text-right font-bold text-emerald-600">
+                                                    {f.yaAbonado > 0 ? `+ ${fmt(f.yaAbonado)}` : '---'}
                                                 </td>
                                                 <td className="p-2 text-right font-black text-red-600">{fmt(f.saldo)}</td>
                                                 <td className="p-2 text-right">
@@ -311,7 +282,6 @@ const handleDeleteAbono = async (abonoDoc) => {
                 </div>
             )}
 
-            {/* TAB: HISTORIAL ABONOS */}
             {activeTab === 'Historial Abonos' && (
                 <Card title="Abonos Realizados">
                     <div className="overflow-x-auto">
@@ -343,9 +313,8 @@ const handleDeleteAbono = async (abonoDoc) => {
                 </Card>
             )}
 
-            {/* TAB: BASE PROVEEDORES */}
             {activeTab === 'Base de Proveedores' && (
-                <div className="max-w-md mx-auto">
+                <div className="max-w-md mx-auto py-4">
                     <Card title="Directorio de Proveedores">
                         <form onSubmit={handleAddProveedor} className="flex gap-2 mb-4">
                             <input type="text" className="flex-1 border-2 rounded-xl px-3 uppercase text-xs font-bold" placeholder="Nombre..." value={nuevoProveedor} onChange={e => setNuevoProveedor(e.target.value)} />
@@ -363,7 +332,6 @@ const handleDeleteAbono = async (abonoDoc) => {
                 </div>
             )}
 
-            {/* MODAL ABONO */}
             {showModalAbono && (
                 <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -371,7 +339,7 @@ const handleDeleteAbono = async (abonoDoc) => {
                         <div className="space-y-4">
                             <div className="max-h-48 overflow-y-auto border rounded-xl p-2 bg-slate-50">
                                 {facturasPorProveedor[proveedorSeleccionado]?.items.map(f => (
-                                    <label key={f.id} className="flex items-center p-2 mb-1 bg-white rounded border cursor-pointer hover:border-blue-400 transition-all">
+                                    <label key={f.id} className="flex items-center p-2 mb-1 bg-white rounded border cursor-pointer hover:border-blue-400">
                                         <input type="checkbox" className="w-4 h-4 mr-3 accent-blue-600" checked={selectedFacturas.includes(f.id)} onChange={(e) => e.target.checked ? setSelectedFacturas([...selectedFacturas, f.id]) : setSelectedFacturas(selectedFacturas.filter(id => id !== f.id))} />
                                         <div className="flex-1 text-[11px] font-bold">Fac: {f.numero} ({f.fecha})</div>
                                         <div className="text-xs font-black text-red-600">{fmt(f.saldo)}</div>
@@ -382,7 +350,7 @@ const handleDeleteAbono = async (abonoDoc) => {
                             <input type="number" className="w-full border-4 border-blue-100 rounded-xl p-4 text-3xl font-black text-blue-800 text-center" value={montoAbono} onChange={e => setMontoAbono(e.target.value)} placeholder="0.00" />
                             <div className="flex gap-2">
                                 <button onClick={() => {setShowModalAbono(false); setMontoAbono(''); setSelectedFacturas([]);}} className="flex-1 py-3 font-bold text-gray-400 uppercase text-xs">Cancelar</button>
-                                <button onClick={handleRealizarAbono} disabled={loading || !montoAbono || selectedFacturas.length === 0} className="flex-[2] bg-emerald-600 text-white py-3 rounded-xl font-black uppercase shadow-lg transition-all">Confirmar Pago</button>
+                                <button onClick={handleRealizarAbono} disabled={loading || !montoAbono || selectedFacturas.length === 0} className="flex-[2] bg-emerald-600 text-white py-3 rounded-xl font-black uppercase shadow-lg">Confirmar Pago</button>
                             </div>
                         </div>
                     </div>
