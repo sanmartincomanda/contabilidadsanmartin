@@ -7,12 +7,12 @@ export const CATEGORIES = ['Alquiler', 'Servicios', 'Sueldos', 'Compra Inventari
 export const BRANCHES = [
     { id: 'granada', name: 'Distribuidora Granada San Martín Granada' },
     { id: 'amparito', name: 'Carnes Amparito' },
-    { id: 'inmaculada', name: 'Distribuidora Granada Inmaculada (en proceso)' },
+    { id: 'inmaculada', name: 'Distribuidora Granada Inmaculada' },
     { id: 'ruta1', name: 'Ruta 1' },
     { id: 'ruta2', name: 'Ruta 2' },
-    { id: 'ruta3', name: 'Ruta 3' },
+    { id: 'CEDI', name: 'CEDI' },
     { id: 'masaya', name: 'Masaya Gold' },
-    { id: 'masaya2', name: 'Masaya Mercado' },
+    { id: 'masaya2', name: 'Masaya Nindiri' },
 ];
 
 // 3. Constantes de Columnas para Carga CSV
