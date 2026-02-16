@@ -64,85 +64,121 @@ export function AccountsPayable({ data }) {
     const [montoAbono, setMontoAbono] = useState('');
     const [proveedorSeleccionado, setProveedorSeleccionado] = useState('');
 
-    const handleRealizarAbono = async () => {
-        const montoTotalAbono = parseFloat(montoAbono);
-        if (isNaN(montoTotalAbono) || montoTotalAbono <= 0 || selectedFacturas.length === 0) return;
+const handleRealizarAbono = async () => {
+    const montoTotalAbono = parseFloat(montoAbono);
+    if (isNaN(montoTotalAbono) || montoTotalAbono <= 0 || selectedFacturas.length === 0) return;
 
-        setLoading(true);
-        try {
-            await runTransaction(db, async (transaction) => {
-                const q = query(collection(db, 'abonos_pagar'), orderBy('secuencia', 'desc'), limit(1));
-                const snap = await getDocs(q);
-                const nuevaSecuencia = snap.empty ? 1 : (snap.docs[0].data().secuencia + 1);
+    setLoading(true);
+    try {
+        // 1. LEER FUERA: Obtenemos la secuencia antes de entrar a la transacción
+        const q = query(collection(db, 'abonos_pagar'), orderBy('secuencia', 'desc'), limit(1));
+        const snap = await getDocs(q);
+        const nuevaSecuencia = snap.empty ? 1 : (snap.docs[0].data().secuencia + 1);
 
-                let restante = montoTotalAbono;
-                const facturasAfectadas = [];
+        await runTransaction(db, async (transaction) => {
+            let restante = montoTotalAbono;
+            const facturasAfectadas = [];
 
-                // Ordenar seleccionadas por fecha para pagar las más viejas primero
-                const sortedIds = [...selectedFacturas].sort((a,b) => {
-                    const fa = facturas.find(x => x.id === a);
-                    const fb = facturas.find(x => x.id === b);
-                    return new Date(fa.fecha) - new Date(fb.fecha);
+            // 2. LEER DENTRO: Primero obtenemos todos los documentos de las facturas (READS)
+            const refsYDocs = [];
+            for (const fId of selectedFacturas) {
+                const ref = doc(db, 'cuentas_por_pagar', fId);
+                const snapshot = await transaction.get(ref); // Lectura
+                if (!snapshot.exists()) throw "Una de las facturas no existe";
+                refsYDocs.push({ ref, snapshot, data: snapshot.data() });
+            }
+
+            // 3. PROCESAR Y ESCRIBIR (WRITES)
+            // Ordenamos por fecha para aplicar el pago a la más antigua
+            refsYDocs.sort((a, b) => new Date(a.data.fecha) - new Date(b.data.fecha));
+
+            for (const item of refsYDocs) {
+                if (restante <= 0) break;
+
+                const pagoParaEstaFactura = Math.min(item.data.saldo, restante);
+                const nuevoSaldo = Number((item.data.saldo - pagoParaEstaFactura).toFixed(2));
+
+                // Realizamos la actualización (Escritura)
+                transaction.update(item.ref, {
+                    saldo: nuevoSaldo,
+                    estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial'
                 });
 
-                for (const fId of sortedIds) {
-                    if (restante <= 0) break;
-                    const fRef = doc(db, 'cuentas_por_pagar', fId);
-                    const fDoc = await transaction.get(fRef);
-                    const dataF = fDoc.data();
+                facturasAfectadas.push({ id: item.snapshot.id, montoAbonado: pagoParaEstaFactura });
+                restante = Number((restante - pagoParaEstaFactura).toFixed(2));
+            }
 
-                    const pagoParaEstaFactura = Math.min(dataF.saldo, restante);
-                    const nuevoSaldo = Number((dataF.saldo - pagoParaEstaFactura).toFixed(2));
-
-                    transaction.update(fRef, {
-                        saldo: nuevoSaldo,
-                        estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial'
-                    });
-
-                    facturasAfectadas.push({ id: fId, montoAbonado: pagoParaEstaFactura });
-                    restante = Number((restante - pagoParaEstaFactura).toFixed(2));
-                }
-
-                transaction.set(doc(collection(db, 'abonos_pagar')), {
-                    fecha: new Date().toISOString().substring(0, 10),
-                    montoTotal: montoTotalAbono,
-                    proveedor: proveedorSeleccionado,
-                    secuencia: nuevaSecuencia,
-                    detalleAfectado: facturasAfectadas,
-                    timestamp: Timestamp.now()
-                });
+            // Guardar el abono (Escritura)
+            const nuevoAbonoRef = doc(collection(db, 'abonos_pagar'));
+            transaction.set(nuevoAbonoRef, {
+                fecha: new Date().toISOString().substring(0, 10),
+                montoTotal: montoTotalAbono,
+                proveedor: proveedorSeleccionado,
+                secuencia: nuevaSecuencia,
+                detalleAfectado: facturasAfectadas,
+                timestamp: Timestamp.now()
             });
-            setShowModalAbono(false);
-            setMontoAbono('');
-            setSelectedFacturas([]);
-        } catch (e) { alert("Error: " + e.message); }
-        setLoading(false);
-    };
+        });
+
+        alert(`✅ Abono #${nuevaSecuencia} procesado.`);
+        setShowModalAbono(false);
+        setMontoAbono('');
+        setSelectedFacturas([]);
+    } catch (e) {
+        console.error("Error en abono:", e);
+        alert("Error: " + e);
+    }
+    setLoading(false);
+};
 
     // --- 3. ANULAR ABONO (REVERTIR EXACTAMENTE) ---
-    const handleDeleteAbono = async (abonoDoc) => {
-        if (!window.confirm(`¿Anular abono #${abonoDoc.secuencia}?`)) return;
-        
-        setLoading(true);
-        try {
-            await runTransaction(db, async (transaction) => {
-                for (const item of abonoDoc.detalleAfectado || []) {
-                    const fRef = doc(db, 'cuentas_por_pagar', item.id);
-                    const fDoc = await transaction.get(fRef);
-                    if (fDoc.exists()) {
-                        const dataF = fDoc.data();
-                        const nuevoSaldo = Number((dataF.saldo + item.montoAbonado).toFixed(2));
-                        transaction.update(fRef, {
-                            saldo: nuevoSaldo,
-                            estado: nuevoSaldo >= dataF.monto ? 'pendiente' : 'parcial'
-                        });
-                    }
+    // --- 3. ANULAR ABONO (CORREGIDO: LECTURAS ANTES QUE ESCRITURAS) ---
+const handleDeleteAbono = async (abonoDoc) => {
+    if (!window.confirm(`¿Anular abono #${abonoDoc.secuencia}? Las facturas recuperarán su saldo anterior.`)) return;
+    
+    setLoading(true);
+    try {
+        await runTransaction(db, async (transaction) => {
+            // 1. PRIMERO TODAS LAS LECTURAS (READS)
+            // Creamos un array con los datos actuales de las facturas antes de modificar nada
+            const facturasParaActualizar = [];
+            
+            for (const item of abonoDoc.detalleAfectado || []) {
+                const fRef = doc(db, 'cuentas_por_pagar', item.id);
+                const fDoc = await transaction.get(fRef); // Lectura
+                
+                if (fDoc.exists()) {
+                    facturasParaActualizar.push({
+                        ref: fRef,
+                        snapshot: fDoc,
+                        montoAbonado: item.montoAbonado
+                    });
                 }
-                transaction.delete(doc(db, 'abonos_pagar', abonoDoc.id));
-            });
-        } catch (e) { alert("Error al anular: " + e.message); }
-        setLoading(false);
-    };
+            }
+
+            // 2. LUEGO TODAS LAS ESCRITURAS (WRITES)
+            for (const fObj of facturasParaActualizar) {
+                const dataF = fObj.snapshot.data();
+                const nuevoSaldo = Number((dataF.saldo + fObj.montoAbonado).toFixed(2));
+                
+                transaction.update(fObj.ref, {
+                    saldo: nuevoSaldo,
+                    // Si el nuevo saldo es igual o mayor al monto original, vuelve a 'pendiente'
+                    estado: nuevoSaldo >= dataF.monto ? 'pendiente' : 'parcial'
+                });
+            }
+
+            // Borrar el documento del abono (Escritura)
+            transaction.delete(doc(db, 'abonos_pagar', abonoDoc.id));
+        });
+        
+        alert("✅ Abono anulado y saldos restaurados.");
+    } catch (e) { 
+        console.error(e);
+        alert("Error al anular: " + e.message); 
+    }
+    setLoading(false);
+};
 
     // --- 4. CÁLCULOS FILTRANDO PAGADAS Y ORDENANDO POR FECHA ---
     const { facturasPorProveedor, saldoTotalGeneral } = useMemo(() => {
