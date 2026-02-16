@@ -26,9 +26,12 @@ export function AccountsPayable({ data }) {
     const abonos = data.abonos_pagar || [];
     const listaProveedores = data.proveedores || [];
 
+    const SUCURSALES = ["Carnes Amparito", "CSM Granada", "CSM Masaya", "CEDI", "CSM Granada Inmaculada"];
+
     const [facturaForm, setFacturaForm] = useState({
         fecha: new Date().toISOString().substring(0, 10),
         proveedor: '',
+        sucursal: '', // Nueva propiedad
         numero: '',
         vencimiento: '',
         monto: ''
@@ -38,13 +41,16 @@ export function AccountsPayable({ data }) {
     const handleSaveFactura = async (e) => {
         e.preventDefault();
         const montoNum = parseFloat(facturaForm.monto);
-        if (!facturaForm.proveedor || isNaN(montoNum) || montoNum <= 0) return alert("Datos inválidos.");
+        if (!facturaForm.proveedor || !facturaForm.sucursal || isNaN(montoNum) || montoNum <= 0) {
+            return alert("Por favor complete Proveedor, Sucursal y Monto.");
+        }
 
         setLoading(true);
         try {
             await addDoc(collection(db, 'cuentas_por_pagar'), {
                 fecha: facturaForm.fecha,
                 proveedor: facturaForm.proveedor,
+                sucursal: facturaForm.sucursal, // Se guarda la sucursal
                 numero: facturaForm.numero?.trim() || "S/N",
                 vencimiento: facturaForm.vencimiento || "",
                 monto: montoNum,
@@ -52,13 +58,13 @@ export function AccountsPayable({ data }) {
                 estado: 'pendiente',
                 timestamp: Timestamp.now()
             });
-            setFacturaForm({ ...facturaForm, numero: '', monto: '', vencimiento: '' });
-            alert("✅ Factura registrada.");
+            setFacturaForm({ ...facturaForm, numero: '', monto: '', vencimiento: '', sucursal: '' });
+            alert("✅ Factura registrada exitosamente.");
         } catch (error) { console.error(error); }
         setLoading(false);
     };
 
-    // --- 2. LÓGICA DE ABONOS (CORREGIDA PARA EVITAR ERROR DE TRANSACCIÓN) ---
+    // --- 2. LÓGICA DE ABONOS ---
     const [showModalAbono, setShowModalAbono] = useState(false);
     const [selectedFacturas, setSelectedFacturas] = useState([]);
     const [montoAbono, setMontoAbono] = useState('');
@@ -79,7 +85,6 @@ export function AccountsPayable({ data }) {
                 const facturasAfectadas = [];
                 const refsYDocs = [];
 
-                // LECTURAS PRIMERO
                 for (const fId of selectedFacturas) {
                     const ref = doc(db, 'cuentas_por_pagar', fId);
                     const snapshot = await transaction.get(ref);
@@ -87,10 +92,8 @@ export function AccountsPayable({ data }) {
                     refsYDocs.push({ ref, snapshot, data: snapshot.data() });
                 }
 
-                // ORDENAR CRONOLÓGICAMENTE
                 refsYDocs.sort((a, b) => new Date(a.data.fecha) - new Date(b.data.fecha));
 
-                // ESCRITURAS DESPUÉS
                 for (const item of refsYDocs) {
                     if (restante <= 0) break;
                     const pagoParaEstaFactura = Math.min(item.data.saldo, restante);
@@ -121,7 +124,6 @@ export function AccountsPayable({ data }) {
         setLoading(false);
     };
 
-    // --- 3. ANULAR ABONO (CORREGIDA PARA LECTURAS/ESCRITURAS) ---
     const handleDeleteAbono = async (abonoDoc) => {
         if (!window.confirm(`¿Anular abono #${abonoDoc.secuencia}?`)) return;
         setLoading(true);
@@ -149,7 +151,7 @@ export function AccountsPayable({ data }) {
         setLoading(false);
     };
 
-    // --- 4. CÁLCULOS (MEJORA: COLUMNA ABONADO) ---
+    // --- 3. CÁLCULOS ---
     const { facturasPorProveedor, saldoTotalGeneral } = useMemo(() => {
         const groups = {};
         let totalGeneral = 0;
@@ -158,9 +160,7 @@ export function AccountsPayable({ data }) {
         facturasOrdenadas.forEach(f => {
             if (f.estado !== 'pagado') {
                 if (!groups[f.proveedor]) groups[f.proveedor] = { saldoTotal: 0, items: [] };
-                // Calculamos cuánto se ha abonado ya a esta factura
                 const yaAbonado = Number((f.monto - (f.saldo || 0)).toFixed(2));
-                
                 groups[f.proveedor].items.push({ ...f, yaAbonado });
                 groups[f.proveedor].saldoTotal += (f.saldo || 0);
                 totalGeneral += (f.saldo || 0);
@@ -200,6 +200,7 @@ export function AccountsPayable({ data }) {
                 ))}
             </div>
 
+            {/* TAB: INGRESAR FACTURA */}
             {activeTab === 'Ingresar Factura' && (
                 <div className="max-w-md mx-auto py-4">
                     <Card title="Nueva Factura de Compra">
@@ -209,6 +210,13 @@ export function AccountsPayable({ data }) {
                                 <select className="w-full border-2 rounded-xl p-3 bg-slate-50 font-semibold outline-none focus:border-blue-500" value={facturaForm.proveedor} onChange={e => setFacturaForm({...facturaForm, proveedor: e.target.value})} required>
                                     <option value="">-- Seleccionar --</option>
                                     {listaProveedores.sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Sucursal Destino</label>
+                                <select className="w-full border-2 rounded-xl p-3 bg-slate-50 font-semibold outline-none focus:border-blue-500" value={facturaForm.sucursal} onChange={e => setFacturaForm({...facturaForm, sucursal: e.target.value})} required>
+                                    <option value="">-- Elegir Sucursal --</option>
+                                    {SUCURSALES.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -223,12 +231,13 @@ export function AccountsPayable({ data }) {
                                 <div><label className="text-[10px] font-bold text-gray-400 uppercase">Monto C$</label>
                                 <input type="number" step="0.01" className="w-full border-2 rounded-xl p-3 bg-slate-50 text-xl font-black text-blue-700" value={facturaForm.monto} onChange={e => setFacturaForm({...facturaForm, monto: e.target.value})} required /></div>
                             </div>
-                            <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">Guardar Factura</button>
+                            <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase shadow-lg hover:bg-blue-700">Guardar Factura</button>
                         </form>
                     </Card>
                 </div>
             )}
 
+            {/* TAB: ESTADO DE CUENTA */}
             {activeTab === 'Estado de Cuenta' && (
                 <div className="space-y-6">
                     <div className="bg-slate-900 rounded-2xl p-6 text-center shadow-xl border-b-4 border-red-500">
@@ -236,9 +245,7 @@ export function AccountsPayable({ data }) {
                         <div className="text-4xl font-black text-white mt-1">{fmt(saldoTotalGeneral)}</div>
                     </div>
 
-                    {Object.keys(facturasPorProveedor).length === 0 ? (
-                        <div className="bg-white p-10 rounded-2xl text-center border-2 border-dashed border-slate-200 text-slate-400 font-bold uppercase">No hay deudas pendientes</div>
-                    ) : Object.keys(facturasPorProveedor).map(prov => (
+                    {Object.keys(facturasPorProveedor).map(prov => (
                         <Card key={prov} title={prov} right={<span className="font-black text-red-600 text-xl">{fmt(facturasPorProveedor[prov].saldoTotal)}</span>}>
                             <div className="flex justify-end mb-4">
                                 <button onClick={() => { setProveedorSeleccionado(prov); setShowModalAbono(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase hover:bg-emerald-700">Realizar Abono</button>
@@ -248,6 +255,7 @@ export function AccountsPayable({ data }) {
                                     <thead className="text-gray-400 uppercase font-black border-b border-slate-100">
                                         <tr>
                                             <th className="p-2">Fecha</th>
+                                            <th className="p-2">Sucursal</th>
                                             <th className="p-2">Factura</th>
                                             <th className="p-2">Vencimiento</th>
                                             <th className="p-2 text-right">Monto</th>
@@ -260,8 +268,9 @@ export function AccountsPayable({ data }) {
                                         {facturasPorProveedor[prov].items.map(f => (
                                             <tr key={f.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="p-2 font-semibold text-slate-600">{f.fecha}</td>
+                                                <td className="p-2 font-bold text-blue-600 italic">{f.sucursal}</td>
                                                 <td className="p-2 font-bold text-slate-800">{f.numero}</td>
-                                                <td className="p-2">
+                                                <td className="p-2 text-center">
                                                     <span className={getVencimientoStyle(f.vencimiento)}>{f.vencimiento || '---'}</span>
                                                 </td>
                                                 <td className="p-2 text-right text-slate-500">{fmt(f.monto)}</td>
@@ -282,6 +291,7 @@ export function AccountsPayable({ data }) {
                 </div>
             )}
 
+            {/* TAB: HISTORIAL ABONOS */}
             {activeTab === 'Historial Abonos' && (
                 <Card title="Abonos Realizados">
                     <div className="overflow-x-auto">
@@ -313,8 +323,9 @@ export function AccountsPayable({ data }) {
                 </Card>
             )}
 
+            {/* BASE PROVEEDORES */}
             {activeTab === 'Base de Proveedores' && (
-                <div className="max-w-md mx-auto py-4">
+                <div className="max-w-md mx-auto">
                     <Card title="Directorio de Proveedores">
                         <form onSubmit={handleAddProveedor} className="flex gap-2 mb-4">
                             <input type="text" className="flex-1 border-2 rounded-xl px-3 uppercase text-xs font-bold" placeholder="Nombre..." value={nuevoProveedor} onChange={e => setNuevoProveedor(e.target.value)} />
@@ -332,6 +343,7 @@ export function AccountsPayable({ data }) {
                 </div>
             )}
 
+            {/* MODAL ABONO */}
             {showModalAbono && (
                 <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -341,12 +353,13 @@ export function AccountsPayable({ data }) {
                                 {facturasPorProveedor[proveedorSeleccionado]?.items.map(f => (
                                     <label key={f.id} className="flex items-center p-2 mb-1 bg-white rounded border cursor-pointer hover:border-blue-400">
                                         <input type="checkbox" className="w-4 h-4 mr-3 accent-blue-600" checked={selectedFacturas.includes(f.id)} onChange={(e) => e.target.checked ? setSelectedFacturas([...selectedFacturas, f.id]) : setSelectedFacturas(selectedFacturas.filter(id => id !== f.id))} />
-                                        <div className="flex-1 text-[11px] font-bold">Fac: {f.numero} ({f.fecha})</div>
+                                        <div className="flex-1 text-[11px] font-bold">
+                                            Fac: {f.numero} <span className="text-blue-600 font-normal">({f.sucursal})</span>
+                                        </div>
                                         <div className="text-xs font-black text-red-600">{fmt(f.saldo)}</div>
                                     </label>
                                 ))}
                             </div>
-                            <button onClick={() => setSelectedFacturas(facturasPorProveedor[proveedorSeleccionado].items.map(f => f.id))} type="button" className="w-full text-[10px] bg-slate-200 py-2 rounded font-black uppercase">Seleccionar todas</button>
                             <input type="number" className="w-full border-4 border-blue-100 rounded-xl p-4 text-3xl font-black text-blue-800 text-center" value={montoAbono} onChange={e => setMontoAbono(e.target.value)} placeholder="0.00" />
                             <div className="flex gap-2">
                                 <button onClick={() => {setShowModalAbono(false); setMontoAbono(''); setSelectedFacturas([]);}} className="flex-1 py-3 font-bold text-gray-400 uppercase text-xs">Cancelar</button>
