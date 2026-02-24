@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './components/Login';
 import Header from './components/Header'; 
+import GastosDiarios from './components/GastosDiarios'; // <-- CORREGIDO: importación por defecto (sin llaves)
 
 // COMPONENTES DE LA APLICACIÓN
 import { DataEntry } from './components/DataEntry';
@@ -36,12 +37,13 @@ const useAppData = (
         'inventarios', 
         'compras', 
         'presupuestos', 
-        'cuentas_por_pagar', // Para el módulo de Cuentas por Pagar antiguo
-        'accountspayable',   // Nombre que usa tu módulo nuevo
+        'cuentas_por_pagar',
+        'accountspayable',
         'abonos_pagar',
         'proveedores',
-        'cuentasPorCobrar',  // <-- AGREGADA
-        'patrimonio'         // <-- AGREGADA
+        'cuentasPorCobrar',
+        'patrimonio',
+        'gastosDiarios' // <-- AGREGADA: para que se carguen los datos de gastos diarios
     ]
 ) => {
     const [data, setData] = useState({});
@@ -86,7 +88,7 @@ const useAppData = (
 // Componente para manejar las rutas y la lógica de usuario
 function AppContent() {
     const { data: appData, loading: dataLoading, dataIsPopulated } = useAppData();
-    const { user } = useAuth(); // Necesitamos el usuario para la restricción de email
+    const { user } = useAuth();
 
     const isLimitedUser = user?.email === "adriandiazc95@gmail.com";
     const categoriesList = appData.categorias || [];
@@ -124,6 +126,14 @@ function AppContent() {
                         path="/ingresar" 
                         element={<PrivateRoute 
                             element={!isLimitedUser ? <DataEntry data={appData} categories={categoriesList} branches={branchesList} /> : <Navigate to="/cuentas-pagar" />} 
+                        />} 
+                    />
+                    
+                    {/* CORREGIDO: Ruta de Gastos Diarios con PrivateRoute y variables correctas */}
+                    <Route 
+                        path="/gastos-diarios" 
+                        element={<PrivateRoute 
+                            element={!isLimitedUser ? <GastosDiarios categories={categoriesList} branches={branchesList} /> : <Navigate to="/cuentas-pagar" />} 
                         />} 
                     />
                     

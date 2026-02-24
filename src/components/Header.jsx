@@ -16,7 +16,11 @@ const Icons = {
     x: "M6 18L18 6M6 6l12 12",
     logout: "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
     user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
-    chevronDown: "M19 9l-7 7-7-7"
+    chevronDown: "M19 9l-7 7-7-7",
+    cash: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z",
+    receipt: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
+    trendingUp: "M13 7h8m0 0v8m0-8l-8-8-4 4-6-6",
+    trendingDown: "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"
 };
 
 const Icon = ({ path, className = "w-5 h-5" }) => (
@@ -204,6 +208,17 @@ export default function Header() {
 
                                 {!isLimitedUser && <DataEntryButton />}
 
+                                {/* NUEVO: Gastos Diarios como opción separada */}
+                                {!isLimitedUser && (
+                                    <NavLink 
+                                        to="/gastos-diarios" 
+                                        icon="cash" 
+                                        active={isActive('/gastos-diarios')}
+                                    >
+                                        Gastos Diarios
+                                    </NavLink>
+                                )}
+
                                 <NavLink 
                                     to="/cuentas-pagar" 
                                     icon="creditCard" 
@@ -322,6 +337,18 @@ export default function Header() {
                                         </div>
                                         Inventario
                                     </button>
+
+                                    {/* NUEVO: Gastos Diarios en móvil */}
+                                    <Link 
+                                        to="/gastos-diarios" 
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/gastos-diarios') ? 'bg-rose-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
+                                    >
+                                        <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                                            <Icon path={Icons.cash} className="w-4 h-4 text-rose-400" />
+                                        </div>
+                                        Gastos Diarios
+                                    </Link>
                                 </>
                             )}
 
