@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './components/Login';
 import Header from './components/Header'; 
-import GastosDiarios from './components/GastosDiarios'; // <-- CORREGIDO: importación por defecto (sin llaves)
+import GastosDiarios from './components/GastosDiarios';
 
 // COMPONENTES DE LA APLICACIÓN
 import { DataEntry } from './components/DataEntry';
@@ -43,7 +43,7 @@ const useAppData = (
         'proveedores',
         'cuentasPorCobrar',
         'patrimonio',
-        'gastosDiarios' // <-- AGREGADA: para que se carguen los datos de gastos diarios
+        'gastosDiarios'
     ]
 ) => {
     const [data, setData] = useState({});
@@ -90,7 +90,13 @@ function AppContent() {
     const { data: appData, loading: dataLoading, dataIsPopulated } = useAppData();
     const { user } = useAuth();
 
+    // LÓGICA DE PERMISOS ACTUALIZADA
     const isLimitedUser = user?.email === "adriandiazc95@gmail.com";
+    const isAdmin = !isLimitedUser;
+   const hasDailyExpensesAccess = true;
+   
+
+
     const categoriesList = appData.categorias || [];
     const branchesList = appData.branches?.length > 0 ? appData.branches : BRANCHES;
 
@@ -125,22 +131,21 @@ function AppContent() {
                     <Route 
                         path="/ingresar" 
                         element={<PrivateRoute 
-                            element={!isLimitedUser ? <DataEntry data={appData} categories={categoriesList} branches={branchesList} /> : <Navigate to="/cuentas-pagar" />} 
+                            element={isAdmin ? <DataEntry data={appData} categories={categoriesList} branches={branchesList} /> : <Navigate to="/cuentas-pagar" />} 
                         />} 
                     />
                     
-                    {/* CORREGIDO: Ruta de Gastos Diarios con PrivateRoute y variables correctas */}
                     <Route 
-                        path="/gastos-diarios" 
-                        element={<PrivateRoute 
-                            element={!isLimitedUser ? <GastosDiarios categories={categoriesList} branches={branchesList} /> : <Navigate to="/cuentas-pagar" />} 
+                     path="/gastos-diarios" 
+                     element={<PrivateRoute 
+                        element={<GastosDiarios categories={categoriesList} branches={branchesList} />} 
                         />} 
-                    />
+                        />
                     
                     <Route 
                         path="/conciliacion" 
                         element={<PrivateRoute 
-                            element={!isLimitedUser ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} 
+                            element={isAdmin ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} 
                         />} 
                     />
 
@@ -152,14 +157,14 @@ function AppContent() {
                     <Route 
                         path="/reportes" 
                         element={<PrivateRoute 
-                            element={!isLimitedUser ? <Reports data={appData} /> : <Navigate to="/cuentas-pagar" />} 
+                            element={isAdmin ? <Reports data={appData} /> : <Navigate to="/cuentas-pagar" />} 
                         />} 
                     />
 
                     <Route 
                         path="/maestros/categorias" 
                         element={<PrivateRoute 
-                            element={!isLimitedUser ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} 
+                            element={isAdmin ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} 
                         />} 
                     />
                     

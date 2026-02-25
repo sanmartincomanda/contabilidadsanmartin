@@ -38,7 +38,10 @@ export default function Header() {
     const [isScrolled, setIsScrolled] = useState(false);
     const dropdownRef = useRef(null);
 
-    // Detectar scroll para efecto glassmorphism
+    // LÓGICA DE PERMISOS (Igual a App.jsx)
+    const isAdmin = user?.email !== "adriandiazc95@gmail.com";
+    const hasDailyExpensesAccess = user?.email === "adriandiazc95@gmail.com" || isAdmin;
+
     useEffect(() => {
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 10);
@@ -47,7 +50,6 @@ export default function Header() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Cerrar dropdown al hacer click fuera
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -57,8 +59,6 @@ export default function Header() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    const isLimitedUser = user?.email === "adriandiazc95@gmail.com";
 
     const handleLogout = async () => {
         try {
@@ -73,7 +73,6 @@ export default function Header() {
         return location.pathname === path || location.pathname.startsWith(path);
     };
 
-    // Navegación directa sin dropdown problemático
     const handleDataEntryClick = (tab) => {
         navigate(`/ingresar?tab=${tab}`);
         setIsMenuOpen(false);
@@ -95,7 +94,7 @@ export default function Header() {
     );
 
     const DataEntryButton = () => {
-        if (isLimitedUser) return null;
+        if (!isAdmin) return null;
 
         return (
             <div className="relative" ref={dropdownRef}>
@@ -188,7 +187,6 @@ export default function Header() {
             }`}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
-                        {/* LOGO */}
                         <Link to="/" className="flex items-center gap-3 group">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow">
                                 <Icon path={Icons.wallet} className="w-6 h-6 text-white" />
@@ -199,17 +197,16 @@ export default function Header() {
                             </div>
                         </Link>
 
-                        {/* NAVEGACIÓN DESKTOP */}
                         {user && (
                             <div className="hidden md:flex items-center gap-1">
                                 <NavLink to="/" icon="home" active={isActive('/')}>
                                     Inicio
                                 </NavLink>
 
-                                {!isLimitedUser && <DataEntryButton />}
+                                <DataEntryButton />
 
-                                {/* NUEVO: Gastos Diarios como opción separada */}
-                                {!isLimitedUser && (
+                                {/* GASTOS DIARIOS: Visible para Admins y Adrián */}
+                                {hasDailyExpensesAccess && (
                                     <NavLink 
                                         to="/gastos-diarios" 
                                         icon="cash" 
@@ -227,7 +224,7 @@ export default function Header() {
                                     Cuentas por Pagar
                                 </NavLink>
 
-                                {!isLimitedUser && (
+                                {isAdmin && (
                                     <>
                                         <NavLink 
                                             to="/conciliacion" 
@@ -253,7 +250,6 @@ export default function Header() {
                                     </>
                                 )}
 
-                                {/* USUARIO Y LOGOUT */}
                                 <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-700">
                                     <div className="hidden lg:flex flex-col items-end">
                                         <span className="text-sm font-bold text-white">{user.email.split('@')[0]}</span>
@@ -270,7 +266,6 @@ export default function Header() {
                             </div>
                         )}
 
-                        {/* BOTÓN MÓVIL */}
                         {user && (
                             <div className="md:hidden">
                                 <button
@@ -294,7 +289,7 @@ export default function Header() {
                     </div>
                 </div>
 
-                {/* MENÚ MÓVIL */}
+                {/* MENÚ MÓVIL ACTUALIZADO */}
                 {isMobileMenuOpen && user && (
                     <div className="md:hidden bg-slate-800/95 backdrop-blur-xl border-t border-slate-700 animate-fade-in">
                         <div className="px-4 pt-2 pb-4 space-y-1">
@@ -307,7 +302,7 @@ export default function Header() {
                                 Inicio
                             </Link>
 
-                            {!isLimitedUser && (
+                            {isAdmin && (
                                 <>
                                     <div className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Ingresar Datos</div>
                                     <button 
@@ -337,19 +332,21 @@ export default function Header() {
                                         </div>
                                         Inventario
                                     </button>
-
-                                    {/* NUEVO: Gastos Diarios en móvil */}
-                                    <Link 
-                                        to="/gastos-diarios" 
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/gastos-diarios') ? 'bg-rose-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
-                                    >
-                                        <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
-                                            <Icon path={Icons.cash} className="w-4 h-4 text-rose-400" />
-                                        </div>
-                                        Gastos Diarios
-                                    </Link>
                                 </>
+                            )}
+
+                            {/* GASTOS DIARIOS MÓVIL */}
+                            {hasDailyExpensesAccess && (
+                                <Link 
+                                    to="/gastos-diarios" 
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/gastos-diarios') ? 'bg-rose-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                                        <Icon path={Icons.cash} className="w-4 h-4 text-rose-400" />
+                                    </div>
+                                    Gastos Diarios
+                                </Link>
                             )}
 
                             <div className="border-t border-slate-700 my-2"></div>
@@ -363,7 +360,7 @@ export default function Header() {
                                 Cuentas por Pagar
                             </Link>
 
-                            {!isLimitedUser && (
+                            {isAdmin && (
                                 <>
                                     <Link 
                                         to="/conciliacion" 
@@ -409,7 +406,7 @@ export default function Header() {
                 )}
             </nav>
             
-            {/* SPACER para compensar el header fixed */}
+            {/* SPACER */}
             <div className="h-16"></div>
         </>
     );
