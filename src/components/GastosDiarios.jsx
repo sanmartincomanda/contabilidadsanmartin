@@ -2,15 +2,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
 import { 
-    collection, addDoc, Timestamp, query, where, getDocs, orderBy, doc, deleteDoc 
+    collection, addDoc, Timestamp, getDocs, doc, deleteDoc 
 } from 'firebase/firestore';
 import { fmt } from '../constants';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
     trash: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
-    edit: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
-    save: "M5 13l4 4L19 7",
     calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
     building: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
     fileText: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
@@ -21,7 +19,6 @@ const Icons = {
     tag: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
     refresh: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
     dollar: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-    x: "M6 18L18 6M6 6l12 12",
     info: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
     chevronRight: "M9 5l7 7-7 7"
 };
@@ -137,35 +134,33 @@ export default function GastosDiarios({ categories = [], branches = [] }) {
 
     const CAJAS = ['Caja Carnes Amparito', 'Caja CSM Granada'];
 
-    // Cargar registros de gastos diarios - CON ÍNDICE FIREBASE
+    // Cargar registros de gastos diarios - SIN ÍNDICES (funciona inmediatamente)
     const cargarRegistros = useCallback(async () => {
         setLoading(true);
         try {
-            let q;
+            // Consulta SIMPLE: sin where ni orderBy que requieran índice
+            // Solo obtenemos todos los documentos y filtramos/ordenamos en JavaScript
+            const snapshot = await getDocs(collection(db, 'gastosDiarios'));
             
-            // Si hay filtro de fecha, usamos el índice compuesto (fecha ASC, timestamp DESC)
-            if (filtroFecha) {
-                q = query(
-                    collection(db, 'gastosDiarios'), 
-                    where('fecha', '==', filtroFecha),
-                    orderBy('timestamp', 'desc')
-                );
-            } else {
-                // Sin filtro de fecha, solo ordenamos por timestamp
-                q = query(
-                    collection(db, 'gastosDiarios'), 
-                    orderBy('timestamp', 'desc')
-                );
-            }
-            
-            const snapshot = await getDocs(q);
             let docs = snapshot.docs.map(d => ({ 
                 id: d.id, 
                 ...d.data(),
                 timestamp: d.data().timestamp || null
             }));
             
-            // Filtrar por caja en memoria (no requiere índice)
+            // Ordenar por timestamp en JavaScript (más reciente primero)
+            docs.sort((a, b) => {
+                const timeA = a.timestamp?.toMillis?.() || 0;
+                const timeB = b.timestamp?.toMillis?.() || 0;
+                return timeB - timeA;
+            });
+            
+            // Filtrar por fecha en JavaScript
+            if (filtroFecha) {
+                docs = docs.filter(d => d.fecha === filtroFecha);
+            }
+            
+            // Filtrar por caja en JavaScript
             if (filtroCaja !== 'todas') {
                 docs = docs.filter(d => d.caja === filtroCaja);
             }
@@ -246,11 +241,15 @@ export default function GastosDiarios({ categories = [], branches = [] }) {
             await deleteDoc(doc(db, 'gastosDiarios', id));
             
             if (tipoRegistro === 'Gasto') {
-                const qGastos = query(collection(db, 'gastos'), where('gastoDiarioId', '==', id));
-                const snapshot = await getDocs(qGastos);
-                snapshot.docs.forEach(async (docSnap) => {
-                    await deleteDoc(doc(db, 'gastos', docSnap.id));
-                });
+                // Buscar y eliminar el gasto relacionado en la colección 'gastos'
+                const gastosSnapshot = await getDocs(collection(db, 'gastos'));
+                const gastosRelacionados = gastosSnapshot.docs.filter(
+                    doc => doc.data().gastoDiarioId === id
+                );
+                
+                for (const gastoDoc of gastosRelacionados) {
+                    await deleteDoc(doc(db, 'gastos', gastoDoc.id));
+                }
             }
             
             cargarRegistros();
