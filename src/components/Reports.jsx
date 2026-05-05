@@ -3,6 +3,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { fmt, peso, branchName, resolveBranchId } from '../constants'; 
 import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
+import { resolveIncomeEntries } from '../services/incomeAggregation';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -122,6 +123,7 @@ const StatCard = ({ title, value, subtitle, icon, variant = 'default', trend }) 
 const aggregateData = (data) => {
     const results = {}; 
     const { ingresos = [], gastos = [], inventarios = [], compras = [], presupuestos = [], cuentas_por_pagar: facturasCredito = [] } = data;
+    const normalizedIngresos = resolveIncomeEntries(ingresos);
 
     const getDateString = (firestoreDate, fallback = '') => {
         if (typeof firestoreDate === 'string') return firestoreDate;
@@ -165,7 +167,7 @@ const aggregateData = (data) => {
             .filter(Boolean)
     );
     
-    [...ingresos, ...gastos].forEach(item => {
+    [...normalizedIngresos, ...gastos].forEach(item => {
         const dateString = getDateString(item.date || item.fecha); 
         const month = dateString.substring(0, 7); 
         const branchId = resolveBranchId(item.branch || item.branchId || item.sucursal || item.branchName);
@@ -173,11 +175,11 @@ const aggregateData = (data) => {
         if (!branchData) return;
 
         if (item.category) { 
-            branchData.totalExpense += peso(item.amount);
-            branchData.expenseDetails[item.category] = (branchData.expenseDetails[item.category] || 0) + peso(item.amount);
-            branchData.rawExpenses.push({ ...item, dateStr: dateString });
+            branchData.totalExpense += peso(item.amount ?? item.monto);
+            branchData.expenseDetails[item.category] = (branchData.expenseDetails[item.category] || 0) + peso(item.amount ?? item.monto);
+            branchData.rawExpenses.push({ ...item, dateStr: dateString, amount: peso(item.amount ?? item.monto) });
         } else { 
-            branchData.totalIncome += peso(item.amount);
+            branchData.totalIncome += peso(item.amount ?? item.monto);
         }
     });
 

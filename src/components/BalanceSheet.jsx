@@ -1,6 +1,7 @@
 // src/components/BalanceSheet.jsx
 import React, { useMemo } from 'react';
 import { fmt, peso } from '../constants';
+import { sumIncomeForMonth } from '../services/incomeAggregation';
 
 const StatCard = ({ title, total, children, accentColor }) => (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:shadow-md">
@@ -48,9 +49,7 @@ export default function BalanceSheet({ data }) {
         // --- LÓGICA DEL ESTADO DE RESULTADOS (Idéntica a tu reporte) ---
         
         // A. Ingresos Totales del mes pasado
-        const ingresosMes = ingresos
-            .filter(i => i.date && i.date.startsWith(mesPasadoStr))
-            .reduce((acc, i) => acc + (peso(i.amount) || 0), 0);
+        const ingresosMes = sumIncomeForMonth(ingresos, mesPasadoStr);
 
         // B. Cálculo del Costo de Venta Real (Inventario Inicial + Compras - Inv Final)
         const invDelMes = inventarios.filter(i => i.month === mesPasadoStr);

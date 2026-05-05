@@ -6,6 +6,8 @@ import {
 } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../constants';
+import { resolveIncomeEntries } from '../services/incomeAggregation';
+import { syncSicarDailyIncome } from '../services/sicarIncomeSync';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -139,6 +141,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
             const dataToSave = {};
             for (const key in editData) {
                 if (key === 'id') continue;
+                if (fields[key]?.readonly) continue;
                 if (fields[key]?.type === 'number' || fields[key]?.type === 'currency') {
                     dataToSave[key] = parseFloat(editData[key]) || 0;
                 } else if (key === 'timestamp') {
@@ -187,6 +190,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
     const renderInput = (key, value) => {
         const field = fields[key];
         if (key === 'timestamp') return <span className='text-slate-400 text-xs'>No editable</span>;
+        if (field?.readonly) return <span className='text-slate-400 text-xs'>No editable</span>;
 
         if (field?.type === 'branch') {
             return (
@@ -345,6 +349,8 @@ const EditableList = ({ data, collectionName, fields, filterMonth, onFilterChang
 const IncomeForm = ({ loading, setLoading, onSuccess }) => {
     const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
     const [amount, setAmount] = useState('');
+    const [syncDate, setSyncDate] = useState(new Date().toISOString().substring(0, 10));
+    const [syncLoading, setSyncLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -355,9 +361,12 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
         try {
             await addDoc(collection(db, 'ingresos'), {
                 date,
+                month: date.substring(0, 7),
                 amount: numAmount,
                 branch: DEFAULT_BRANCH_ID,
                 branchName: DEFAULT_BRANCH_NAME,
+                source: 'manual',
+                sourceLabel: 'MANUAL',
                 timestamp: Timestamp.now(),
                 is_conciled: false,
             });
@@ -370,16 +379,54 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
             setLoading(false);
         }
     };
+
+    const handleSyncIncome = async () => {
+        setSyncLoading(true);
+        try {
+            const result = await syncSicarDailyIncome({ date: syncDate });
+            const syncedTotal = Number(result?.totalAmount || 0);
+            const syncedCount = Number(result?.syncedCount || 0);
+            const syncedDate = result?.startDate || syncDate;
+
+            alert(`SICAR sincronizado para ${syncedDate}: ${syncedCount} registro(s) por ${fmt(syncedTotal)}.`);
+            onSuccess?.();
+        } catch (error) {
+            console.error('Error sincronizando SICAR:', error);
+            alert(error?.message || 'No se pudo sincronizar desde SICAR.');
+        } finally {
+            setSyncLoading(false);
+        }
+    };
     
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
                 Todo se registrara en {DEFAULT_BRANCH_NAME}.
             </div>
-            <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
-            <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-emerald-600" value={amount} onChange={e => setAmount(e.target.value)} required />
-            <Button type="submit" variant="success" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Ingreso'}</Button>
-        </form>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="mb-3">
+                    <h4 className="text-sm font-bold text-emerald-800">Ingresos diarios desde SICAR</h4>
+                    <p className="text-xs text-emerald-700">Sincroniza el total diario de Carnes Amparito sin duplicar el ingreso manual del mismo dia.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Input label="Fecha SICAR" type="date" icon="calendar" value={syncDate} onChange={e => setSyncDate(e.target.value)} required />
+                    <Button type="button" variant="success" disabled={syncLoading} className="self-end w-full" onClick={handleSyncIncome}>
+                        {syncLoading ? 'Sincronizando...' : 'Sincronizar SICAR'}
+                    </Button>
+                </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+                <div>
+                    <h4 className="text-sm font-bold text-slate-800">Ingreso manual</h4>
+                    <p className="text-xs text-slate-500">Usa este formulario cuando el dato no venga desde SICAR.</p>
+                </div>
+                <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
+                <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-emerald-600" value={amount} onChange={e => setAmount(e.target.value)} required />
+                <Button type="submit" variant="success" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Ingreso Manual'}</Button>
+            </form>
+        </div>
     );
 };
 
@@ -688,6 +735,7 @@ export function DataEntry({ categories, data }) {
     const fieldsConfig = {
         Ingresos: {
             date: { label: 'Fecha', type: 'date' },
+            sourceLabel: { label: 'Origen', type: 'text', readonly: true },
             amount: { label: 'Monto', type: 'currency' }
         },
         Gastos: {
@@ -736,6 +784,15 @@ export function DataEntry({ categories, data }) {
             'Cuentas por Cobrar': 'cuentasPorCobrar',
             'Patrimonio': 'patrimonio'
         };
+
+        if (activeTab === 'Ingresos') {
+            return resolveIncomeEntries(data.ingresos || []).map((item) => ({
+                ...item,
+                date: item.date || item.fecha || '',
+                amount: Number(item.amount ?? item.monto ?? 0) || 0,
+                sourceLabel: item.source === 'sicar' ? 'SICAR' : 'MANUAL',
+            }));
+        }
 
         if (activeTab === 'Compras') {
             return (data.compras || []).map((item) => ({
