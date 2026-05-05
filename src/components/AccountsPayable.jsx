@@ -2,10 +2,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { db } from '../firebase';
 import { 
-    collection, addDoc, doc, Timestamp, runTransaction, 
+    collection, addDoc, doc, Timestamp, runTransaction, writeBatch,
     query, orderBy, limit, getDocs, deleteDoc 
 } from 'firebase/firestore';
-import { fmt } from '../constants';
+import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 
 // --- ICONOS SVG INLINE ---
 const Icon = ({ path, className = "w-5 h-5" }) => (
@@ -138,16 +138,22 @@ export function AccountsPayable({ data }) {
     const [loading, setLoading] = useState(false);
     const [nuevoProveedor, setNuevoProveedor] = useState('');
     
-    const facturas = data.cuentas_por_pagar || [];
+    const facturas = useMemo(() => {
+        return (data.cuentas_por_pagar || []).map((factura) => {
+            return {
+                ...factura,
+                branch: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
+                paymentType: factura.paymentType || 'credito',
+            };
+        });
+    }, [data.cuentas_por_pagar]);
     const abonos = data.abonos_pagar || [];
     const listaProveedores = data.proveedores || [];
-
-    const SUCURSALES = ["Carnes Amparito", "CSM Granada", "CSM Masaya", "CEDI", "CSM Granada Inmaculada"];
 
     const [facturaForm, setFacturaForm] = useState({
         fecha: new Date().toISOString().substring(0, 10),
         proveedor: '',
-        sucursal: '',
         numero: '',
         vencimiento: '',
         monto: ''
@@ -194,24 +200,56 @@ export function AccountsPayable({ data }) {
     const handleSaveFactura = useCallback(async (e) => {
         e.preventDefault();
         const montoNum = parseFloat(facturaForm.monto);
-        if (!facturaForm.proveedor || !facturaForm.sucursal || isNaN(montoNum) || montoNum <= 0) {
-            return alert("Por favor complete Proveedor, Sucursal y Monto.");
+        if (!facturaForm.proveedor || isNaN(montoNum) || montoNum <= 0) {
+            return alert("Por favor complete Proveedor y Monto.");
         }
+
+        const branchId = DEFAULT_BRANCH_ID;
+        const branchLabel = DEFAULT_BRANCH_NAME;
 
         setLoading(true);
         try {
-            await addDoc(collection(db, 'cuentas_por_pagar'), {
+            const facturaRef = doc(collection(db, 'cuentas_por_pagar'));
+            const compraRef = doc(collection(db, 'compras'), `credito_${facturaRef.id}`);
+            const batch = writeBatch(db);
+
+            batch.set(facturaRef, {
                 fecha: facturaForm.fecha,
+                month: facturaForm.fecha.substring(0, 7),
                 proveedor: facturaForm.proveedor,
-                sucursal: facturaForm.sucursal,
+                sucursal: branchLabel,
+                branch: branchId,
+                branchName: branchLabel,
                 numero: facturaForm.numero?.trim() || "S/N",
                 vencimiento: facturaForm.vencimiento || "",
                 monto: montoNum,
                 saldo: montoNum,
                 estado: 'pendiente',
+                paymentType: 'credito',
+                isInventoryCost: true,
+                mirroredToCompras: true,
+                mirroredPurchaseId: compraRef.id,
                 timestamp: Timestamp.now()
             });
-            setFacturaForm({ ...facturaForm, numero: '', monto: '', vencimiento: '', sucursal: '' });
+
+            batch.set(compraRef, {
+                date: facturaForm.fecha,
+                month: facturaForm.fecha.substring(0, 7),
+                supplier: facturaForm.proveedor,
+                invoiceNumber: facturaForm.numero?.trim() || "S/N",
+                amount: montoNum,
+                branch: branchId,
+                branchName: branchLabel,
+                paymentType: 'credito',
+                isInventoryCost: true,
+                sourceCollection: 'cuentas_por_pagar',
+                sourceFacturaId: facturaRef.id,
+                linkedPayableId: facturaRef.id,
+                timestamp: Timestamp.now()
+            });
+
+            await batch.commit();
+            setFacturaForm((prev) => ({ ...prev, numero: '', monto: '', vencimiento: '' }));
         } catch (error) { 
             console.error(error);
             alert("Error al guardar");
@@ -456,7 +494,13 @@ export function AccountsPayable({ data }) {
                         <SlideIn className="max-w-2xl mx-auto">
                             <Card title="Registrar Nueva Factura" icon="fileText">
                                 <form onSubmit={handleSaveFactura} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                                        Las facturas registradas aqui se contabilizan como costo a credito.
+                                    </div>
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                                        Todo quedara unificado en {DEFAULT_BRANCH_NAME}.
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4">
                                         <Select
                                             label="Proveedor"
                                             value={facturaForm.proveedor}
@@ -468,18 +512,6 @@ export function AccountsPayable({ data }) {
                                                     {listaProveedores.sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(p => (
                                                         <option key={p.id} value={p.nombre}>{p.nombre}</option>
                                                     ))}
-                                                </>
-                                            }
-                                        />
-                                        <Select
-                                            label="Sucursal Destino"
-                                            value={facturaForm.sucursal}
-                                            onChange={e => setFacturaForm({...facturaForm, sucursal: e.target.value})}
-                                            required
-                                            options={
-                                                <>
-                                                    <option value="">Seleccionar sucursal...</option>
-                                                    {SUCURSALES.map(s => <option key={s} value={s}>{s}</option>)}
                                                 </>
                                             }
                                         />
@@ -565,7 +597,6 @@ export function AccountsPayable({ data }) {
                                                 <thead className="bg-slate-50 border-b border-slate-200">
                                                     <tr>
                                                         <th className="p-4 text-left font-bold text-slate-600">Factura</th>
-                                                        <th className="p-4 text-left font-bold text-slate-600">Sucursal</th>
                                                         <th className="p-4 text-left font-bold text-slate-600">Emisión</th>
                                                         <th className="p-4 text-left font-bold text-slate-600">Vencimiento</th>
                                                         <th className="p-4 text-right font-bold text-slate-600">Monto</th>
@@ -580,12 +611,6 @@ export function AccountsPayable({ data }) {
                                                         return (
                                                             <tr key={f.id} className="hover:bg-slate-50/80 transition-colors group">
                                                                 <td className="p-4 font-bold text-slate-800">{f.numero}</td>
-                                                                <td className="p-4">
-                                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold">
-                                                                        <Icon path={Icons.building} className="w-3 h-3" />
-                                                                        {f.sucursal}
-                                                                    </span>
-                                                                </td>
                                                                 <td className="p-4 text-slate-600">{f.fecha}</td>
                                                                 <td className="p-4">
                                                                     <Badge variant={vencInfo.variant}>
@@ -800,7 +825,6 @@ export function AccountsPayable({ data }) {
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="font-bold text-slate-800">Factura #{f.numero}</span>
-                                                <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full text-slate-600">{f.sucursal}</span>
                                             </div>
                                             <div className="text-xs text-slate-500">Emisión: {f.fecha}</div>
                                         </div>

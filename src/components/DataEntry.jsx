@@ -5,7 +5,7 @@ import {
     collection, addDoc, Timestamp, query, where, getDocs, orderBy, doc, deleteDoc, updateDoc 
 } from 'firebase/firestore';
 import Papa from 'papaparse';
-import { fmt } from '../constants';
+import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../constants';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -179,15 +179,32 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
         if (typeof value === 'object' && value instanceof Timestamp) {
             try { return value.toDate().toLocaleString('es-ES'); } catch (e) { return '—'; }
         }
+        if (field?.type === 'branch') return branchName(value);
         if (field?.type === 'currency') return fmt(Number(value));
         return String(value);
     };
 
     const renderInput = (key, value) => {
         const field = fields[key];
-        const type = field?.type === 'currency' || field?.type === 'number' ? 'number' : field?.type === 'date' ? 'date' : field?.type === 'month' ? 'month' : 'text';
-        
         if (key === 'timestamp') return <span className='text-slate-400 text-xs'>No editable</span>;
+
+        if (field?.type === 'branch') {
+            return (
+                <select
+                    value={value === null || value === undefined ? '' : String(value)}
+                    onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
+                    className="w-full rounded border border-blue-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={loading}
+                >
+                    <option value="">Seleccionar...</option>
+                    {(field.options || []).map((option) => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                    ))}
+                </select>
+            );
+        }
+
+        const type = field?.type === 'currency' || field?.type === 'number' ? 'number' : field?.type === 'date' ? 'date' : field?.type === 'month' ? 'month' : 'text';
 
         return (
             <input
@@ -325,21 +342,24 @@ const EditableList = ({ data, collectionName, fields, filterMonth, onFilterChang
 
 // --- FORMULARIOS ---
 
-const IncomeForm = ({ branches, loading, setLoading, onSuccess }) => {
+const IncomeForm = ({ loading, setLoading, onSuccess }) => {
     const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
     const [amount, setAmount] = useState('');
-    const [branch, setBranch] = useState(branches?.[0]?.id || '');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         const numAmount = Number(amount);
         if (isNaN(numAmount) || numAmount <= 0) return alert('Monto inválido.');
-        if (!branch) return alert('Debes seleccionar una sucursal.');
 
         setLoading(true);
         try {
             await addDoc(collection(db, 'ingresos'), {
-                date, amount: numAmount, branch, timestamp: Timestamp.now(), is_conciled: false,
+                date,
+                amount: numAmount,
+                branch: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
+                timestamp: Timestamp.now(),
+                is_conciled: false,
             });
             setAmount('');
             onSuccess?.();
@@ -353,31 +373,39 @@ const IncomeForm = ({ branches, loading, setLoading, onSuccess }) => {
     
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                Todo se registrara en {DEFAULT_BRANCH_NAME}.
+            </div>
             <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
             <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-emerald-600" value={amount} onChange={e => setAmount(e.target.value)} required />
-            <Select label="Sucursal" icon="building" value={branch} onChange={e => setBranch(e.target.value)} required options={<><option value="">Seleccionar...</option>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</>} />
-            <Button type="submit" variant="success" disabled={loading || !branch} className="w-full">{loading ? 'Guardando...' : 'Registrar Ingreso'}</Button>
+            <Button type="submit" variant="success" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Ingreso'}</Button>
         </form>
     );
 };
 
-const ExpenseForm = ({ categories, branches, loading, setLoading, onSuccess }) => {
+const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
     const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [categoryId, setCategoryId] = useState('');
-    const [branch, setBranch] = useState(branches?.[0]?.id || '');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         const numAmount = Number(amount);
         const selectedCategoryName = categories.find(c => c.id === categoryId)?.name;
-        if (!description || isNaN(numAmount) || numAmount <= 0 || !selectedCategoryName || !branch) return alert('Complete todos los campos.');
+        if (!description || isNaN(numAmount) || numAmount <= 0 || !selectedCategoryName) return alert('Complete todos los campos.');
 
         setLoading(true);
         try {
             await addDoc(collection(db, 'gastos'), {
-                date, description, amount: numAmount, category: selectedCategoryName, branch, timestamp: Timestamp.now(), is_conciled: false,
+                date,
+                description,
+                amount: numAmount,
+                category: selectedCategoryName,
+                branch: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
+                timestamp: Timestamp.now(),
+                is_conciled: false,
             });
             setDescription(''); setAmount(''); setCategoryId('');
             onSuccess?.();
@@ -402,7 +430,8 @@ const ExpenseForm = ({ categories, branches, loading, setLoading, onSuccess }) =
                     description: row['Descripcion'] || 'Sin Descripción',
                     amount: parseFloat(row['Monto']),
                     category: row['Categoria'] || 'Otros',
-                    branch: branches.find(b => b.id === row['Sucursal'] || b.name === row['Sucursal'])?.id || branches[0]?.id,
+                    branch: DEFAULT_BRANCH_ID,
+                    branchName: DEFAULT_BRANCH_NAME,
                     timestamp: Timestamp.now(), is_conciled: false
                 }));
                 setLoading(true);
@@ -422,13 +451,15 @@ const ExpenseForm = ({ categories, branches, loading, setLoading, onSuccess }) =
     return (
         <div className="space-y-4">
             <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                    Todo se registrara en {DEFAULT_BRANCH_NAME}.
+                </div>
                 <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
                 <Input label="Descripción" icon="fileText" placeholder="Ej: Pago de servicios..." value={description} onChange={e => setDescription(e.target.value)} required />
                 <div className="grid grid-cols-2 gap-3">
                     <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-rose-600" value={amount} onChange={e => setAmount(e.target.value)} required />
                     <Select label="Categoría" icon="tag" value={categoryId} onChange={e => setCategoryId(e.target.value)} required options={<><option value="">Seleccionar...</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</>} />
                 </div>
-                <Select label="Sucursal" icon="building" value={branch} onChange={e => setBranch(e.target.value)} required options={branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)} />
                 <Button type="submit" variant="danger" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Gasto'}</Button>
             </form>
             <div className="border-t border-slate-200 pt-4">
@@ -444,17 +475,23 @@ const ExpenseForm = ({ categories, branches, loading, setLoading, onSuccess }) =
 
 // --- OTROS FORMULARIOS ---
 
-const InventoryForm = ({ branches, loading, setLoading, onSuccess }) => {
+const InventoryForm = ({ loading, setLoading, onSuccess }) => {
     const [month, setMonth] = useState(getCurrentMonth());
     const [type, setType] = useState('inicial');
     const [amount, setAmount] = useState('');
-    const [branch, setBranch] = useState(branches?.[0]?.id || '');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await addDoc(collection(db, 'inventarios'), { month, type, amount: Number(amount) || 0, branch, timestamp: Timestamp.now() });
+            await addDoc(collection(db, 'inventarios'), {
+                month,
+                type,
+                amount: Number(amount) || 0,
+                branch: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
+                timestamp: Timestamp.now()
+            });
             setAmount(''); onSuccess?.();
         } catch (error) { alert('Error'); }
         finally { setLoading(false); }
@@ -462,34 +499,72 @@ const InventoryForm = ({ branches, loading, setLoading, onSuccess }) => {
     
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                Todo se registrara en {DEFAULT_BRANCH_NAME}.
+            </div>
             <Input label="Mes" type="month" icon="calendar" value={month} onChange={e => setMonth(e.target.value)} required />
             <Select label="Tipo" icon="box" value={type} onChange={e => setType(e.target.value)} options={<><option value="inicial">Inicial</option><option value="final">Final</option></>} />
             <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} required />
-            <Select label="Sucursal" icon="building" value={branch} onChange={e => setBranch(e.target.value)} options={branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)} />
             <Button type="submit" variant="primary" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar'}</Button>
         </form>
     );
 };
 
 const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
-    const [month, setMonth] = useState(getCurrentMonth());
+    const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [supplier, setSupplier] = useState('');
+    const [invoiceNumber, setInvoiceNumber] = useState('');
     const [amount, setAmount] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        const numAmount = Number(amount);
+
+        if (!supplier.trim() || isNaN(numAmount) || numAmount <= 0) {
+            return alert('Complete proveedor y monto.');
+        }
+
         setLoading(true);
         try {
-            await addDoc(collection(db, 'compras'), { month, amount: Number(amount) || 0, timestamp: Timestamp.now() });
-            setAmount(''); onSuccess?.();
-        } catch (error) { alert('Error'); }
-        finally { setLoading(false); }
+            await addDoc(collection(db, 'compras'), {
+                date,
+                month: date.substring(0, 7),
+                supplier: supplier.trim().toUpperCase(),
+                invoiceNumber: invoiceNumber.trim() || 'S/N',
+                amount: numAmount,
+                branch: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
+                paymentType: 'contado',
+                isInventoryCost: true,
+                timestamp: Timestamp.now(),
+            });
+            setSupplier('');
+            setInvoiceNumber('');
+            setAmount('');
+            onSuccess?.();
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error al guardar');
+        } finally {
+            setLoading(false);
+        }
     };
     
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label="Mes" type="month" icon="calendar" value={month} onChange={e => setMonth(e.target.value)} required />
-            <Input label="Total Compras" type="number" step="0.01" icon="shoppingCart" placeholder="0.00" className="text-lg font-bold text-purple-600" value={amount} onChange={e => setAmount(e.target.value)} required />
-            <Button type="submit" variant="purple" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Compras'}</Button>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                Las compras registradas aqui se contabilizan como costo de contado.
+            </div>
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                Todo se registrara en {DEFAULT_BRANCH_NAME}.
+            </div>
+            <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
+            <Input label="Proveedor" icon="users" placeholder="Nombre del proveedor" value={supplier} onChange={e => setSupplier(e.target.value)} required />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input label="Numero de Factura" icon="fileText" placeholder="Ej: 001-001-000000001" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} />
+                <Input label="Monto Factura" type="number" step="0.01" icon="shoppingCart" placeholder="0.00" className="text-lg font-bold text-purple-600" value={amount} onChange={e => setAmount(e.target.value)} required />
+            </div>
+            <Button type="submit" variant="purple" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Compra de Contado'}</Button>
         </form>
     );
 };
@@ -577,7 +652,7 @@ const getCurrentMonth = () => {
 
 // --- COMPONENTE PRINCIPAL ---
 
-export function DataEntry({ categories, branches, data }) {
+export function DataEntry({ categories, data }) {
     const [activeTab, setActiveTab] = useState('Ingresos');
     const [loading, setLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -596,7 +671,7 @@ export function DataEntry({ categories, branches, data }) {
         'Ingresos': { icon: 'trendingUp', label: 'Ingresos', color: 'emerald' },
         'Gastos': { icon: 'trendingDown', label: 'Gastos', color: 'rose' },
         'Inventario': { icon: 'box', label: 'Inventario', color: 'blue' },
-        'Compras': { icon: 'shoppingCart', label: 'Compras', color: 'purple' },
+        'Compras': { icon: 'shoppingCart', label: 'Compras Contado', color: 'purple' },
         'Presupuesto': { icon: 'target', label: 'Presupuesto', color: 'amber' },
         'Cuentas por Cobrar': { icon: 'handCoin', label: 'Cuentas por Cobrar', color: 'sky' },
         'Patrimonio': { icon: 'scale', label: 'Patrimonio', color: 'emerald' }
@@ -613,25 +688,26 @@ export function DataEntry({ categories, branches, data }) {
     const fieldsConfig = {
         Ingresos: {
             date: { label: 'Fecha', type: 'date' },
-            amount: { label: 'Monto', type: 'currency' },
-            branch: { label: 'Sucursal', type: 'text' }
+            amount: { label: 'Monto', type: 'currency' }
         },
         Gastos: {
             date: { label: 'Fecha', type: 'date' },
             description: { label: 'Descripción', type: 'text' },
             category: { label: 'Categoría', type: 'text' },
-            amount: { label: 'Monto', type: 'currency' },
-            branch: { label: 'Sucursal', type: 'text' }
+            amount: { label: 'Monto', type: 'currency' }
         },
         Inventario: {
             month: { label: 'Mes', type: 'month' },
             type: { label: 'Tipo', type: 'text' },
-            amount: { label: 'Monto', type: 'currency' },
-            branch: { label: 'Sucursal', type: 'text' }
+            amount: { label: 'Monto', type: 'currency' }
         },
         Compras: {
+            date: { label: 'Fecha', type: 'date' },
             month: { label: 'Mes', type: 'month' },
-            amount: { label: 'Total', type: 'currency' }
+            supplier: { label: 'Proveedor', type: 'text' },
+            invoiceNumber: { label: 'Factura', type: 'text' },
+            paymentType: { label: 'Tipo', type: 'text' },
+            amount: { label: 'Monto', type: 'currency' }
         },
         Presupuesto: {
             month: { label: 'Mes', type: 'month' },
@@ -660,6 +736,20 @@ export function DataEntry({ categories, branches, data }) {
             'Cuentas por Cobrar': 'cuentasPorCobrar',
             'Patrimonio': 'patrimonio'
         };
+
+        if (activeTab === 'Compras') {
+            return (data.compras || []).map((item) => ({
+                ...item,
+                date: item.date || item.fecha || '',
+                month: item.month || ((item.date || item.fecha) ? (item.date || item.fecha).substring(0, 7) : ''),
+                supplier: item.supplier || item.proveedor || 'REGISTRO LEGACY',
+                invoiceNumber: item.invoiceNumber || item.numero || '',
+                branch: item.branch || DEFAULT_BRANCH_ID,
+                branchName: item.branchName || DEFAULT_BRANCH_NAME,
+                paymentType: item.paymentType || (item.sourceFacturaId || item.linkedPayableId ? 'credito' : ((item.date || item.fecha) ? 'contado' : 'legacy')),
+            }));
+        }
+
         return data[collectionMap[activeTab]] || [];
     };
 
@@ -710,9 +800,9 @@ export function DataEntry({ categories, branches, data }) {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <FadeIn className="no-print">
                         <Card title={`Nuevo ${tabsConfig[activeTab].label}`} icon={tabsConfig[activeTab].icon} gradient={true}>
-                            {activeTab === 'Ingresos' && <IncomeForm branches={branches} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                            {activeTab === 'Gastos' && <ExpenseForm categories={categories} branches={branches} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                            {activeTab === 'Inventario' && <InventoryForm branches={branches} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                            {activeTab === 'Ingresos' && <IncomeForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                            {activeTab === 'Gastos' && <ExpenseForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                            {activeTab === 'Inventario' && <InventoryForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                             {activeTab === 'Compras' && <PurchasesForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                             {activeTab === 'Presupuesto' && <BudgetForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                             {activeTab === 'Cuentas por Cobrar' && <ReceivableForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}

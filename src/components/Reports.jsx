@@ -1,6 +1,6 @@
 // src/components/Reports.jsx
 import React, { useMemo, useState, useCallback } from 'react';
-import { BRANCHES, fmt, peso, branchName } from '../constants'; 
+import { fmt, peso, branchName, resolveBranchId } from '../constants'; 
 import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
 
@@ -121,39 +121,56 @@ const StatCard = ({ title, value, subtitle, icon, variant = 'default', trend }) 
 // --- LÓGICA DE AGREGACIÓN ---
 const aggregateData = (data) => {
     const results = {}; 
-    const { ingresos = [], gastos = [], inventarios = [], compras = [], presupuestos = [] } = data;
+    const { ingresos = [], gastos = [], inventarios = [], compras = [], presupuestos = [], cuentas_por_pagar: facturasCredito = [] } = data;
 
-    const getDateString = (firestoreDate) => {
+    const getDateString = (firestoreDate, fallback = '') => {
         if (typeof firestoreDate === 'string') return firestoreDate;
         if (firestoreDate && firestoreDate.toDate) return firestoreDate.toDate().toISOString().substring(0, 10);
-        return new Date().toISOString().substring(0, 10);
+        return fallback;
     };
 
-    const purchasesByMonth = compras.reduce((acc, c) => {
-        acc[c.month] = (acc[c.month] || 0) + peso(c.amount); 
-        return acc;
-    }, {});
+    const getMonthString = (item, primaryKeys = []) => {
+        const directDate = primaryKeys.map((key) => item[key]).find(Boolean);
+        const dateString = getDateString(directDate);
+        if (dateString) return dateString.substring(0, 7);
+        return item.month || item.mes || '';
+    };
+
+    const ensureBranchData = (month, branchId) => {
+        if (!month || !branchId) return null;
+
+        results[month] = results[month] || {};
+        results[month][branchId] = results[month][branchId] || {
+            totalIncome: 0,
+            totalExpense: 0,
+            totalPurchases: 0,
+            expenseDetails: {},
+            rawExpenses: []
+        };
+
+        return results[month][branchId];
+    };
+
+    const legacyPurchasesByMonth = {};
 
     const budgetsByMonth = presupuestos.reduce((acc, p) => {
         acc[p.month] = acc[p.month] || {};
         acc[p.month][p.category] = (acc[p.month][p.category] || 0) + peso(p.amount);
         return acc;
     }, {});
+
+    const mirroredFacturaIds = new Set(
+        compras
+            .map((item) => item.sourceFacturaId || item.linkedPayableId || (item.id?.startsWith('credito_') ? item.id.replace('credito_', '') : ''))
+            .filter(Boolean)
+    );
     
     [...ingresos, ...gastos].forEach(item => {
-        const dateString = getDateString(item.date); 
+        const dateString = getDateString(item.date || item.fecha); 
         const month = dateString.substring(0, 7); 
-        const branchId = item.branch;
-        
-        results[month] = results[month] || {};
-        results[month][branchId] = results[month][branchId] || { 
-            totalIncome: 0, 
-            totalExpense: 0, 
-            expenseDetails: {},
-            rawExpenses: [] 
-        };
-
-        const branchData = results[month][branchId];
+        const branchId = resolveBranchId(item.branch || item.branchId || item.sucursal || item.branchName);
+        const branchData = ensureBranchData(month, branchId);
+        if (!branchData) return;
 
         if (item.category) { 
             branchData.totalExpense += peso(item.amount);
@@ -165,33 +182,67 @@ const aggregateData = (data) => {
     });
 
     inventarios.forEach(item => {
-        const month = item.month;
-        const branchId = item.branch;
-        if (!branchId || !month) return; 
-
-        results[month] = results[month] || {};
-        results[month][branchId] = results[month][branchId] || {
-            totalIncome: 0, totalExpense: 0, expenseDetails: {}, rawExpenses: [] 
-        };
-        const branchData = results[month][branchId];
+        const month = item.month || item.mes;
+        const branchId = resolveBranchId(item.branch || item.branchId || item.sucursal || item.branchName);
+        const branchData = ensureBranchData(month, branchId);
+        if (!branchData) return;
         
         if (item.type === 'inicial') branchData.initialInventory = peso(item.amount);
         else if (item.type === 'final') branchData.finalInventory = peso(item.amount);
     });
 
+    compras.forEach(item => {
+        const month = getMonthString(item, ['date', 'fecha']);
+        const branchId = resolveBranchId(item.branch || item.branchId || item.sucursal || item.branchName);
+        const amount = peso(item.amount ?? item.monto);
+
+        if (!amount || !month) return;
+        results[month] = results[month] || {};
+
+        if (!branchId) {
+            legacyPurchasesByMonth[month] = (legacyPurchasesByMonth[month] || 0) + amount;
+            return;
+        }
+
+        const branchData = ensureBranchData(month, branchId);
+        if (!branchData) return;
+        branchData.totalPurchases += amount;
+    });
+
+    facturasCredito.forEach(item => {
+        if (item.id && mirroredFacturaIds.has(item.id)) return;
+
+        const month = getMonthString(item, ['fecha', 'date']);
+        const branchId = resolveBranchId(item.branch || item.branchId || item.sucursal || item.branchName);
+        const amount = peso(item.monto ?? item.amount);
+
+        if (!amount || !month) return;
+        results[month] = results[month] || {};
+
+        if (!branchId) {
+            legacyPurchasesByMonth[month] = (legacyPurchasesByMonth[month] || 0) + amount;
+            return;
+        }
+
+        const branchData = ensureBranchData(month, branchId);
+        if (!branchData) return;
+        branchData.totalPurchases += amount;
+    });
+
     return Object.entries(results).map(([month, branchesData]) => {
         const branchEntriesArray = Object.values(branchesData);
         const totalIncomeMonth = branchEntriesArray.reduce((sum, data) => sum + data.totalIncome, 0);
-        const totalPurchasesGlobal = purchasesByMonth[month] || 0; 
+        const totalLegacyPurchases = legacyPurchasesByMonth[month] || 0;
         const monthlyBudget = budgetsByMonth[month] || {}; 
         
         const branchEntries = Object.entries(branchesData).map(([branchId, data]) => {
             const salesPercentage = totalIncomeMonth > 0 ? (data.totalIncome / totalIncomeMonth) : 0;
-            const distributedPurchases = totalPurchasesGlobal * salesPercentage;
+            const distributedLegacyPurchases = totalLegacyPurchases * salesPercentage;
             const initialInv = data.initialInventory || 0;
             const finalInv = data.finalInventory || 0;
+            const totalPurchases = (data.totalPurchases || 0) + distributedLegacyPurchases;
             
-            const COGS = initialInv + distributedPurchases - finalInv;
+            const COGS = initialInv + totalPurchases - finalInv;
             const grossProfit = data.totalIncome - COGS;
             const netProfit = grossProfit - data.totalExpense;
 
@@ -203,7 +254,7 @@ const aggregateData = (data) => {
                 totalExpense: data.totalExpense,
                 initialInventory: initialInv,
                 finalInventory: finalInv,
-                totalPurchases: distributedPurchases,
+                totalPurchases: totalPurchases,
                 COGS: COGS,
                 grossProfit: grossProfit,
                 netProfit: netProfit,
@@ -216,6 +267,8 @@ const aggregateData = (data) => {
         const totalInitialInv = branchEntries.reduce((sum, b) => sum + (b.initialInventory || 0), 0);
         const totalFinalInv = branchEntries.reduce((sum, b) => sum + (b.finalInventory || 0), 0);
         const totalExpenseMonth = branchEntries.reduce((sum, b) => sum + b.totalExpense, 0);
+        const totalDirectPurchasesMonth = branchEntriesArray.reduce((sum, branchData) => sum + (branchData.totalPurchases || 0), 0);
+        const totalPurchasesGlobal = totalDirectPurchasesMonth + totalLegacyPurchases;
         const COGS_consolidado = totalInitialInv + totalPurchasesGlobal - totalFinalInv;
 
         branchEntries.push({
@@ -225,6 +278,7 @@ const aggregateData = (data) => {
             isConsolidated: true,
             totalIncome: totalIncomeMonth,
             totalExpense: totalExpenseMonth,
+            totalPurchases: totalPurchasesGlobal,
             COGS: COGS_consolidado,
             expenseDetails: [], 
             rawExpenses: branchEntries.reduce((acc, b) => [...acc, ...b.rawExpenses], []),
@@ -238,7 +292,6 @@ const aggregateData = (data) => {
 export default function Reports({ data }) {
     const [activeTab, setActiveTab] = useState('Resultados');
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7));
-    const [selectedBranch, setSelectedBranch] = useState(null);
     const [expandedCategories, setExpandedCategories] = useState([]);
 
     const aggregatedData = useMemo(() => aggregateData(data), [data]);
@@ -248,18 +301,9 @@ export default function Reports({ data }) {
         return months.sort((a, b) => b.localeCompare(a));
     }, [aggregatedData]);
     
-    const availableBranches = useMemo(() => {
-        const branches = [...new Set(aggregatedData.map(d => d.branchId))].filter(id => id !== 'consolidado'); 
-        return branches.map(id => ({ id, name: branchName(id) }));
-    }, [aggregatedData]);
-
     const filteredReport = useMemo(() => {
-        return aggregatedData.filter(d => {
-            const monthMatch = selectedMonth ? d.month === selectedMonth : true;
-            let branchMatch = selectedBranch ? d.branchId === selectedBranch : true;
-            return monthMatch && branchMatch;
-        });
-    }, [aggregatedData, selectedMonth, selectedBranch]);
+        return aggregatedData.filter(d => selectedMonth ? d.month === selectedMonth : true);
+    }, [aggregatedData, selectedMonth]);
 
     let totalIncome = 0;
     let totalExpenses = 0;
@@ -271,7 +315,7 @@ export default function Reports({ data }) {
     let finalExpenseRows = [];
 
     if (filteredReport.length > 0) {
-        const d = selectedBranch ? filteredReport[0] : filteredReport.find(x => x.branchId === 'consolidado');
+        const d = filteredReport.find(x => x.branchId === 'consolidado');
         if (d) {
             totalIncome = d.totalIncome;
             totalExpenses = d.totalExpense;
@@ -286,9 +330,9 @@ export default function Reports({ data }) {
             
             const expenseMap = {};
             allCategories.forEach(cat => {
-                const realAmount = selectedBranch 
-                    ? (filteredReport[0].expenseDetails.find(ed => ed[0] === cat)?.[1] || 0)
-                    : filteredReport.filter(x => !x.isConsolidated).reduce((acc, curr) => acc + (curr.expenseDetails.find(ed => ed[0] === cat)?.[1] || 0), 0);
+                const realAmount = filteredReport
+                    .filter(x => !x.isConsolidated)
+                    .reduce((acc, curr) => acc + (curr.expenseDetails.find(ed => ed[0] === cat)?.[1] || 0), 0);
                 
                 expenseMap[cat] = realAmount;
             });
@@ -385,7 +429,7 @@ export default function Reports({ data }) {
                         <div className="space-y-6">
                             {/* FILTROS */}
                             <FadeIn delay={200}>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
                                     <Select
                                         label="Periodo de Análisis"
                                         icon="calendar"
@@ -397,23 +441,6 @@ export default function Reports({ data }) {
                                         options={availableMonths.map(month => (
                                             <option key={month} value={month}>{month}</option>
                                         ))}
-                                    />
-                                    <Select
-                                        label="Unidad de Negocio"
-                                        icon="building"
-                                        value={selectedBranch || ''}
-                                        onChange={(e) => {
-                                            setSelectedBranch(e.target.value || null);
-                                            setExpandedCategories([]);
-                                        }}
-                                        options={
-                                            <>
-                                                <option value="">Consolidado Global</option>
-                                                {availableBranches.map(branch => (
-                                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
-                                                ))}
-                                            </>
-                                        }
                                     />
                                 </div>
                             </FadeIn>

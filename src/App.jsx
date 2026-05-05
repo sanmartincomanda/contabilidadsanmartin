@@ -1,12 +1,11 @@
 // src/App.jsx 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { db } from './firebase'; 
 import { collection, query, onSnapshot } from 'firebase/firestore'; 
 
 // Importación de constantes y contextos
-import { BRANCHES } from './constants'; 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './components/Login';
@@ -19,6 +18,7 @@ import { BankReconciliation } from './components/BankReconciliation';
 import Reports from './components/Reports';
 import CategoryManager from './components/CategoryManager';
 import { AccountsPayable } from './components/AccountsPayable';
+import { runOneBranchMigration } from './services/oneBranchMigration';
 
 const Dashboard = () => (
     <div className="p-8 bg-white rounded-xl shadow-lg">
@@ -33,7 +33,6 @@ const useAppData = (
         'ingresos', 
         'gastos', 
         'categorias', 
-        'branches', 
         'inventarios', 
         'compras', 
         'presupuestos', 
@@ -89,6 +88,7 @@ const useAppData = (
 function AppContent() {
     const { data: appData, loading: dataLoading, dataIsPopulated } = useAppData();
     const { user } = useAuth();
+    const migrationAttemptedRef = useRef(false);
 
     // LÓGICA DE PERMISOS ACTUALIZADA
     const isLimitedUser = user?.email === "adriandiazc95@gmail.com";
@@ -96,9 +96,23 @@ function AppContent() {
    const hasDailyExpensesAccess = true;
    
 
-
     const categoriesList = appData.categorias || [];
-    const branchesList = appData.branches?.length > 0 ? appData.branches : BRANCHES;
+    useEffect(() => {
+        if (!user || !isAdmin || dataLoading || !dataIsPopulated || migrationAttemptedRef.current) return;
+
+        migrationAttemptedRef.current = true;
+
+        runOneBranchMigration(appData)
+            .then((result) => {
+                if (result.operations > 0) {
+                    console.info('Migracion unificada completada:', result);
+                }
+            })
+            .catch((error) => {
+                migrationAttemptedRef.current = false;
+                console.error('Error ejecutando migracion unificada:', error);
+            });
+    }, [user, isAdmin, dataLoading, dataIsPopulated, appData]);
 
     if (dataLoading) {
         return (
@@ -131,14 +145,14 @@ function AppContent() {
                     <Route 
                         path="/ingresar" 
                         element={<PrivateRoute 
-                            element={isAdmin ? <DataEntry data={appData} categories={categoriesList} branches={branchesList} /> : <Navigate to="/cuentas-pagar" />} 
+                            element={isAdmin ? <DataEntry data={appData} categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} 
                         />} 
                     />
                     
                     <Route 
                      path="/gastos-diarios" 
                      element={<PrivateRoute 
-                        element={<GastosDiarios categories={categoriesList} branches={branchesList} />} 
+                        element={<GastosDiarios categories={categoriesList} />} 
                         />} 
                         />
                     

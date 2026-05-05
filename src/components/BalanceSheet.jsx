@@ -39,6 +39,11 @@ export default function BalanceSheet({ data }) {
         const ingresos = data?.ingresos || [];
         const compras = data?.compras || [];
         const gastos = data?.gastos || [];
+        const mirroredFacturaIds = new Set(
+            compras
+                .map((compra) => compra.sourceFacturaId || compra.linkedPayableId || (compra.id?.startsWith('credito_') ? compra.id.replace('credito_', '') : ''))
+                .filter(Boolean)
+        );
 
         // --- LÓGICA DEL ESTADO DE RESULTADOS (Idéntica a tu reporte) ---
         
@@ -49,14 +54,23 @@ export default function BalanceSheet({ data }) {
 
         // B. Cálculo del Costo de Venta Real (Inventario Inicial + Compras - Inv Final)
         const invDelMes = inventarios.filter(i => i.month === mesPasadoStr);
-        const invInicial = invDelMes.find(i => i.type === 'inicial')?.amount || 0;
-        const invFinal = invDelMes.find(i => i.type === 'final')?.amount || 0;
+        const invInicial = invDelMes
+            .filter(i => i.type === 'inicial')
+            .reduce((acc, i) => acc + (peso(i.amount) || 0), 0);
+        const invFinal = invDelMes
+            .filter(i => i.type === 'final')
+            .reduce((acc, i) => acc + (peso(i.amount) || 0), 0);
         
         const comprasMes = compras
             .filter(c => c.month === mesPasadoStr || (c.date && c.date.startsWith(mesPasadoStr)))
             .reduce((acc, c) => acc + (peso(c.amount) || 0), 0);
 
-        const costoDeVenta = peso(invInicial) + comprasMes - peso(invFinal);
+        const comprasCreditoMes = facturasPagar
+            .filter(f => !f.id || !mirroredFacturaIds.has(f.id))
+            .filter(f => (f.month && f.month === mesPasadoStr) || (f.fecha && f.fecha.startsWith(mesPasadoStr)))
+            .reduce((acc, f) => acc + (peso(f.monto) || 0), 0);
+
+        const costoDeVenta = peso(invInicial) + comprasMes + comprasCreditoMes - peso(invFinal);
 
         // C. Gastos Operacionales
         const gastosMes = gastos

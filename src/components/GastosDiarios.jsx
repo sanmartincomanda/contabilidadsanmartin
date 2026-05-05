@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { 
     collection, addDoc, Timestamp, getDocs, doc, deleteDoc 
 } from 'firebase/firestore';
-import { fmt } from '../constants';
+import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -113,7 +113,7 @@ const Badge = ({ children, variant = 'default' }) => {
 
 // --- COMPONENTE PRINCIPAL: GASTOS DIARIOS ---
 
-export default function GastosDiarios({ categories = [], branches = [] }) {
+export default function GastosDiarios({ categories = [] }) {
     const [activeTab, setActiveTab] = useState('registro');
     const [loading, setLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -125,14 +125,13 @@ export default function GastosDiarios({ categories = [], branches = [] }) {
     const [monto, setMonto] = useState('');
     const [tipo, setTipo] = useState('Gasto');
     const [categoriaId, setCategoriaId] = useState('');
-    const [sucursal, setSucursal] = useState(branches?.[0]?.id || '');
 
     // Estados para el historial/reporte
     const [filtroFecha, setFiltroFecha] = useState(new Date().toISOString().substring(0, 10));
     const [filtroCaja, setFiltroCaja] = useState('todas');
     const [registros, setRegistros] = useState([]);
 
-    const CAJAS = ['Caja Carnes Amparito', 'Caja CSM Granada'];
+    const CAJAS = ['Caja Carnes Amparito'];
 
     // Cargar registros de gastos diarios - SIN ÍNDICES (funciona inmediatamente)
     const cargarRegistros = useCallback(async () => {
@@ -185,7 +184,7 @@ export default function GastosDiarios({ categories = [], branches = [] }) {
         e.preventDefault();
         const numMonto = Number(monto);
         if (isNaN(numMonto) || numMonto <= 0) return alert('Monto inválido.');
-        if (!descripcion || !sucursal) return alert('Complete todos los campos.');
+        if (!descripcion) return alert('Complete todos los campos.');
         if (tipo === 'Gasto' && !categoriaId) return alert('Categoría requerida para gastos.');
 
         setLoading(true);
@@ -199,7 +198,8 @@ export default function GastosDiarios({ categories = [], branches = [] }) {
                 monto: numMonto, 
                 tipo, 
                 categoria: categoriaNombre || null, 
-                sucursal,
+                sucursal: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
                 timestamp: Timestamp.now()
             });
 
@@ -209,7 +209,8 @@ export default function GastosDiarios({ categories = [], branches = [] }) {
                     description: `${descripcion} (Caja: ${caja})`,
                     amount: numMonto,
                     category: categoriaNombre,
-                    branch: sucursal,
+                    branch: DEFAULT_BRANCH_ID,
+                    branchName: DEFAULT_BRANCH_NAME,
                     timestamp: Timestamp.now(),
                     is_conciled: false,
                     origen: 'gastosDiarios',
@@ -388,22 +389,12 @@ export default function GastosDiarios({ categories = [], branches = [] }) {
                                         />
                                     )}
                                     
-                                    <Select 
-                                        label="Sucursal" 
-                                        icon="building" 
-                                        value={sucursal} 
-                                        onChange={e => setSucursal(e.target.value)} 
-                                        required 
-                                        options={
-                                            <>
-                                                <option value="">Seleccionar...</option>
-                                                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                            </>
-                                        } 
-                                    />
+                                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                                        Todo queda unificado en {DEFAULT_BRANCH_NAME}.
+                                    </div>
                                     
                                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                                        <span className="font-bold">Nota:</span> Los <b>Gastos</b> afectan el Estado de Resultados y se registran también en el módulo de Gastos. Las <b>Compras</b> solo quedan aquí.
+                                        <span className="font-bold">Nota:</span> Los <b>Gastos</b> afectan el Estado de Resultados y se registran también en el módulo de Gastos. Las <b>Compras</b> solo quedan aquí, siempre bajo {DEFAULT_BRANCH_NAME}.
                                     </div>
                                     
                                     <Button 
@@ -434,7 +425,7 @@ export default function GastosDiarios({ categories = [], branches = [] }) {
                                     <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
                                         <h4 className="font-bold text-emerald-800 mb-2">Flujo de trabajo recomendado:</h4>
                                         <ol className="list-decimal ml-5 space-y-1">
-                                            <li>Selecciona la caja correcta</li>
+                                            <li>Trabaja siempre sobre la caja unificada de Carnes Amparito</li>
                                             <li>Ingresa todos los gastos del día</li>
                                             <li>Revisa el reporte en la pestaña "Reporte / Historial"</li>
                                             <li>Imprime el cierre de caja si es necesario</li>
