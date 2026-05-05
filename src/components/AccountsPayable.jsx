@@ -263,6 +263,15 @@ export function AccountsPayable({ data }) {
     const [montoAbono, setMontoAbono] = useState('');
     const [proveedorSeleccionado, setProveedorSeleccionado] = useState('');
     const [montoPrevisualizado, setMontoPrevisualizado] = useState(0);
+    const [paymentMethod, setPaymentMethod] = useState('transferencia');
+
+    const closeModalAbono = useCallback(() => {
+        setShowModalAbono(false);
+        setSelectedFacturas([]);
+        setMontoAbono('');
+        setMontoPrevisualizado(0);
+        setPaymentMethod('transferencia');
+    }, []);
 
     // Calcular monto previsualizado
     useEffect(() => {
@@ -295,9 +304,12 @@ export function AccountsPayable({ data }) {
 
         setLoading(true);
         try {
+            const fechaAbono = new Date().toISOString().substring(0, 10);
             const q = query(collection(db, 'abonos_pagar'), orderBy('secuencia', 'desc'), limit(1));
             const snap = await getDocs(q);
             const nuevaSecuencia = snap.empty ? 1 : (snap.docs[0].data().secuencia + 1);
+            const abonoRef = doc(collection(db, 'abonos_pagar'));
+            const gastoDiarioRef = paymentMethod === 'efectivo' ? doc(collection(db, 'gastosDiarios')) : null;
 
             await runTransaction(db, async (transaction) => {
                 let restante = montoTotalAbono;
@@ -307,7 +319,7 @@ export function AccountsPayable({ data }) {
                 for (const fId of selectedFacturas) {
                     const ref = doc(db, 'cuentas_por_pagar', fId);
                     const snapshot = await transaction.get(ref);
-                    if (!snapshot.exists()) throw "Una factura no existe";
+                    if (!snapshot.exists()) throw new Error('Una factura no existe');
                     refsYDocs.push({ ref, snapshot, data: snapshot.data() });
                 }
 
@@ -327,24 +339,41 @@ export function AccountsPayable({ data }) {
                     restante = Number((restante - pagoParaEstaFactura).toFixed(2));
                 }
 
-                transaction.set(doc(collection(db, 'abonos_pagar')), {
-                    fecha: new Date().toISOString().substring(0, 10),
+                transaction.set(abonoRef, {
+                    fecha: fechaAbono,
                     montoTotal: montoTotalAbono,
                     proveedor: proveedorSeleccionado,
                     secuencia: nuevaSecuencia,
+                    paymentMethod,
+                    linkedGastoDiarioId: gastoDiarioRef?.id || null,
                     detalleAfectado: facturasAfectadas,
                     timestamp: Timestamp.now()
                 });
+
+                if (gastoDiarioRef) {
+                    transaction.set(gastoDiarioRef, {
+                        fecha: fechaAbono,
+                        caja: 'Caja Carnes Amparito',
+                        descripcion: `ABONO A PROVEEDOR ${proveedorSeleccionado}`,
+                        monto: montoTotalAbono,
+                        tipo: 'ABONO',
+                        categoria: 'ABONO',
+                        sucursal: DEFAULT_BRANCH_ID,
+                        branch: DEFAULT_BRANCH_ID,
+                        branchName: DEFAULT_BRANCH_NAME,
+                        origen: 'abonos_pagar',
+                        linkedAbonoId: abonoRef.id,
+                        paymentMethod,
+                        timestamp: Timestamp.now()
+                    });
+                }
             });
-            setShowModalAbono(false);
-            setMontoAbono('');
-            setSelectedFacturas([]);
-            setMontoPrevisualizado(0);
+            closeModalAbono();
         } catch (e) { 
             alert("Error: " + e.message); 
         }
         setLoading(false);
-    }, [montoAbono, selectedFacturas, proveedorSeleccionado]);
+    }, [closeModalAbono, montoAbono, paymentMethod, selectedFacturas, proveedorSeleccionado]);
 
     const handleDeleteAbono = useCallback(async (abonoDoc) => {
         if (!window.confirm(`¿Anular abono #${abonoDoc.secuencia}?`)) return;
@@ -366,6 +395,9 @@ export function AccountsPayable({ data }) {
                         saldo: nuevoSaldo,
                         estado: nuevoSaldo >= dataF.monto ? 'pendiente' : 'parcial'
                     });
+                }
+                if (abonoDoc.paymentMethod === 'efectivo' && abonoDoc.linkedGastoDiarioId) {
+                    transaction.delete(doc(db, 'gastosDiarios', abonoDoc.linkedGastoDiarioId));
                 }
                 transaction.delete(doc(db, 'abonos_pagar', abonoDoc.id));
             });
@@ -582,7 +614,11 @@ export function AccountsPayable({ data }) {
                                             <Button 
                                                 variant="success" 
                                                 onClick={() => { 
-                                                    setProveedorSeleccionado(prov); 
+                                                    setProveedorSeleccionado(prov);
+                                                    setSelectedFacturas([]);
+                                                    setMontoAbono('');
+                                                    setMontoPrevisualizado(0);
+                                                    setPaymentMethod('transferencia');
                                                     setShowModalAbono(true); 
                                                 }}
                                                 className="flex items-center gap-2"
@@ -663,6 +699,7 @@ export function AccountsPayable({ data }) {
                                                 <th className="p-4 text-left font-bold text-slate-600">Recibo #</th>
                                                 <th className="p-4 text-left font-bold text-slate-600">Fecha</th>
                                                 <th className="p-4 text-left font-bold text-slate-600">Proveedor</th>
+                                                <th className="p-4 text-left font-bold text-slate-600">Metodo</th>
                                                 <th className="p-4 text-right font-bold text-slate-600">Monto Abonado</th>
                                                 <th className="p-4 text-center font-bold text-slate-600">Acciones</th>
                                             </tr>
@@ -673,6 +710,11 @@ export function AccountsPayable({ data }) {
                                                     <td className="p-4 font-mono font-bold text-blue-600 text-lg">#{a.secuencia}</td>
                                                     <td className="p-4 text-slate-600">{a.fecha}</td>
                                                     <td className="p-4 font-bold text-slate-800">{a.proveedor}</td>
+                                                    <td className="p-4">
+                                                        <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
+                                                            {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                                                        </Badge>
+                                                    </td>
                                                     <td className="p-4 text-right font-black text-emerald-600 text-lg">{fmt(a.montoTotal)}</td>
                                                     <td className="p-4 text-center">
                                                         <button 
@@ -738,7 +780,7 @@ export function AccountsPayable({ data }) {
                 {showModalAbono && (
                     <div 
                         className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in"
-                        onClick={() => setShowModalAbono(false)}
+                        onClick={closeModalAbono}
                     >
                         <div 
                             className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar animate-slide-in"
@@ -750,7 +792,7 @@ export function AccountsPayable({ data }) {
                                     <p className="text-slate-500 font-medium">{proveedorSeleccionado}</p>
                                 </div>
                                 <button 
-                                    onClick={() => setShowModalAbono(false)}
+                                    onClick={closeModalAbono}
                                     className="p-2 hover:bg-slate-100 rounded-full transition-colors"
                                 >
                                     <Icon path={Icons.x} className="w-6 h-6 text-slate-400" />
@@ -869,16 +911,30 @@ export function AccountsPayable({ data }) {
                                 )}
                             </div>
 
+                            <div className="bg-white p-4 rounded-2xl border-2 border-slate-200 mb-6">
+                                <Select
+                                    label="Metodo de Pago"
+                                    value={paymentMethod}
+                                    onChange={e => setPaymentMethod(e.target.value)}
+                                    options={
+                                        <>
+                                            <option value="transferencia">Transferencia</option>
+                                            <option value="efectivo">Efectivo</option>
+                                        </>
+                                    }
+                                />
+                                <div className="mt-3 text-xs font-medium text-slate-500">
+                                    {paymentMethod === 'efectivo'
+                                        ? 'Este abono tambien se registrara en Gastos Diarios como ABONO para reflejar la salida de caja en efectivo.'
+                                        : 'La transferencia mantiene el flujo actual y no genera movimiento adicional en Gastos Diarios.'}
+                                </div>
+                            </div>
+
                             {/* BOTONES */}
                             <div className="flex gap-3">
                                 <Button
                                     variant="ghost"
-                                    onClick={() => {
-                                        setShowModalAbono(false);
-                                        setMontoAbono('');
-                                        setSelectedFacturas([]);
-                                        setMontoPrevisualizado(0);
-                                    }}
+                                    onClick={closeModalAbono}
                                     className="flex-1"
                                 >
                                     Cancelar

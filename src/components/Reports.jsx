@@ -3,7 +3,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { fmt, peso, branchName, resolveBranchId } from '../constants'; 
 import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
-import { resolveIncomeEntries } from '../services/incomeAggregation';
+import { resolveReportIncomeEntries } from '../services/incomeAggregation';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -123,7 +123,7 @@ const StatCard = ({ title, value, subtitle, icon, variant = 'default', trend }) 
 const aggregateData = (data) => {
     const results = {}; 
     const { ingresos = [], gastos = [], inventarios = [], compras = [], presupuestos = [], cuentas_por_pagar: facturasCredito = [] } = data;
-    const normalizedIngresos = resolveIncomeEntries(ingresos);
+    const normalizedIngresos = resolveReportIncomeEntries(ingresos);
 
     const getDateString = (firestoreDate, fallback = '') => {
         if (typeof firestoreDate === 'string') return firestoreDate;

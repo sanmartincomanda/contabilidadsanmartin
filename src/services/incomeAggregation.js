@@ -12,26 +12,39 @@ const normalizeAmount = (value) => Number(value ?? 0) || 0;
 export const getIncomeDate = (income) => normalizeDate(income?.date || income?.fecha || income?.timestamp);
 export const getIncomeAmount = (income) => normalizeAmount(income?.amount ?? income?.monto ?? income?.total);
 
-export const resolveIncomeEntries = (ingresos = []) => {
+const normalizeIncomeEntry = (income) => {
+    const date = getIncomeDate(income);
+    if (!date) return null;
+
+    const source = normalizeSource(income?.source);
+
+    return {
+        ...income,
+        date,
+        month: income?.month || date.substring(0, 7),
+        amount: getIncomeAmount(income),
+        description: income?.description || income?.detalle || (source === 'sicar' ? 'Ingreso diario SICAR' : 'Ingreso manual'),
+        reference: income?.reference || income?.referencia || '',
+        source,
+        sourceLabel: source === 'sicar' ? 'SICAR' : 'MANUAL',
+    };
+};
+
+export const resolveIncomeEntries = (ingresos = []) => (
+    ingresos
+        .map(normalizeIncomeEntry)
+        .filter(Boolean)
+);
+
+export const resolveReportIncomeEntries = (ingresos = []) => {
     const groupedByDate = new Map();
 
-    ingresos.forEach((income) => {
-        const date = getIncomeDate(income);
-        if (!date) return;
-
-        const source = normalizeSource(income.source);
-        const normalizedIncome = {
-            ...income,
-            date,
-            amount: getIncomeAmount(income),
-            source,
-        };
-
-        if (!groupedByDate.has(date)) {
-            groupedByDate.set(date, []);
+    resolveIncomeEntries(ingresos).forEach((income) => {
+        if (!groupedByDate.has(income.date)) {
+            groupedByDate.set(income.date, []);
         }
 
-        groupedByDate.get(date).push(normalizedIncome);
+        groupedByDate.get(income.date).push(income);
     });
 
     return Array.from(groupedByDate.values()).flatMap((items) => {
@@ -43,7 +56,7 @@ export const resolveIncomeEntries = (ingresos = []) => {
 export const sumIncomeForMonth = (ingresos = [], month) => {
     if (!month) return 0;
 
-    return resolveIncomeEntries(ingresos)
+    return resolveReportIncomeEntries(ingresos)
         .filter((income) => income.date?.startsWith(month))
         .reduce((total, income) => total + income.amount, 0);
 };

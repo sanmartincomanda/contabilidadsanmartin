@@ -252,7 +252,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
     );
 };
 
-const EditableList = ({ data, collectionName, fields, filterMonth, onFilterChange }) => {
+const EditableList = ({ data, collectionName, fields, filterValue, filterType = 'month', filterLabel = 'Filtrar por Mes', onFilterChange }) => {
     const [localData, setLocalData] = useState(data);
 
     useEffect(() => {
@@ -276,10 +276,13 @@ const EditableList = ({ data, collectionName, fields, filterMonth, onFilterChang
     const filteredData = useMemo(() => {
         let result = localData;
         
-        if (filterMonth) {
+        if (filterValue) {
             result = localData.filter(item => {
                 const itemDate = item.date || item.month || item.fecha || item.mes;
-                return itemDate && itemDate.substring(0, 7) === filterMonth;
+                if (!itemDate) return false;
+                return filterType === 'date'
+                    ? itemDate.substring(0, 10) === filterValue
+                    : itemDate.substring(0, 7) === filterValue;
             });
         }
         
@@ -288,7 +291,7 @@ const EditableList = ({ data, collectionName, fields, filterMonth, onFilterChang
             const dateB = getItemDate(b);
             return dateB - dateA;
         });
-    }, [localData, filterMonth]);
+    }, [localData, filterType, filterValue]);
 
     const hasData = filteredData && filteredData.length > 0;
 
@@ -296,10 +299,10 @@ const EditableList = ({ data, collectionName, fields, filterMonth, onFilterChang
         <div className="mt-6">
             {onFilterChange && (
                 <div className="mb-4 flex items-center gap-3">
-                    <label className="text-sm font-bold text-slate-600 uppercase">Filtrar por Mes:</label>
+                    <label className="text-sm font-bold text-slate-600 uppercase">{filterLabel}:</label>
                     <input
-                        type="month"
-                        value={filterMonth}
+                        type={filterType}
+                        value={filterValue}
                         onChange={(e) => onFilterChange(e.target.value)}
                         className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                     />
@@ -310,7 +313,7 @@ const EditableList = ({ data, collectionName, fields, filterMonth, onFilterChang
                 <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 text-slate-400 text-center">
                     <Icon path={Icons.alertCircle} className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                     <p className="font-medium">
-                        {filterMonth ? `No hay registros para ${filterMonth}` : "No hay registros recientes"}
+                        {filterValue ? `No hay registros para ${filterValue}` : "No hay registros recientes"}
                     </p>
                     <p className="text-sm mt-1">¡Empieza a registrar datos!</p>
                 </div>
@@ -348,6 +351,8 @@ const EditableList = ({ data, collectionName, fields, filterMonth, onFilterChang
 
 const IncomeForm = ({ loading, setLoading, onSuccess }) => {
     const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [description, setDescription] = useState('VENTA DEL DIA');
+    const [reference, setReference] = useState('');
     const [amount, setAmount] = useState('');
     const [syncDate, setSyncDate] = useState(new Date().toISOString().substring(0, 10));
     const [syncLoading, setSyncLoading] = useState(false);
@@ -355,6 +360,7 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const numAmount = Number(amount);
+        if (!description.trim()) return alert('Complete fecha, detalle y monto.');
         if (isNaN(numAmount) || numAmount <= 0) return alert('Monto inválido.');
 
         setLoading(true);
@@ -362,6 +368,8 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
             await addDoc(collection(db, 'ingresos'), {
                 date,
                 month: date.substring(0, 7),
+                description: description.trim().toUpperCase(),
+                reference: reference.trim().toUpperCase(),
                 amount: numAmount,
                 branch: DEFAULT_BRANCH_ID,
                 branchName: DEFAULT_BRANCH_NAME,
@@ -370,6 +378,8 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
                 timestamp: Timestamp.now(),
                 is_conciled: false,
             });
+            setDescription('VENTA DEL DIA');
+            setReference('');
             setAmount('');
             onSuccess?.();
         } catch (error) {
@@ -420,9 +430,11 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
             <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
                 <div>
                     <h4 className="text-sm font-bold text-slate-800">Ingreso manual</h4>
-                    <p className="text-xs text-slate-500">Usa este formulario cuando el dato no venga desde SICAR.</p>
+                    <p className="text-xs text-slate-500">Registra cada ingreso por dia con su detalle para que el historial quede mas claro.</p>
                 </div>
                 <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
+                <Input label="Detalle del ingreso" icon="fileText" placeholder="Ej: Venta del dia, deposito, transferencia..." value={description} onChange={e => setDescription(e.target.value)} required />
+                <Input label="Referencia" icon="receipt" placeholder="Ej: Cierre caja, deposito BAC, nota interna..." value={reference} onChange={e => setReference(e.target.value)} />
                 <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-emerald-600" value={amount} onChange={e => setAmount(e.target.value)} required />
                 <Button type="submit" variant="success" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Ingreso Manual'}</Button>
             </form>
@@ -705,7 +717,7 @@ export function DataEntry({ categories, data }) {
     const [refreshKey, setRefreshKey] = useState(0);
 
     const [filterMonth, setFilterMonth] = useState({
-        Ingresos: getCurrentMonth(),
+        Ingresos: new Date().toISOString().substring(0, 10),
         Gastos: getCurrentMonth(),
         Inventario: getCurrentMonth(),
         Compras: getCurrentMonth(),
@@ -724,6 +736,16 @@ export function DataEntry({ categories, data }) {
         'Patrimonio': { icon: 'scale', label: 'Patrimonio', color: 'emerald' }
     };
 
+    const filterConfig = {
+        Ingresos: { type: 'date', label: 'Filtrar por Dia' },
+        Gastos: { type: 'month', label: 'Filtrar por Mes' },
+        Inventario: { type: 'month', label: 'Filtrar por Mes' },
+        Compras: { type: 'month', label: 'Filtrar por Mes' },
+        Presupuesto: { type: 'month', label: 'Filtrar por Mes' },
+        'Cuentas por Cobrar': { type: 'month', label: 'Filtrar por Mes' },
+        Patrimonio: { type: 'month', label: 'Filtrar por Mes' },
+    };
+
     const handleSuccess = () => {
         setRefreshKey(prev => prev + 1);
     };
@@ -735,6 +757,8 @@ export function DataEntry({ categories, data }) {
     const fieldsConfig = {
         Ingresos: {
             date: { label: 'Fecha', type: 'date' },
+            description: { label: 'Detalle', type: 'text' },
+            reference: { label: 'Referencia', type: 'text' },
             sourceLabel: { label: 'Origen', type: 'text', readonly: true },
             amount: { label: 'Monto', type: 'currency' }
         },
@@ -789,6 +813,8 @@ export function DataEntry({ categories, data }) {
             return resolveIncomeEntries(data.ingresos || []).map((item) => ({
                 ...item,
                 date: item.date || item.fecha || '',
+                description: item.description || item.detalle || 'INGRESO DEL DIA',
+                reference: item.reference || item.referencia || '',
                 amount: Number(item.amount ?? item.monto ?? 0) || 0,
                 sourceLabel: item.source === 'sicar' ? 'SICAR' : 'MANUAL',
             }));
@@ -873,7 +899,9 @@ export function DataEntry({ categories, data }) {
                                 data={getListData()}
                                 collectionName={getCollectionName()}
                                 fields={fieldsConfig[activeTab]}
-                                filterMonth={filterMonth[activeTab]}
+                                filterValue={filterMonth[activeTab]}
+                                filterType={filterConfig[activeTab].type}
+                                filterLabel={filterConfig[activeTab].label}
                                 onFilterChange={(value) => handleFilterChange(activeTab, value)}
                             />
                         </Card>

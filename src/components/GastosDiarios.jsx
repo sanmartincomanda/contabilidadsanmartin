@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
 import { 
-    collection, addDoc, Timestamp, getDocs, doc, deleteDoc 
+    collection, Timestamp, getDocs, doc, deleteDoc, writeBatch
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 
@@ -189,34 +189,64 @@ export default function GastosDiarios({ categories = [] }) {
 
         setLoading(true);
         try {
-            const categoriaNombre = tipo === 'Gasto' ? categories.find(c => c.id === categoriaId)?.name : 'Compra';
-            
-            const docRef = await addDoc(collection(db, 'gastosDiarios'), {
-                fecha, 
-                caja, 
-                descripcion, 
-                monto: numMonto, 
-                tipo, 
-                categoria: categoriaNombre || null, 
+            const timestamp = Timestamp.now();
+            const categoriaNombre = tipo === 'Gasto'
+                ? categories.find(c => c.id === categoriaId)?.name
+                : 'Compra';
+            const gastoDiarioRef = doc(collection(db, 'gastosDiarios'));
+            const gastoRef = tipo === 'Gasto' ? doc(collection(db, 'gastos')) : null;
+            const compraRef = tipo === 'Compra' ? doc(collection(db, 'compras')) : null;
+            const batch = writeBatch(db);
+
+            batch.set(gastoDiarioRef, {
+                fecha,
+                caja,
+                descripcion,
+                monto: numMonto,
+                tipo,
+                categoria: categoriaNombre || null,
                 sucursal: DEFAULT_BRANCH_ID,
+                branch: DEFAULT_BRANCH_ID,
                 branchName: DEFAULT_BRANCH_NAME,
-                timestamp: Timestamp.now()
+                linkedExpenseId: gastoRef?.id || null,
+                linkedPurchaseId: compraRef?.id || null,
+                timestamp
             });
 
-            if (tipo === 'Gasto') {
-                await addDoc(collection(db, 'gastos'), {
+            if (gastoRef) {
+                batch.set(gastoRef, {
                     date: fecha,
                     description: `${descripcion} (Caja: ${caja})`,
                     amount: numMonto,
                     category: categoriaNombre,
                     branch: DEFAULT_BRANCH_ID,
                     branchName: DEFAULT_BRANCH_NAME,
-                    timestamp: Timestamp.now(),
+                    timestamp,
                     is_conciled: false,
                     origen: 'gastosDiarios',
-                    gastoDiarioId: docRef.id
+                    gastoDiarioId: gastoDiarioRef.id
                 });
             }
+
+            if (compraRef) {
+                batch.set(compraRef, {
+                    date: fecha,
+                    month: fecha.substring(0, 7),
+                    supplier: descripcion.trim().toUpperCase(),
+                    invoiceNumber: `GD-${gastoDiarioRef.id.slice(0, 8).toUpperCase()}`,
+                    amount: numMonto,
+                    branch: DEFAULT_BRANCH_ID,
+                    branchName: DEFAULT_BRANCH_NAME,
+                    paymentType: 'contado',
+                    isInventoryCost: true,
+                    description: `${descripcion} (Caja: ${caja})`,
+                    sourceCollection: 'gastosDiarios',
+                    sourceGastoDiarioId: gastoDiarioRef.id,
+                    timestamp
+                });
+            }
+
+            await batch.commit();
 
             setDescripcion(''); 
             setMonto(''); 
@@ -234,25 +264,47 @@ export default function GastosDiarios({ categories = [] }) {
     };
 
     // Eliminar registro
-    const handleEliminar = async (id, tipoRegistro) => {
+    const handleEliminar = async (registro) => {
+        if (registro.tipo === 'ABONO' && (registro.origen === 'abonos_pagar' || registro.linkedAbonoId)) {
+            return alert('Los abonos en efectivo se anulan desde Cuentas por Pagar.');
+        }
         if (!window.confirm('¿Eliminar este registro?')) return;
         
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'gastosDiarios', id));
+            await deleteDoc(doc(db, 'gastosDiarios', registro.id));
             
-            if (tipoRegistro === 'Gasto') {
+            if (registro.tipo === 'Gasto') {
                 // Buscar y eliminar el gasto relacionado en la colección 'gastos'
-                const gastosSnapshot = await getDocs(collection(db, 'gastos'));
+                if (registro.linkedExpenseId) {
+                    await deleteDoc(doc(db, 'gastos', registro.linkedExpenseId));
+                } else {
+                    const gastosSnapshot = await getDocs(collection(db, 'gastos'));
                 const gastosRelacionados = gastosSnapshot.docs.filter(
-                    doc => doc.data().gastoDiarioId === id
+                    doc => doc.data().gastoDiarioId === registro.id
                 );
                 
-                for (const gastoDoc of gastosRelacionados) {
-                    await deleteDoc(doc(db, 'gastos', gastoDoc.id));
+                    for (const gastoDoc of gastosRelacionados) {
+                        await deleteDoc(doc(db, 'gastos', gastoDoc.id));
+                    }
                 }
             }
             
+            if (registro.tipo === 'Compra') {
+                if (registro.linkedPurchaseId) {
+                    await deleteDoc(doc(db, 'compras', registro.linkedPurchaseId));
+                } else {
+                    const comprasSnapshot = await getDocs(collection(db, 'compras'));
+                    const comprasRelacionadas = comprasSnapshot.docs.filter(
+                        item => item.data().sourceGastoDiarioId === registro.id
+                    );
+
+                    for (const compraDoc of comprasRelacionadas) {
+                        await deleteDoc(doc(db, 'compras', compraDoc.id));
+                    }
+                }
+            }
+
             cargarRegistros();
         } catch (error) {
             console.error('Error al eliminar:', error);
@@ -265,7 +317,8 @@ export default function GastosDiarios({ categories = [] }) {
     // Calcular totales
     const totalGastos = registros.filter(r => r.tipo === 'Gasto').reduce((sum, r) => sum + (r.monto || 0), 0);
     const totalCompras = registros.filter(r => r.tipo === 'Compra').reduce((sum, r) => sum + (r.monto || 0), 0);
-    const totalGeneral = totalGastos + totalCompras;
+    const totalAbonos = registros.filter(r => r.tipo === 'ABONO').reduce((sum, r) => sum + (r.monto || 0), 0);
+    const totalGeneral = totalGastos + totalCompras + totalAbonos;
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -362,7 +415,7 @@ export default function GastosDiarios({ categories = [] }) {
                                             value={tipo} 
                                             onChange={e => { 
                                                 setTipo(e.target.value); 
-                                                if (e.target.value === 'Compra') setCategoriaId(''); 
+                                                if (e.target.value !== 'Gasto') setCategoriaId(''); 
                                             }} 
                                             options={
                                                 <>
@@ -480,7 +533,7 @@ export default function GastosDiarios({ categories = [] }) {
                                 </div>
 
                                 {/* Totales */}
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                                     <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
                                         <div className="text-xs font-bold text-rose-600 uppercase tracking-wider">Gastos</div>
                                         <div className="text-2xl font-black text-rose-700">{fmt(totalGastos)}</div>
@@ -488,6 +541,10 @@ export default function GastosDiarios({ categories = [] }) {
                                     <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-center">
                                         <div className="text-xs font-bold text-purple-600 uppercase tracking-wider">Compras</div>
                                         <div className="text-2xl font-black text-purple-700">{fmt(totalCompras)}</div>
+                                    </div>
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                                        <div className="text-xs font-bold text-amber-600 uppercase tracking-wider">Abonos</div>
+                                        <div className="text-2xl font-black text-amber-700">{fmt(totalAbonos)}</div>
                                     </div>
                                     <div className="bg-slate-800 rounded-xl p-4 text-center">
                                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total del Día</div>
@@ -527,7 +584,7 @@ export default function GastosDiarios({ categories = [] }) {
                                                             <td className="px-4 py-3 text-sm font-medium text-slate-700">{reg.caja}</td>
                                                             <td className="px-4 py-3 text-sm text-slate-800">{reg.descripcion}</td>
                                                             <td className="px-4 py-3">
-                                                                <Badge variant={reg.tipo === 'Gasto' ? 'danger' : 'purple'}>
+                                                                <Badge variant={reg.tipo === 'Gasto' ? 'danger' : reg.tipo === 'ABONO' ? 'warning' : 'purple'}>
                                                                     {reg.tipo}
                                                                 </Badge>
                                                             </td>
@@ -535,7 +592,7 @@ export default function GastosDiarios({ categories = [] }) {
                                                             <td className="px-4 py-3 text-right font-bold text-slate-800">{fmt(reg.monto)}</td>
                                                             <td className="px-4 py-3 text-center no-print">
                                                                 <button 
-                                                                    onClick={() => handleEliminar(reg.id, reg.tipo)} 
+                                                                    onClick={() => handleEliminar(reg)} 
                                                                     className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                                                                     disabled={loading}
                                                                 >
