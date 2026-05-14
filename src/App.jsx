@@ -1,31 +1,21 @@
-// src/App.jsx 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { db } from './firebase'; 
-import { collection, query, onSnapshot } from 'firebase/firestore'; 
+import { db } from './firebase';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 
-// Importación de constantes y contextos
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './components/Login';
-import Header from './components/Header'; 
+import Header from './components/Header';
 import GastosDiarios from './components/GastosDiarios';
-
-// COMPONENTES DE LA APLICACIÓN
 import { DataEntry } from './components/DataEntry';
-import { BankReconciliation } from './components/BankReconciliation'; 
+import { BankReconciliation } from './components/BankReconciliation';
 import Reports from './components/Reports';
 import CategoryManager from './components/CategoryManager';
 import { AccountsPayable } from './components/AccountsPayable';
 import { runOneBranchMigration } from './services/oneBranchMigration';
 
-const Dashboard = () => (
-    <div className="p-8 bg-white rounded-xl shadow-lg">
-      <h1 className="text-4xl font-extrabold text-blue-800">Panel de Control Principal</h1>
-      <p className="mt-4 text-gray-600">Utiliza la barra de navegación superior para acceder a tus módulos.</p>
-    </div>
-);
+const BRAND_LOGO = '/amparito-logo.jpeg';
 
 const APP_COLLECTIONS = [
     'ingresos',
@@ -40,17 +30,57 @@ const APP_COLLECTIONS = [
     'proveedores',
     'cuentasPorCobrar',
     'patrimonio',
-    'gastosDiarios'
+    'gastosDiarios',
 ];
 
-// --- Hook para cargar datos ---
-const useAppData = (
-    collections = APP_COLLECTIONS,
-    enabled = true
-) => {
+const Dashboard = () => (
+    <div className="overflow-hidden rounded-[2rem] border border-[#e6c9b8] bg-gradient-to-br from-[#fff8f2] via-white to-[#f7e5d9] shadow-[0_25px_80px_rgba(127,18,24,0.12)]">
+        <div className="grid gap-8 p-8 lg:grid-cols-[1.3fr_0.7fr] lg:p-12">
+            <div className="space-y-6">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#f2b635]/40 bg-[#fdf1d6] px-4 py-2 text-xs font-bold uppercase tracking-[0.35em] text-[#8a141b]">
+                    Carnes Amparito
+                </div>
+                <div className="space-y-3">
+                    <h1 className="text-4xl font-black leading-tight text-[#7f1218] lg:text-5xl">
+                        Centro Contable y de Gestion
+                    </h1>
+                    <p className="max-w-2xl text-base font-medium leading-7 text-[#5f4540] lg:text-lg">
+                        Administra ingresos, costos, cuentas por pagar y reportes con una imagen alineada a la historia y calidad de Carnes Amparito.
+                    </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-[#ead6ca] bg-white/80 p-4">
+                        <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">Marca</div>
+                        <div className="mt-2 text-lg font-black text-[#7f1218]">Identidad Amparito</div>
+                    </div>
+                    <div className="rounded-2xl border border-[#ead6ca] bg-white/80 p-4">
+                        <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">Operacion</div>
+                        <div className="mt-2 text-lg font-black text-[#7f1218]">Caja y compras</div>
+                    </div>
+                    <div className="rounded-2xl border border-[#ead6ca] bg-white/80 p-4">
+                        <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">Control</div>
+                        <div className="mt-2 text-lg font-black text-[#7f1218]">Reportes claros</div>
+                    </div>
+                </div>
+            </div>
+            <div className="relative flex items-center justify-center">
+                <div className="absolute inset-8 rounded-full bg-[#a81d24]/10 blur-3xl" />
+                <div className="relative rounded-[2rem] border border-white/70 bg-white/90 p-4 shadow-2xl shadow-[#7f1218]/15">
+                    <img
+                        src={BRAND_LOGO}
+                        alt="Carnes Amparito"
+                        className="mx-auto h-auto w-full max-w-xs rounded-[1.5rem] object-cover"
+                    />
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
+const useAppData = (collections = APP_COLLECTIONS, enabled = true) => {
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(enabled);
-    
+
     useEffect(() => {
         if (!enabled || !db) {
             setData({});
@@ -60,9 +90,9 @@ const useAppData = (
 
         setData({});
         setLoading(true);
-        
+
         const unsubscribes = [];
-        let mounted = true; 
+        let mounted = true;
         const loadedCollections = new Set();
 
         const markCollectionAsLoaded = (collectionName) => {
@@ -74,43 +104,48 @@ const useAppData = (
             }
         };
 
-        collections.forEach(col => {
-            const q = query(collection(db, col)); 
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                if (!mounted) return; 
-                const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                setData(prev => ({ ...prev, [col]: list }));
-                markCollectionAsLoaded(col);
-            }, (error) => {
-                console.error(`Error en ${col}:`, error);
-                markCollectionAsLoaded(col);
-            });
+        collections.forEach((collectionName) => {
+            const q = query(collection(db, collectionName));
+            const unsubscribe = onSnapshot(
+                q,
+                (snapshot) => {
+                    if (!mounted) return;
+
+                    const list = snapshot.docs.map((item) => ({
+                        id: item.id,
+                        ...item.data(),
+                    }));
+
+                    setData((prev) => ({ ...prev, [collectionName]: list }));
+                    markCollectionAsLoaded(collectionName);
+                },
+                (error) => {
+                    console.error(`Error en ${collectionName}:`, error);
+                    markCollectionAsLoaded(collectionName);
+                }
+            );
+
             unsubscribes.push(unsubscribe);
         });
-        
-        return () => { 
+
+        return () => {
             mounted = false;
-            unsubscribes.forEach(unsub => unsub());
+            unsubscribes.forEach((unsubscribe) => unsubscribe());
         };
-    }, [collections, enabled]); 
-    
+    }, [collections, enabled]);
+
     return { data, loading, dataIsPopulated: Object.keys(data).length > 0 };
 };
 
-// Componente para manejar las rutas y la lógica de usuario
 function AppContent() {
     const { user } = useAuth();
     const { data: appData, loading: dataLoading, dataIsPopulated } = useAppData(undefined, !!user);
     const migrationAttemptedRef = useRef(false);
 
-    // LÓGICA DE PERMISOS ACTUALIZADA
-    const isLimitedUser = user?.email === "adriandiazc95@gmail.com";
+    const isLimitedUser = user?.email === 'adriandiazc95@gmail.com';
     const isAdmin = !isLimitedUser;
-   const hasDailyExpensesAccess = true;
-   
-
     const categoriesList = appData.categorias || [];
+
     useEffect(() => {
         if (!user || !isAdmin || dataLoading || !dataIsPopulated || migrationAttemptedRef.current) return;
 
@@ -141,17 +176,36 @@ function AppContent() {
 
     if (dataLoading) {
         return (
-            <div className="flex justify-center items-center min-h-screen bg-gray-50 text-blue-600 font-medium">
-                Cargando datos de la SuperApp...
+            <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#fff8f3] px-6 text-center text-[#7f1218]">
+                <img
+                    src={BRAND_LOGO}
+                    alt="Carnes Amparito"
+                    className="h-28 w-28 rounded-[1.75rem] border border-[#edd5c5] bg-white p-2 shadow-xl shadow-[#7f1218]/10"
+                />
+                <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.45em] text-[#b98b2d]">Carnes Amparito</p>
+                    <p className="mt-3 text-2xl font-black">Cargando informacion contable...</p>
+                </div>
             </div>
         );
     }
 
     if (!dataIsPopulated) {
         return (
-            <div className="flex flex-col justify-center items-center min-h-screen bg-red-50 p-4">
-                <h1 className="text-2xl font-bold text-red-800">🚨 ERROR DE CONEXIÓN</h1>
-                <button onClick={() => window.location.reload()} className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg">
+            <div className="flex min-h-screen flex-col items-center justify-center bg-[#fff4f1] p-6 text-center">
+                <img
+                    src={BRAND_LOGO}
+                    alt="Carnes Amparito"
+                    className="mb-6 h-32 w-32 rounded-[2rem] border border-[#f0d3c8] bg-white p-2 shadow-xl shadow-[#7f1218]/10"
+                />
+                <h1 className="text-3xl font-black text-[#8a141b]">Error de conexion</h1>
+                <p className="mt-3 max-w-md text-sm font-medium text-[#6f4d48]">
+                    No logramos cargar la informacion de Carnes Amparito. Revisa la conexion e intenta nuevamente.
+                </p>
+                <button
+                    onClick={() => window.location.reload()}
+                    className="mt-6 rounded-full bg-[#a81d24] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#a81d24]/25 transition hover:bg-[#8c171d]"
+                >
                     Reintentar
                 </button>
             </div>
@@ -160,53 +214,51 @@ function AppContent() {
 
     return (
         <>
-            <Header /> 
-            <main className="p-4">
+            <Header />
+            <main className="p-4 md:p-6">
                 <Routes>
                     <Route path="/login" element={<Navigate to="/" replace />} />
-                    
                     <Route path="/" element={<PrivateRoute element={<Dashboard />} />} />
-                    
-                    <Route 
-                        path="/ingresar" 
-                        element={<PrivateRoute 
-                            element={isAdmin ? <DataEntry data={appData} categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} 
-                        />} 
+                    <Route
+                        path="/ingresar"
+                        element={
+                            <PrivateRoute
+                                element={isAdmin ? <DataEntry data={appData} categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />}
+                            />
+                        }
                     />
-                    
-                    <Route 
-                     path="/gastos-diarios" 
-                     element={<PrivateRoute 
-                        element={<GastosDiarios categories={categoriesList} />} 
-                        />} 
-                        />
-                    
-                    <Route 
-                        path="/conciliacion" 
-                        element={<PrivateRoute 
-                            element={isAdmin ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} 
-                        />} 
+                    <Route
+                        path="/gastos-diarios"
+                        element={<PrivateRoute element={<GastosDiarios categories={categoriesList} />} />}
                     />
-
-                    <Route 
-                        path="/cuentas-pagar" 
-                        element={<PrivateRoute element={<AccountsPayable data={appData} />} />} 
+                    <Route
+                        path="/conciliacion"
+                        element={
+                            <PrivateRoute
+                                element={isAdmin ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />}
+                            />
+                        }
                     />
-
-                    <Route 
-                        path="/reportes" 
-                        element={<PrivateRoute 
-                            element={isAdmin ? <Reports data={appData} /> : <Navigate to="/cuentas-pagar" />} 
-                        />} 
+                    <Route
+                        path="/cuentas-pagar"
+                        element={<PrivateRoute element={<AccountsPayable data={appData} />} />}
                     />
-
-                    <Route 
-                        path="/maestros/categorias" 
-                        element={<PrivateRoute 
-                            element={isAdmin ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} 
-                        />} 
+                    <Route
+                        path="/reportes"
+                        element={
+                            <PrivateRoute
+                                element={isAdmin ? <Reports data={appData} /> : <Navigate to="/cuentas-pagar" />}
+                            />
+                        }
                     />
-                    
+                    <Route
+                        path="/maestros/categorias"
+                        element={
+                            <PrivateRoute
+                                element={isAdmin ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />}
+                            />
+                        }
+                    />
                     <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
             </main>

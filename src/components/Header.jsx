@@ -1,9 +1,9 @@
-// src/components/Header.jsx
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import React, { useState, useEffect, useRef } from 'react';
 
-// --- ICONOS SVG INLINE ---
+const BRAND_LOGO = '/amparito-logo.jpeg';
+
 const Icons = {
     home: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
     plus: "M12 4v16m8-8H4",
@@ -23,11 +23,14 @@ const Icons = {
     trendingDown: "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"
 };
 
-const Icon = ({ path, className = "w-5 h-5" }) => (
+const Icon = ({ path, className = 'w-5 h-5' }) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d={path} />
     </svg>
 );
+
+const dropdownBase =
+    'rounded-2xl border border-[#efd8c8] bg-white/95 shadow-2xl shadow-[#7f1218]/10 ring-1 ring-[#7f1218]/5 backdrop-blur';
 
 export default function Header() {
     const { user, logout } = useAuth();
@@ -38,14 +41,11 @@ export default function Header() {
     const [isScrolled, setIsScrolled] = useState(false);
     const dropdownRef = useRef(null);
 
-    // LÓGICA DE PERMISOS (Igual a App.jsx)
-    const isAdmin = user?.email !== "adriandiazc95@gmail.com";
-    const hasDailyExpensesAccess = user?.email === "adriandiazc95@gmail.com" || isAdmin;
+    const isAdmin = user?.email !== 'adriandiazc95@gmail.com';
+    const hasDailyExpensesAccess = user?.email === 'adriandiazc95@gmail.com' || isAdmin;
 
     useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 10);
-        };
+        const handleScroll = () => setIsScrolled(window.scrollY > 10);
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
@@ -56,6 +56,7 @@ export default function Header() {
                 setIsMenuOpen(false);
             }
         };
+
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
@@ -65,13 +66,11 @@ export default function Header() {
             await logout();
             navigate('/login');
         } catch (e) {
-            console.error("Error al cerrar sesión", e);
+            console.error('Error al cerrar sesion', e);
         }
     };
 
-    const isActive = (path) => {
-        return location.pathname === path || location.pathname.startsWith(path);
-    };
+    const isActive = (path) => location.pathname === path || location.pathname.startsWith(path);
 
     const handleDataEntryClick = (tab) => {
         navigate(`/ingresar?tab=${tab}`);
@@ -79,13 +78,14 @@ export default function Header() {
         setIsMobileMenuOpen(false);
     };
 
-    const NavLink = ({ to, children, icon, active = false }) => (
-        <Link 
-            to={to} 
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
-                active 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' 
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+    const NavLink = ({ to, children, icon, active = false, onClick }) => (
+        <Link
+            to={to}
+            onClick={onClick}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${
+                active
+                    ? 'bg-[#a81d24] text-white shadow-lg shadow-[#a81d24]/30'
+                    : 'text-[#f8ece2] hover:bg-white/10 hover:text-white'
             }`}
         >
             {icon && <Icon path={Icons[icon]} className="w-4 h-4" />}
@@ -98,12 +98,12 @@ export default function Header() {
 
         return (
             <div className="relative" ref={dropdownRef}>
-                <button 
-                    onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
+                <button
+                    onClick={() => setIsMenuOpen((prev) => !prev)}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${
                         isMenuOpen || location.pathname === '/ingresar'
-                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' 
-                            : 'text-slate-300 hover:text-white hover:bg-white/10'
+                            ? 'bg-[#f2b635] text-[#651317] shadow-lg shadow-[#f2b635]/25'
+                            : 'text-[#f8ece2] hover:bg-white/10 hover:text-white'
                     }`}
                 >
                     <Icon path={Icons.plus} className="w-4 h-4" />
@@ -112,55 +112,58 @@ export default function Header() {
                 </button>
 
                 {isMenuOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-56 rounded-2xl shadow-2xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden animate-fade-in">
-                        <div className="py-2">
-                            <button 
+                    <div className={`absolute left-0 top-full z-50 mt-3 w-64 overflow-hidden ${dropdownBase}`}>
+                        <div className="border-b border-[#f1dfd1] bg-[#fff8f2] px-4 py-3">
+                            <div className="text-xs font-bold uppercase tracking-[0.3em] text-[#b98b2d]">Carnes Amparito</div>
+                            <div className="mt-1 text-sm font-black text-[#7f1218]">Registro operativo</div>
+                        </div>
+                        <div className="p-2">
+                            <button
                                 onClick={() => handleDataEntryClick('Ingresos')}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left"
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[#5d413d] transition hover:bg-[#edf8f0] hover:text-[#166534]"
                             >
-                                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                    <Icon path={Icons.trendingUp} className="w-4 h-4 text-emerald-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e3f7e8] text-[#1e7a44]">
+                                    <Icon path={Icons.trendingUp} className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-bold">Ingresos</div>
-                                    <div className="text-xs text-slate-400">Registrar ventas</div>
+                                    <div className="font-black">Ingresos</div>
+                                    <div className="text-xs text-[#92736f]">Ventas y movimientos del dia</div>
                                 </div>
                             </button>
-                            <button 
+                            <button
                                 onClick={() => handleDataEntryClick('Gastos')}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors text-left"
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[#5d413d] transition hover:bg-[#fff0ef] hover:text-[#8a141b]"
                             >
-                                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                                    <Icon path={Icons.trendingDown} className="w-4 h-4 text-red-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fde2de] text-[#a81d24]">
+                                    <Icon path={Icons.trendingDown} className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-bold">Gastos</div>
-                                    <div className="text-xs text-slate-400">Registrar egresos</div>
+                                    <div className="font-black">Gastos</div>
+                                    <div className="text-xs text-[#92736f]">Egresos y pagos operativos</div>
                                 </div>
                             </button>
-                            <button 
+                            <button
                                 onClick={() => handleDataEntryClick('Inventario')}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[#5d413d] transition hover:bg-[#fff7e7] hover:text-[#8a5a11]"
                             >
-                                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                    <Icon path={Icons.wallet} className="w-4 h-4 text-blue-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fff0c8] text-[#b67812]">
+                                    <Icon path={Icons.wallet} className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-bold">Inventario</div>
-                                    <div className="text-xs text-slate-400">Control de stock</div>
+                                    <div className="font-black">Inventario</div>
+                                    <div className="text-xs text-[#92736f]">Control y valorizacion</div>
                                 </div>
                             </button>
-                            <div className="border-t border-slate-100 my-1"></div>
-                            <button 
+                            <button
                                 onClick={() => handleDataEntryClick('Presupuesto')}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-orange-50 hover:text-orange-700 transition-colors text-left"
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[#5d413d] transition hover:bg-[#fff5ee] hover:text-[#9a4a0e]"
                             >
-                                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                                    <Icon path={Icons.chart} className="w-4 h-4 text-orange-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ffe8d5] text-[#bb5d1f]">
+                                    <Icon path={Icons.chart} className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-bold">Presupuestos</div>
-                                    <div className="text-xs text-slate-400">Planificación</div>
+                                    <div className="font-black">Presupuesto</div>
+                                    <div className="text-xs text-[#92736f]">Planificacion mensual</div>
                                 </div>
                             </button>
                         </div>
@@ -180,84 +183,72 @@ export default function Header() {
                 .animate-fade-in { animation: fade-in 0.2s ease-out; }
             `}</style>
 
-            <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-                isScrolled 
-                    ? 'bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-slate-900/20' 
-                    : 'bg-slate-900'
-            }`}>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <Link to="/" className="flex items-center gap-3 group">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-shadow">
-                                <Icon path={Icons.wallet} className="w-6 h-6 text-white" />
+            <nav
+                className={`fixed left-0 right-0 top-0 z-50 transition-all duration-300 ${
+                    isScrolled
+                        ? 'bg-gradient-to-r from-[#2b1113]/95 via-[#5e1318]/95 to-[#8a141b]/95 shadow-2xl shadow-[#2b1113]/30 backdrop-blur-xl'
+                        : 'bg-gradient-to-r from-[#2b1113] via-[#5e1318] to-[#8a141b]'
+                }`}
+            >
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <div className="flex h-20 items-center justify-between">
+                        <Link to="/" className="group flex items-center gap-4">
+                            <div className="rounded-[1.4rem] border border-white/20 bg-[#fff7ef] p-1.5 shadow-lg shadow-black/10 transition group-hover:scale-[1.02]">
+                                <img
+                                    src={BRAND_LOGO}
+                                    alt="Carnes Amparito"
+                                    className="h-12 w-12 rounded-[1rem] object-cover"
+                                />
                             </div>
                             <div className="hidden sm:block">
-                                <span className="text-xl font-black text-white tracking-tight">Finanzas</span>
-                                <span className="text-xl font-black text-blue-400">App</span>
+                                <div className="text-lg font-black uppercase tracking-[0.28em] text-[#f2b635]">Carnes</div>
+                                <div className="-mt-1 text-2xl font-black text-white">Amparito</div>
+                                <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#f8d8c8]">
+                                    Centro contable
+                                </div>
                             </div>
                         </Link>
 
                         {user && (
-                            <div className="hidden md:flex items-center gap-1">
-                                <NavLink to="/" icon="home" active={isActive('/')}>
+                            <div className="hidden items-center gap-1 md:flex">
+                                <NavLink to="/" icon="home" active={location.pathname === '/'}>
                                     Inicio
                                 </NavLink>
 
                                 <DataEntryButton />
 
-                                {/* GASTOS DIARIOS: Visible para Admins y Adrián */}
                                 {hasDailyExpensesAccess && (
-                                    <NavLink 
-                                        to="/gastos-diarios" 
-                                        icon="cash" 
-                                        active={isActive('/gastos-diarios')}
-                                    >
+                                    <NavLink to="/gastos-diarios" icon="cash" active={isActive('/gastos-diarios')}>
                                         Gastos Diarios
                                     </NavLink>
                                 )}
 
-                                <NavLink 
-                                    to="/cuentas-pagar" 
-                                    icon="creditCard" 
-                                    active={isActive('/cuentas-pagar')}
-                                >
+                                <NavLink to="/cuentas-pagar" icon="creditCard" active={isActive('/cuentas-pagar')}>
                                     Cuentas por Pagar
                                 </NavLink>
 
                                 {isAdmin && (
                                     <>
-                                        <NavLink 
-                                            to="/conciliacion" 
-                                            icon="check" 
-                                            active={isActive('/conciliacion')}
-                                        >
-                                            Conciliación
+                                        <NavLink to="/conciliacion" icon="check" active={isActive('/conciliacion')}>
+                                            Conciliacion
                                         </NavLink>
-                                        <NavLink 
-                                            to="/reportes" 
-                                            icon="chart" 
-                                            active={isActive('/reportes')}
-                                        >
+                                        <NavLink to="/reportes" icon="chart" active={isActive('/reportes')}>
                                             Reportes
                                         </NavLink>
-                                        <NavLink 
-                                            to="/maestros/categorias" 
-                                            icon="tag" 
-                                            active={isActive('/maestros')}
-                                        >
-                                            Categorías
+                                        <NavLink to="/maestros/categorias" icon="tag" active={isActive('/maestros')}>
+                                            Categorias
                                         </NavLink>
                                     </>
                                 )}
 
-                                <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-700">
+                                <div className="ml-4 flex items-center gap-3 border-l border-white/15 pl-4">
                                     <div className="hidden lg:flex flex-col items-end">
-                                        <span className="text-sm font-bold text-white">{user.email.split('@')[0]}</span>
-                                        <span className="text-xs text-slate-400">{user.email}</span>
+                                        <span className="text-sm font-black text-white">{user.email.split('@')[0]}</span>
+                                        <span className="text-xs font-medium text-[#f3d3c2]">{user.email}</span>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={handleLogout}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl font-semibold text-sm transition-all duration-200 border border-red-500/20 hover:border-red-500 hover:shadow-lg hover:shadow-red-500/30"
+                                        className="flex items-center gap-2 rounded-xl border border-[#f2b635]/35 bg-[#f2b635]/12 px-4 py-2.5 text-sm font-bold text-[#ffe9b3] transition hover:bg-[#f2b635] hover:text-[#651317] hover:shadow-lg hover:shadow-[#f2b635]/20"
                                     >
                                         <Icon path={Icons.logout} className="w-4 h-4" />
                                         <span className="hidden sm:inline">Salir</span>
@@ -269,8 +260,8 @@ export default function Header() {
                         {user && (
                             <div className="md:hidden">
                                 <button
-                                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                                    className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                                    onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                                    className="rounded-xl border border-white/15 bg-white/5 p-2 text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
                                 >
                                     <Icon path={isMobileMenuOpen ? Icons.x : Icons.menu} className="w-6 h-6" />
                                 </button>
@@ -278,136 +269,138 @@ export default function Header() {
                         )}
 
                         {!user && (
-                            <Link 
-                                to="/login" 
-                                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/30"
+                            <Link
+                                to="/login"
+                                className="flex items-center gap-2 rounded-xl bg-[#f2b635] px-5 py-2.5 text-sm font-black uppercase tracking-[0.2em] text-[#651317] shadow-lg shadow-[#f2b635]/25 transition hover:bg-[#f6c24a]"
                             >
                                 <Icon path={Icons.user} className="w-4 h-4" />
-                                Iniciar Sesión
+                                Entrar
                             </Link>
                         )}
                     </div>
                 </div>
 
-                {/* MENÚ MÓVIL ACTUALIZADO */}
                 {isMobileMenuOpen && user && (
-                    <div className="md:hidden bg-slate-800/95 backdrop-blur-xl border-t border-slate-700 animate-fade-in">
-                        <div className="px-4 pt-2 pb-4 space-y-1">
-                            <Link 
-                                to="/" 
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
-                            >
-                                <Icon path={Icons.home} className="w-5 h-5" />
+                    <div className="animate-fade-in border-t border-white/10 bg-gradient-to-b from-[#531418]/95 to-[#2b1113]/95 backdrop-blur-xl md:hidden">
+                        <div className="space-y-1 px-4 pb-4 pt-3">
+                            <div className="mb-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <div className="flex items-center gap-3">
+                                    <img
+                                        src={BRAND_LOGO}
+                                        alt="Carnes Amparito"
+                                        className="h-12 w-12 rounded-[1rem] border border-white/15 object-cover"
+                                    />
+                                    <div>
+                                        <div className="text-sm font-black text-white">{user.email}</div>
+                                        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#f2b635]">
+                                            Carnes Amparito
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <NavLink to="/" icon="home" active={location.pathname === '/'} onClick={() => setIsMobileMenuOpen(false)}>
                                 Inicio
-                            </Link>
+                            </NavLink>
 
                             {isAdmin && (
                                 <>
-                                    <div className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Ingresar Datos</div>
-                                    <button 
+                                    <div className="px-4 pb-1 pt-3 text-[11px] font-bold uppercase tracking-[0.32em] text-[#f2b635]">
+                                        Ingresar datos
+                                    </div>
+                                    <button
                                         onClick={() => handleDataEntryClick('Ingresos')}
-                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm text-slate-300 hover:text-white hover:bg-white/10"
+                                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
                                     >
-                                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                            <Icon path={Icons.plus} className="w-4 h-4 text-emerald-400" />
-                                        </div>
+                                        <Icon path={Icons.trendingUp} className="w-5 h-5 text-[#6bd18f]" />
                                         Ingresos
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => handleDataEntryClick('Gastos')}
-                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm text-slate-300 hover:text-white hover:bg-white/10"
+                                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
                                     >
-                                        <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                                            <Icon path={Icons.plus} className="w-4 h-4 text-red-400" />
-                                        </div>
+                                        <Icon path={Icons.trendingDown} className="w-5 h-5 text-[#f2968f]" />
                                         Gastos
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => handleDataEntryClick('Inventario')}
-                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm text-slate-300 hover:text-white hover:bg-white/10"
+                                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
                                     >
-                                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                                            <Icon path={Icons.wallet} className="w-4 h-4 text-blue-400" />
-                                        </div>
+                                        <Icon path={Icons.wallet} className="w-5 h-5 text-[#f2b635]" />
                                         Inventario
+                                    </button>
+                                    <button
+                                        onClick={() => handleDataEntryClick('Presupuesto')}
+                                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
+                                    >
+                                        <Icon path={Icons.chart} className="w-5 h-5 text-[#ffdba2]" />
+                                        Presupuesto
                                     </button>
                                 </>
                             )}
 
-                            {/* GASTOS DIARIOS MÓVIL */}
                             {hasDailyExpensesAccess && (
-                                <Link 
-                                    to="/gastos-diarios" 
+                                <NavLink
+                                    to="/gastos-diarios"
+                                    icon="cash"
+                                    active={isActive('/gastos-diarios')}
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/gastos-diarios') ? 'bg-rose-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
                                 >
-                                    <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
-                                        <Icon path={Icons.cash} className="w-4 h-4 text-rose-400" />
-                                    </div>
                                     Gastos Diarios
-                                </Link>
+                                </NavLink>
                             )}
 
-                            <div className="border-t border-slate-700 my-2"></div>
-
-                            <Link 
-                                to="/cuentas-pagar" 
+                            <NavLink
+                                to="/cuentas-pagar"
+                                icon="creditCard"
+                                active={isActive('/cuentas-pagar')}
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/cuentas-pagar') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
                             >
-                                <Icon path={Icons.creditCard} className="w-5 h-5" />
                                 Cuentas por Pagar
-                            </Link>
+                            </NavLink>
 
                             {isAdmin && (
                                 <>
-                                    <Link 
-                                        to="/conciliacion" 
+                                    <NavLink
+                                        to="/conciliacion"
+                                        icon="check"
+                                        active={isActive('/conciliacion')}
                                         onClick={() => setIsMobileMenuOpen(false)}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/conciliacion') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
                                     >
-                                        <Icon path={Icons.check} className="w-5 h-5" />
-                                        Conciliación
-                                    </Link>
-                                    <Link 
-                                        to="/reportes" 
+                                        Conciliacion
+                                    </NavLink>
+                                    <NavLink
+                                        to="/reportes"
+                                        icon="chart"
+                                        active={isActive('/reportes')}
                                         onClick={() => setIsMobileMenuOpen(false)}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/reportes') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
                                     >
-                                        <Icon path={Icons.chart} className="w-5 h-5" />
                                         Reportes
-                                    </Link>
-                                    <Link 
-                                        to="/maestros/categorias" 
+                                    </NavLink>
+                                    <NavLink
+                                        to="/maestros/categorias"
+                                        icon="tag"
+                                        active={isActive('/maestros')}
                                         onClick={() => setIsMobileMenuOpen(false)}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm ${isActive('/maestros') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
                                     >
-                                        <Icon path={Icons.tag} className="w-5 h-5" />
-                                        Categorías
-                                    </Link>
+                                        Categorias
+                                    </NavLink>
                                 </>
                             )}
 
-                            <div className="border-t border-slate-700 my-2"></div>
-
-                            <div className="px-4 py-2">
-                                <div className="text-sm font-bold text-white mb-1">{user.email}</div>
-                                <button 
-                                    onClick={handleLogout}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 text-red-400 rounded-xl font-semibold text-sm border border-red-500/20"
-                                >
-                                    <Icon path={Icons.logout} className="w-4 h-4" />
-                                    Cerrar Sesión
-                                </button>
-                            </div>
+                            <button
+                                onClick={handleLogout}
+                                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#f2b635]/35 bg-[#f2b635]/12 px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-[#ffe9b3] transition hover:bg-[#f2b635] hover:text-[#651317]"
+                            >
+                                <Icon path={Icons.logout} className="w-4 h-4" />
+                                Cerrar sesion
+                            </button>
                         </div>
                     </div>
                 )}
             </nav>
-            
-            {/* SPACER */}
-            <div className="h-16"></div>
+
+            <div className="h-20" />
         </>
     );
 }
