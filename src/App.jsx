@@ -27,33 +27,52 @@ const Dashboard = () => (
     </div>
 );
 
+const APP_COLLECTIONS = [
+    'ingresos',
+    'gastos',
+    'categorias',
+    'inventarios',
+    'compras',
+    'presupuestos',
+    'cuentas_por_pagar',
+    'accountspayable',
+    'abonos_pagar',
+    'proveedores',
+    'cuentasPorCobrar',
+    'patrimonio',
+    'gastosDiarios'
+];
+
 // --- Hook para cargar datos ---
 const useAppData = (
-    collections = [
-        'ingresos', 
-        'gastos', 
-        'categorias', 
-        'inventarios', 
-        'compras', 
-        'presupuestos', 
-        'cuentas_por_pagar',
-        'accountspayable',
-        'abonos_pagar',
-        'proveedores',
-        'cuentasPorCobrar',
-        'patrimonio',
-        'gastosDiarios'
-    ]
+    collections = APP_COLLECTIONS,
+    enabled = true
 ) => {
     const [data, setData] = useState({});
-    const [loading, setLoading] = useState(true);
-    const [loadedCount, setLoadedCount] = useState(0); 
+    const [loading, setLoading] = useState(enabled);
     
     useEffect(() => {
-        if (!db) return;
+        if (!enabled || !db) {
+            setData({});
+            setLoading(false);
+            return;
+        }
+
+        setData({});
+        setLoading(true);
         
         const unsubscribes = [];
         let mounted = true; 
+        const loadedCollections = new Set();
+
+        const markCollectionAsLoaded = (collectionName) => {
+            if (loadedCollections.has(collectionName)) return;
+            loadedCollections.add(collectionName);
+
+            if (mounted && loadedCollections.size === collections.length) {
+                setLoading(false);
+            }
+        };
 
         collections.forEach(col => {
             const q = query(collection(db, col)); 
@@ -62,15 +81,10 @@ const useAppData = (
                 const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 setData(prev => ({ ...prev, [col]: list }));
-                
-                setLoadedCount(prev => {
-                    const newCount = prev + (prev < collections.length ? 1 : 0);
-                    if (newCount === collections.length && mounted) setLoading(false);
-                    return newCount;
-                });
+                markCollectionAsLoaded(col);
             }, (error) => {
                 console.error(`Error en ${col}:`, error);
-                setLoading(false);
+                markCollectionAsLoaded(col);
             });
             unsubscribes.push(unsubscribe);
         });
@@ -79,15 +93,15 @@ const useAppData = (
             mounted = false;
             unsubscribes.forEach(unsub => unsub());
         };
-    }, [collections.length]); 
+    }, [collections, enabled]); 
     
     return { data, loading, dataIsPopulated: Object.keys(data).length > 0 };
 };
 
 // Componente para manejar las rutas y la lógica de usuario
 function AppContent() {
-    const { data: appData, loading: dataLoading, dataIsPopulated } = useAppData();
     const { user } = useAuth();
+    const { data: appData, loading: dataLoading, dataIsPopulated } = useAppData(undefined, !!user);
     const migrationAttemptedRef = useRef(false);
 
     // LÓGICA DE PERMISOS ACTUALIZADA
@@ -114,6 +128,17 @@ function AppContent() {
             });
     }, [user, isAdmin, dataLoading, dataIsPopulated, appData]);
 
+    if (!user) {
+        return (
+            <main>
+                <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="*" element={<Navigate to="/login" replace />} />
+                </Routes>
+            </main>
+        );
+    }
+
     if (dataLoading) {
         return (
             <div className="flex justify-center items-center min-h-screen bg-gray-50 text-blue-600 font-medium">
@@ -138,7 +163,7 @@ function AppContent() {
             <Header /> 
             <main className="p-4">
                 <Routes>
-                    <Route path="/login" element={<Login />} />
+                    <Route path="/login" element={<Navigate to="/" replace />} />
                     
                     <Route path="/" element={<PrivateRoute element={<Dashboard />} />} />
                     
