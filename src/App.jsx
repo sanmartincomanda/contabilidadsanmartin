@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { db } from './firebase';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot, getDocs } from 'firebase/firestore';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -13,24 +13,33 @@ import { BankReconciliation } from './components/BankReconciliation';
 import Reports from './components/Reports';
 import CategoryManager from './components/CategoryManager';
 import { AccountsPayable } from './components/AccountsPayable';
-import { runOneBranchMigration } from './services/oneBranchMigration';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
-const APP_COLLECTIONS = [
+const DATA_ENTRY_COLLECTIONS = [
     'ingresos',
     'gastos',
     'categorias',
     'inventarios',
     'compras',
     'presupuestos',
-    'cuentas_por_pagar',
-    'accountspayable',
-    'abonos_pagar',
-    'proveedores',
     'cuentasPorCobrar',
     'patrimonio',
-    'gastosDiarios',
+];
+
+const ACCOUNTS_PAYABLE_COLLECTIONS = [
+    'cuentas_por_pagar',
+    'abonos_pagar',
+    'proveedores',
+];
+
+const REPORT_COLLECTIONS = [
+    'ingresos',
+    'gastos',
+    'inventarios',
+    'compras',
+    'presupuestos',
+    'cuentas_por_pagar',
 ];
 
 const Dashboard = () => (
@@ -77,19 +86,56 @@ const Dashboard = () => (
     </div>
 );
 
-const useAppData = (collections = APP_COLLECTIONS, enabled = true) => {
+const AppLoadingState = () => (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#fff8f3] px-6 text-center text-[#7f1218]">
+        <img
+            src={BRAND_LOGO}
+            alt="Carnes Amparito"
+            className="h-28 w-28 rounded-[1.75rem] border border-[#edd5c5] bg-white p-2 shadow-xl shadow-[#7f1218]/10"
+        />
+        <div>
+            <p className="text-xs font-bold uppercase tracking-[0.45em] text-[#b98b2d]">Carnes Amparito</p>
+            <p className="mt-3 text-2xl font-black">Cargando informacion contable...</p>
+        </div>
+    </div>
+);
+
+const AppErrorState = () => (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#fff4f1] p-6 text-center">
+        <img
+            src={BRAND_LOGO}
+            alt="Carnes Amparito"
+            className="mb-6 h-32 w-32 rounded-[2rem] border border-[#f0d3c8] bg-white p-2 shadow-xl shadow-[#7f1218]/10"
+        />
+        <h1 className="text-3xl font-black text-[#8a141b]">Error de conexion</h1>
+        <p className="mt-3 max-w-md text-sm font-medium text-[#6f4d48]">
+            No logramos cargar la informacion de Carnes Amparito. Revisa la conexion e intenta nuevamente.
+        </p>
+        <button
+            onClick={() => window.location.reload()}
+            className="mt-6 rounded-full bg-[#a81d24] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#a81d24]/25 transition hover:bg-[#8c171d]"
+        >
+            Reintentar
+        </button>
+    </div>
+);
+
+const useFirestoreCollections = (collections = [], enabled = true, live = true) => {
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(enabled);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (!enabled || !db) {
+        if (!enabled || !db || collections.length === 0) {
             setData({});
             setLoading(false);
+            setError(null);
             return;
         }
 
         setData({});
         setLoading(true);
+        setError(null);
 
         const unsubscribes = [];
         let mounted = true;
@@ -104,7 +150,33 @@ const useAppData = (collections = APP_COLLECTIONS, enabled = true) => {
             }
         };
 
+        const loadCollectionData = async (collectionName) => {
+            try {
+                const q = query(collection(db, collectionName));
+                const snapshot = await getDocs(q);
+                if (!mounted) return;
+
+                const list = snapshot.docs.map((item) => ({
+                    id: item.id,
+                    ...item.data(),
+                }));
+
+                setData((prev) => ({ ...prev, [collectionName]: list }));
+            } catch (collectionError) {
+                if (!mounted) return;
+                console.error(`Error en ${collectionName}:`, collectionError);
+                setError(collectionError);
+            } finally {
+                markCollectionAsLoaded(collectionName);
+            }
+        };
+
         collections.forEach((collectionName) => {
+            if (!live) {
+                loadCollectionData(collectionName);
+                return;
+            }
+
             const q = query(collection(db, collectionName));
             const unsubscribe = onSnapshot(
                 q,
@@ -119,8 +191,11 @@ const useAppData = (collections = APP_COLLECTIONS, enabled = true) => {
                     setData((prev) => ({ ...prev, [collectionName]: list }));
                     markCollectionAsLoaded(collectionName);
                 },
-                (error) => {
-                    console.error(`Error en ${collectionName}:`, error);
+                (collectionError) => {
+                    console.error(`Error en ${collectionName}:`, collectionError);
+                    if (mounted) {
+                        setError(collectionError);
+                    }
                     markCollectionAsLoaded(collectionName);
                 }
             );
@@ -132,36 +207,41 @@ const useAppData = (collections = APP_COLLECTIONS, enabled = true) => {
             mounted = false;
             unsubscribes.forEach((unsubscribe) => unsubscribe());
         };
-    }, [collections, enabled]);
+    }, [collections, enabled, live]);
 
-    return { data, loading, dataIsPopulated: Object.keys(data).length > 0 };
+    return { data, loading, error, dataIsPopulated: Object.keys(data).length > 0 };
 };
 
 function AppContent() {
     const { user } = useAuth();
-    const { data: appData, loading: dataLoading, dataIsPopulated } = useAppData(undefined, !!user);
-    const migrationAttemptedRef = useRef(false);
+    const location = useLocation();
 
     const isLimitedUser = user?.email === 'adriandiazc95@gmail.com';
     const isAdmin = !isLimitedUser;
-    const categoriesList = appData.categorias || [];
+    const currentPath = location.pathname;
+    const needsCategories = currentPath === '/ingresar' || currentPath === '/gastos-diarios' || currentPath.startsWith('/maestros/categorias');
+    const dataEntryEnabled = !!user && isAdmin && currentPath === '/ingresar';
+    const accountsPayableEnabled = !!user && currentPath === '/cuentas-pagar';
+    const reportsEnabled = !!user && isAdmin && currentPath === '/reportes';
+    const categoriesEnabled = !!user && needsCategories;
 
-    useEffect(() => {
-        if (!user || !isAdmin || dataLoading || !dataIsPopulated || migrationAttemptedRef.current) return;
-
-        migrationAttemptedRef.current = true;
-
-        runOneBranchMigration(appData)
-            .then((result) => {
-                if (result.operations > 0) {
-                    console.info('Migracion unificada completada:', result);
-                }
-            })
-            .catch((error) => {
-                migrationAttemptedRef.current = false;
-                console.error('Error ejecutando migracion unificada:', error);
-            });
-    }, [user, isAdmin, dataLoading, dataIsPopulated, appData]);
+    const { data: categoriesData } = useFirestoreCollections(['categorias'], categoriesEnabled, true);
+    const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(
+        DATA_ENTRY_COLLECTIONS,
+        dataEntryEnabled,
+        true
+    );
+    const { data: accountsPayableData, loading: accountsPayableLoading, error: accountsPayableError } = useFirestoreCollections(
+        ACCOUNTS_PAYABLE_COLLECTIONS,
+        accountsPayableEnabled,
+        true
+    );
+    const { data: reportsData, loading: reportsLoading, error: reportsError } = useFirestoreCollections(
+        REPORT_COLLECTIONS,
+        reportsEnabled,
+        false
+    );
+    const categoriesList = categoriesData.categorias || [];
 
     if (!user) {
         return (
@@ -171,44 +251,6 @@ function AppContent() {
                     <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
             </main>
-        );
-    }
-
-    if (dataLoading) {
-        return (
-            <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#fff8f3] px-6 text-center text-[#7f1218]">
-                <img
-                    src={BRAND_LOGO}
-                    alt="Carnes Amparito"
-                    className="h-28 w-28 rounded-[1.75rem] border border-[#edd5c5] bg-white p-2 shadow-xl shadow-[#7f1218]/10"
-                />
-                <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.45em] text-[#b98b2d]">Carnes Amparito</p>
-                    <p className="mt-3 text-2xl font-black">Cargando informacion contable...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!dataIsPopulated) {
-        return (
-            <div className="flex min-h-screen flex-col items-center justify-center bg-[#fff4f1] p-6 text-center">
-                <img
-                    src={BRAND_LOGO}
-                    alt="Carnes Amparito"
-                    className="mb-6 h-32 w-32 rounded-[2rem] border border-[#f0d3c8] bg-white p-2 shadow-xl shadow-[#7f1218]/10"
-                />
-                <h1 className="text-3xl font-black text-[#8a141b]">Error de conexion</h1>
-                <p className="mt-3 max-w-md text-sm font-medium text-[#6f4d48]">
-                    No logramos cargar la informacion de Carnes Amparito. Revisa la conexion e intenta nuevamente.
-                </p>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="mt-6 rounded-full bg-[#a81d24] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#a81d24]/25 transition hover:bg-[#8c171d]"
-                >
-                    Reintentar
-                </button>
-            </div>
         );
     }
 
@@ -223,7 +265,19 @@ function AppContent() {
                         path="/ingresar"
                         element={
                             <PrivateRoute
-                                element={isAdmin ? <DataEntry data={appData} categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />}
+                                element={
+                                    isAdmin ? (
+                                        dataEntryLoading ? (
+                                            <AppLoadingState />
+                                        ) : dataEntryError ? (
+                                            <AppErrorState />
+                                        ) : (
+                                            <DataEntry data={dataEntryData} categories={categoriesList} />
+                                        )
+                                    ) : (
+                                        <Navigate to="/cuentas-pagar" />
+                                    )
+                                }
                             />
                         }
                     />
@@ -241,13 +295,37 @@ function AppContent() {
                     />
                     <Route
                         path="/cuentas-pagar"
-                        element={<PrivateRoute element={<AccountsPayable data={appData} />} />}
+                        element={
+                            <PrivateRoute
+                                element={
+                                    accountsPayableLoading ? (
+                                        <AppLoadingState />
+                                    ) : accountsPayableError ? (
+                                        <AppErrorState />
+                                    ) : (
+                                        <AccountsPayable data={accountsPayableData} />
+                                    )
+                                }
+                            />
+                        }
                     />
                     <Route
                         path="/reportes"
                         element={
                             <PrivateRoute
-                                element={isAdmin ? <Reports data={appData} /> : <Navigate to="/cuentas-pagar" />}
+                                element={
+                                    isAdmin ? (
+                                        reportsLoading ? (
+                                            <AppLoadingState />
+                                        ) : reportsError ? (
+                                            <AppErrorState />
+                                        ) : (
+                                            <Reports data={reportsData} />
+                                        )
+                                    ) : (
+                                        <Navigate to="/cuentas-pagar" />
+                                    )
+                                }
                             />
                         }
                     />

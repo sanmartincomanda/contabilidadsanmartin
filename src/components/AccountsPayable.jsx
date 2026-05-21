@@ -6,6 +6,7 @@ import {
     query, orderBy, limit, getDocs, deleteDoc 
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
+import { deletePayableTransaction } from '../services/linkedTransactions';
 
 // --- ICONOS SVG INLINE ---
 const Icon = ({ path, className = "w-5 h-5" }) => (
@@ -407,6 +408,28 @@ export function AccountsPayable({ data }) {
         setLoading(false);
     }, []);
 
+    const handleDeleteFactura = useCallback(async (factura) => {
+        if (!window.confirm('Eliminar esta factura y su compra vinculada?')) return;
+
+        setLoading(true);
+        try {
+            const result = await deletePayableTransaction(factura.id);
+
+            if (result?.blocked) {
+                const abonosLabel = (result.blockingAbonos || [])
+                    .map((abono) => `#${abono.secuencia || abono.id}`)
+                    .join(', ');
+
+                alert(`No se puede eliminar esta factura porque ya tiene abono(s) ${abonosLabel}. Anulalos primero desde Historial Abonos.`);
+                return;
+            }
+        } catch (e) {
+            alert('Error: ' + e.message);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     const handleAddProveedor = useCallback(async (e) => {
         e.preventDefault();
         if (!nuevoProveedor.trim()) return;
@@ -660,10 +683,7 @@ export function AccountsPayable({ data }) {
                                                                 <td className="p-4 text-right font-black text-red-600 text-lg">{fmt(f.saldo)}</td>
                                                                 <td className="p-4 text-center">
                                                                     <button 
-                                                                        onClick={() => { 
-                                                                            if(window.confirm('¿Eliminar esta factura permanentemente?')) 
-                                                                                deleteDoc(doc(db, 'cuentas_por_pagar', f.id));
-                                                                        }}
+                                                                        onClick={() => handleDeleteFactura(f)}
                                                                         className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                                                     >
                                                                         <Icon path={Icons.trash} className="w-4 h-4" />

@@ -8,6 +8,7 @@ import Papa from 'papaparse';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../constants';
 import { resolveIncomeEntries } from '../services/incomeAggregation';
 import { syncSicarDailyIncome } from '../services/sicarIncomeSync';
+import { deletePurchaseTransaction } from '../services/linkedTransactions';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -128,12 +129,27 @@ const Badge = ({ children, variant = 'default' }) => {
     return <span className={`px-2 py-1 rounded-full text-xs font-bold ${variants[variant]}`}>{children}</span>;
 };
 
+const normalizeFilterText = (value) => (
+    String(value ?? '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+);
+
 // --- COMPONENTE: EDITABLE LIST (INTEGRADO) ---
 
 const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState(item);
     const [loading, setLoading] = useState(false);
+    const buildBlockingMessage = (blockingAbonos = []) => {
+        const abonosLabel = blockingAbonos
+            .map((abono) => `#${abono.secuencia || abono.id}`)
+            .join(', ');
+
+        return `No se puede eliminar esta compra porque la factura asociada ya tiene abono(s) ${abonosLabel}. Anulalos primero desde Cuentas por Pagar.`;
+    };
 
     const handleSave = async () => {
         setLoading(true);
@@ -166,7 +182,15 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
         if (!window.confirm("¿Eliminar este registro?")) return;
         setLoading(true);
         try {
-            await deleteDoc(doc(db, collectionName, item.id));
+            if (collectionName === 'compras') {
+                const result = await deletePurchaseTransaction(item.id);
+                if (result?.blocked) {
+                    alert(buildBlockingMessage(result.blockingAbonos));
+                    return;
+                }
+            } else {
+                await deleteDoc(doc(db, collectionName, item.id));
+            }
             onDelete(item.id);
         } catch (error) {
             console.error("Error al eliminar:", error);
@@ -252,7 +276,18 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
     );
 };
 
-const EditableList = ({ data, collectionName, fields, filterValue, filterType = 'month', filterLabel = 'Filtrar por Mes', onFilterChange }) => {
+const EditableList = ({
+    data,
+    collectionName,
+    fields,
+    filterValue,
+    filterType = 'month',
+    filterLabel = 'Filtrar por Mes',
+    onFilterChange,
+    advancedFilters = {},
+    advancedFilterConfig = [],
+    onAdvancedFiltersChange,
+}) => {
     const [localData, setLocalData] = useState(data);
 
     useEffect(() => {
@@ -273,6 +308,18 @@ const EditableList = ({ data, collectionName, fields, filterValue, filterType = 
         return new Date(dateStr);
     };
 
+    const getItemDateString = (item) => {
+        const dateStr = item.date || item.fecha || item.month || item.mes || '';
+        return String(dateStr);
+    };
+
+    const itemMatchesText = (item, keys = [], filterText = '') => {
+        const normalizedFilter = normalizeFilterText(filterText);
+        if (!normalizedFilter) return true;
+
+        return keys.some((key) => normalizeFilterText(item[key]).includes(normalizedFilter));
+    };
+
     const filteredData = useMemo(() => {
         let result = localData;
         
@@ -285,27 +332,75 @@ const EditableList = ({ data, collectionName, fields, filterValue, filterType = 
                     : itemDate.substring(0, 7) === filterValue;
             });
         }
+
+        if (advancedFilters.dateFrom) {
+            result = result.filter((item) => {
+                const itemDate = getItemDateString(item).substring(0, 10);
+                return itemDate && itemDate >= advancedFilters.dateFrom;
+            });
+        }
+
+        if (advancedFilters.dateTo) {
+            result = result.filter((item) => {
+                const itemDate = getItemDateString(item).substring(0, 10);
+                return itemDate && itemDate <= advancedFilters.dateTo;
+            });
+        }
+
+        advancedFilterConfig.forEach((filterField) => {
+            if (['dateFrom', 'dateTo'].includes(filterField.key)) return;
+            const fieldValue = advancedFilters[filterField.key];
+            if (!fieldValue) return;
+
+            result = result.filter((item) => itemMatchesText(item, filterField.keys || [filterField.key], fieldValue));
+        });
         
         return result.sort((a, b) => {
             const dateA = getItemDate(a);
             const dateB = getItemDate(b);
             return dateB - dateA;
         });
-    }, [localData, filterType, filterValue]);
+    }, [advancedFilterConfig, advancedFilters, filterType, filterValue, localData]);
 
     const hasData = filteredData && filteredData.length > 0;
 
     return (
         <div className="mt-6">
             {onFilterChange && (
-                <div className="mb-4 flex items-center gap-3">
-                    <label className="text-sm font-bold text-slate-600 uppercase">{filterLabel}:</label>
-                    <input
-                        type={filterType}
-                        value={filterValue}
-                        onChange={(e) => onFilterChange(e.target.value)}
-                        className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
-                    />
+                <div className="mb-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <label className="text-sm font-bold text-slate-600 uppercase">{filterLabel}:</label>
+                        <input
+                            type={filterType}
+                            value={filterValue}
+                            onChange={(e) => onFilterChange(e.target.value)}
+                            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                        {filterValue && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => onFilterChange('')}>
+                                Limpiar fecha rapida
+                            </Button>
+                        )}
+                    </div>
+
+                    {advancedFilterConfig.length > 0 && onAdvancedFiltersChange && (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            {advancedFilterConfig.map((filterField) => (
+                                <div key={filterField.key} className="space-y-1">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        {filterField.label}
+                                    </label>
+                                    <input
+                                        type={filterField.type || 'text'}
+                                        value={advancedFilters[filterField.key] || ''}
+                                        placeholder={filterField.placeholder || ''}
+                                        onChange={(e) => onAdvancedFiltersChange(filterField.key, e.target.value)}
+                                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
             
@@ -726,6 +821,16 @@ export function DataEntry({ categories, data }) {
         Patrimonio: getCurrentMonth(),
     });
 
+    const [advancedFilters, setAdvancedFilters] = useState({
+        Ingresos: { dateFrom: '', dateTo: '', search: '' },
+        Gastos: { dateFrom: '', dateTo: '', search: '' },
+        Inventario: {},
+        Compras: { dateFrom: '', dateTo: '', supplier: '', invoiceNumber: '' },
+        Presupuesto: {},
+        'Cuentas por Cobrar': {},
+        Patrimonio: {},
+    });
+
     const tabsConfig = {
         'Ingresos': { icon: 'trendingUp', label: 'Ingresos', color: 'emerald' },
         'Gastos': { icon: 'trendingDown', label: 'Gastos', color: 'rose' },
@@ -752,6 +857,16 @@ export function DataEntry({ categories, data }) {
 
     const handleFilterChange = (tab, value) => {
         setFilterMonth(prev => ({ ...prev, [tab]: value }));
+    };
+
+    const handleAdvancedFilterChange = (tab, key, value) => {
+        setAdvancedFilters((prev) => ({
+            ...prev,
+            [tab]: {
+                ...(prev[tab] || {}),
+                [key]: value,
+            },
+        }));
     };
 
     const fieldsConfig = {
@@ -796,6 +911,25 @@ export function DataEntry({ categories, data }) {
             description: { label: 'Descripción', type: 'text' },
             amount: { label: 'Monto', type: 'currency' }
         }
+    };
+
+    const advancedFilterConfig = {
+        Ingresos: [
+            { key: 'dateFrom', label: 'Desde', type: 'date' },
+            { key: 'dateTo', label: 'Hasta', type: 'date' },
+            { key: 'search', label: 'Detalle / Referencia', type: 'text', placeholder: 'Buscar ingreso...', keys: ['description', 'reference', 'sourceLabel'] },
+        ],
+        Gastos: [
+            { key: 'dateFrom', label: 'Desde', type: 'date' },
+            { key: 'dateTo', label: 'Hasta', type: 'date' },
+            { key: 'search', label: 'Descripcion / Categoria', type: 'text', placeholder: 'Buscar gasto...', keys: ['description', 'category'] },
+        ],
+        Compras: [
+            { key: 'dateFrom', label: 'Desde', type: 'date' },
+            { key: 'dateTo', label: 'Hasta', type: 'date' },
+            { key: 'supplier', label: 'Proveedor', type: 'text', placeholder: 'Buscar proveedor...', keys: ['supplier'] },
+            { key: 'invoiceNumber', label: 'No. Factura', type: 'text', placeholder: 'Buscar factura...', keys: ['invoiceNumber'] },
+        ],
     };
 
     const getListData = () => {
@@ -903,6 +1037,9 @@ export function DataEntry({ categories, data }) {
                                 filterType={filterConfig[activeTab].type}
                                 filterLabel={filterConfig[activeTab].label}
                                 onFilterChange={(value) => handleFilterChange(activeTab, value)}
+                                advancedFilters={advancedFilters[activeTab] || {}}
+                                advancedFilterConfig={advancedFilterConfig[activeTab] || []}
+                                onAdvancedFiltersChange={(key, value) => handleAdvancedFilterChange(activeTab, key, value)}
                             />
                         </Card>
                     </FadeIn>
