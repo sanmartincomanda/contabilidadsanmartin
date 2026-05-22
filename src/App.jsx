@@ -14,6 +14,7 @@ import Reports from './components/Reports';
 import CategoryManager from './components/CategoryManager';
 import { AccountsPayable } from './components/AccountsPayable';
 import { fmt } from './constants';
+import { resolveReportIncomeEntries } from './services/incomeAggregation';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
@@ -273,7 +274,7 @@ const Dashboard = ({ data = {} }) => {
     const greetingIcon = hour < 12 ? ICON.sun : hour < 18 ? ICON.sun : ICON.moon;
     const mesLabel = now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
-    const ingresos = data.ingresos || [];
+    const ingresos = resolveReportIncomeEntries(data.ingresos || []);
     const gastos = data.gastos || [];
     const compras = data.compras || [];
     const facturas = data.cuentas_por_pagar || [];
