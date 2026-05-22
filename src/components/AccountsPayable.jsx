@@ -1,9 +1,9 @@
 // src/components/AccountsPayable.jsx
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { 
+import {
     collection, addDoc, doc, Timestamp, runTransaction, writeBatch,
-    query, orderBy, limit, getDocs, deleteDoc 
+    query, orderBy, limit, getDocs, deleteDoc
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { deletePayableTransaction } from '../services/linkedTransactions';
@@ -31,13 +31,12 @@ const Icons = {
     receipt: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
     arrowRightCircle: "M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z",
     calculator: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z",
-    checkSquare: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
     square: "M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"
 };
 
-// --- ANIMACIONES CSS ---
+// --- ANIMACIONES ---
 const FadeIn = ({ children, delay = 0, className = "" }) => (
-    <div 
+    <div
         className={`animate-fade-in ${className}`}
         style={{ animationDelay: `${delay}ms`, animationFillMode: 'both' }}
     >
@@ -46,22 +45,20 @@ const FadeIn = ({ children, delay = 0, className = "" }) => (
 );
 
 const SlideIn = ({ children, className = "" }) => (
-    <div className={`animate-slide-in ${className}`}>
-        {children}
-    </div>
+    <div className={`animate-slide-in ${className}`}>{children}</div>
 );
 
 // --- COMPONENTES UI ---
 const Card = ({ title, children, className = "", right, icon }) => (
-    <div className={`rounded-2xl shadow-lg border border-slate-200/60 bg-white/80 backdrop-blur-xl overflow-hidden ${className}`}>
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white">
+    <div className={`rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden ${className}`}>
+        <div className="flex justify-between items-center px-6 py-4 border-b border-stone-100 bg-stone-50">
             <div className="flex items-center gap-3">
                 {icon && (
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                        <Icon path={Icons[icon]} className="w-5 h-5 text-blue-600" />
+                    <div className="p-2 bg-[#fff0f0] rounded-lg">
+                        <Icon path={Icons[icon]} className="w-4 h-4 text-[#a81d24]" />
                     </div>
                 )}
-                <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+                <h3 className="text-sm font-bold text-slate-800 tracking-tight">{title}</h3>
             </div>
             {right}
         </div>
@@ -71,18 +68,17 @@ const Card = ({ title, children, className = "", right, icon }) => (
 
 const Button = ({ children, variant = 'primary', className = '', disabled, ...props }) => {
     const variants = {
-        primary: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/30',
-        danger: 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/30',
-        success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg shadow-emerald-500/30',
-        ghost: 'bg-transparent hover:bg-slate-100 text-slate-600 border border-slate-200',
-        outline: 'bg-white border-2 border-slate-200 hover:border-blue-500 text-slate-700 hover:text-blue-600',
-        secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold'
+        primary:   'bg-[#a81d24] hover:bg-[#7f1218] text-white shadow-sm shadow-red-900/20',
+        danger:    'bg-red-600 hover:bg-red-700 text-white shadow-sm shadow-red-500/20',
+        success:   'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-500/20',
+        ghost:     'bg-transparent hover:bg-stone-100 text-slate-600 border border-stone-300',
+        outline:   'bg-white border-2 border-stone-200 hover:border-[#a81d24] text-slate-700 hover:text-[#a81d24]',
+        secondary: 'bg-stone-100 hover:bg-stone-200 text-slate-700'
     };
-    
     return (
-        <button 
+        <button
             disabled={disabled}
-            className={`px-6 py-3 rounded-xl font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] ${variants[variant]} ${className}`}
+            className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] ${variants[variant]} ${className}`}
             {...props}
         >
             {children}
@@ -91,12 +87,12 @@ const Button = ({ children, variant = 'primary', className = '', disabled, ...pr
 };
 
 const Input = ({ label, icon, className = '', ...props }) => (
-    <div className="space-y-2">
-        {label && <label className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</label>}
+    <div className="space-y-1.5">
+        {label && <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</label>}
         <div className="relative group">
-            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />}
-            <input 
-                className={`w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-700 outline-none transition-all duration-200 focus:border-blue-500 focus:bg-white focus:shadow-lg focus:shadow-blue-500/10 ${icon ? 'pl-11' : ''} ${className}`}
+            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#a81d24] transition-colors" />}
+            <input
+                className={`w-full bg-stone-50 border border-stone-300 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:bg-white focus:shadow-sm ${icon ? 'pl-10' : ''} ${className}`}
                 {...props}
             />
         </div>
@@ -104,51 +100,60 @@ const Input = ({ label, icon, className = '', ...props }) => (
 );
 
 const Select = ({ label, options, ...props }) => (
-    <div className="space-y-2">
-        {label && <label className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</label>}
+    <div className="space-y-1.5">
+        {label && <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</label>}
         <div className="relative">
-            <select 
-                className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-700 outline-none transition-all duration-200 focus:border-blue-500 focus:bg-white focus:shadow-lg focus:shadow-blue-500/10 appearance-none cursor-pointer"
+            <select
+                className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:bg-white appearance-none cursor-pointer"
                 {...props}
             >
                 {options}
             </select>
-            <Icon path={Icons.chevronRight} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 rotate-90 pointer-events-none" />
+            <Icon path={Icons.chevronRight} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90 pointer-events-none" />
         </div>
     </div>
 );
 
 const Badge = ({ children, variant = 'default' }) => {
     const variants = {
-        default: 'bg-slate-100 text-slate-600',
-        danger: 'bg-red-100 text-red-700 border border-red-200',
-        warning: 'bg-amber-100 text-amber-700 border border-amber-200',
-        success: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-        info: 'bg-blue-100 text-blue-700 border border-blue-200'
+        default: 'bg-stone-100 text-slate-600',
+        danger:  'bg-red-50 text-red-700 border border-red-200',
+        warning: 'bg-amber-50 text-amber-700 border border-amber-200',
+        success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+        info:    'bg-sky-50 text-sky-700 border border-sky-200'
     };
     return (
-        <span className={`px-3 py-1 rounded-full text-xs font-bold ${variants[variant]}`}>
+        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${variants[variant]}`}>
             {children}
         </span>
     );
 };
+
+const Spinner = () => (
+    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+);
 
 // --- COMPONENTE PRINCIPAL ---
 export function AccountsPayable({ data }) {
     const [activeTab, setActiveTab] = useState('Estado de Cuenta');
     const [loading, setLoading] = useState(false);
     const [nuevoProveedor, setNuevoProveedor] = useState('');
-    
+
+    // Ref para bloquear doble-submit en cualquier operación crítica
+    const isProcessingRef = useRef(false);
+
     const facturas = useMemo(() => {
-        return (data.cuentas_por_pagar || []).map((factura) => {
-            return {
-                ...factura,
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
-                paymentType: factura.paymentType || 'credito',
-            };
-        });
+        return (data.cuentas_por_pagar || []).map((factura) => ({
+            ...factura,
+            branch: DEFAULT_BRANCH_ID,
+            branchName: DEFAULT_BRANCH_NAME,
+            paymentType: factura.paymentType || 'credito',
+        }));
     }, [data.cuentas_por_pagar]);
+
     const abonos = data.abonos_pagar || [];
     const listaProveedores = data.proveedores || [];
 
@@ -167,16 +172,14 @@ export function AccountsPayable({ data }) {
         let vencidas = 0;
         let porVencer = 0;
         const hoy = new Date();
-        hoy.setHours(0,0,0,0);
+        hoy.setHours(0, 0, 0, 0);
 
         const facturasOrdenadas = [...facturas]
             .filter(f => f.estado !== 'pagado')
-            .sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+            .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
         facturasOrdenadas.forEach(f => {
-            if (!groups[f.proveedor]) {
-                groups[f.proveedor] = { saldoTotal: 0, items: [] };
-            }
+            if (!groups[f.proveedor]) groups[f.proveedor] = { saldoTotal: 0, items: [] };
             const yaAbonado = Number((f.monto - (f.saldo || 0)).toFixed(2));
             groups[f.proveedor].items.push({ ...f, yaAbonado });
             groups[f.proveedor].saldoTotal += (f.saldo || 0);
@@ -190,8 +193,8 @@ export function AccountsPayable({ data }) {
             }
         });
 
-        return { 
-            facturasPorProveedor: groups, 
+        return {
+            facturasPorProveedor: groups,
             saldoTotalGeneral: totalGeneral,
             stats: { vencidas, porVencer, count: facturasOrdenadas.length }
         };
@@ -205,9 +208,6 @@ export function AccountsPayable({ data }) {
             return alert("Por favor complete Proveedor y Monto.");
         }
 
-        const branchId = DEFAULT_BRANCH_ID;
-        const branchLabel = DEFAULT_BRANCH_NAME;
-
         setLoading(true);
         try {
             const facturaRef = doc(collection(db, 'cuentas_por_pagar'));
@@ -218,9 +218,9 @@ export function AccountsPayable({ data }) {
                 fecha: facturaForm.fecha,
                 month: facturaForm.fecha.substring(0, 7),
                 proveedor: facturaForm.proveedor,
-                sucursal: branchLabel,
-                branch: branchId,
-                branchName: branchLabel,
+                sucursal: DEFAULT_BRANCH_NAME,
+                branch: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
                 numero: facturaForm.numero?.trim() || "S/N",
                 vencimiento: facturaForm.vencimiento || "",
                 monto: montoNum,
@@ -239,8 +239,8 @@ export function AccountsPayable({ data }) {
                 supplier: facturaForm.proveedor,
                 invoiceNumber: facturaForm.numero?.trim() || "S/N",
                 amount: montoNum,
-                branch: branchId,
-                branchName: branchLabel,
+                branch: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
                 paymentType: 'credito',
                 isInventoryCost: true,
                 sourceCollection: 'cuentas_por_pagar',
@@ -250,12 +250,13 @@ export function AccountsPayable({ data }) {
             });
 
             await batch.commit();
-            setFacturaForm((prev) => ({ ...prev, numero: '', monto: '', vencimiento: '' }));
-        } catch (error) { 
+            setFacturaForm(prev => ({ ...prev, numero: '', monto: '', vencimiento: '' }));
+        } catch (error) {
             console.error(error);
             alert("Error al guardar");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [facturaForm]);
 
     // --- MODAL ABONOS ---
@@ -274,35 +275,32 @@ export function AccountsPayable({ data }) {
         setPaymentMethod('transferencia');
     }, []);
 
-    // Calcular monto previsualizado
     useEffect(() => {
-        const facturasDelProveedor = facturasPorProveedor[proveedorSeleccionado]?.items || [];
-        const totalSeleccionado = facturasDelProveedor
+        const items = facturasPorProveedor[proveedorSeleccionado]?.items || [];
+        const total = items
             .filter(f => selectedFacturas.includes(f.id))
             .reduce((sum, f) => sum + (f.saldo || 0), 0);
-        setMontoPrevisualizado(totalSeleccionado);
+        setMontoPrevisualizado(total);
     }, [selectedFacturas, proveedorSeleccionado, facturasPorProveedor]);
 
     const handleSeleccionarTodas = () => {
-        const facturasDelProveedor = facturasPorProveedor[proveedorSeleccionado]?.items || [];
-        const todosLosIds = facturasDelProveedor.map(f => f.id);
-        const todasSeleccionadas = selectedFacturas.length === todosLosIds.length;
-        
-        if (todasSeleccionadas) {
-            setSelectedFacturas([]);
-        } else {
-            setSelectedFacturas(todosLosIds);
-        }
+        const items = facturasPorProveedor[proveedorSeleccionado]?.items || [];
+        const allIds = items.map(f => f.id);
+        setSelectedFacturas(selectedFacturas.length === allIds.length ? [] : allIds);
     };
 
     const handleAbonarMontoSeleccionado = () => {
         setMontoAbono(montoPrevisualizado.toFixed(2));
     };
 
+    // Guard ref: previene doble-submit antes de que React deshabilite el botón via estado
     const handleRealizarAbono = useCallback(async () => {
+        if (isProcessingRef.current) return;
+
         const montoTotalAbono = parseFloat(montoAbono);
         if (isNaN(montoTotalAbono) || montoTotalAbono <= 0 || selectedFacturas.length === 0) return;
 
+        isProcessingRef.current = true;
         setLoading(true);
         try {
             const fechaAbono = new Date().toISOString().substring(0, 10);
@@ -330,12 +328,10 @@ export function AccountsPayable({ data }) {
                     if (restante <= 0) break;
                     const pagoParaEstaFactura = Math.min(item.data.saldo, restante);
                     const nuevoSaldo = Number((item.data.saldo - pagoParaEstaFactura).toFixed(2));
-
                     transaction.update(item.ref, {
                         saldo: nuevoSaldo,
                         estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial'
                     });
-
                     facturasAfectadas.push({ id: item.snapshot.id, montoAbonado: pagoParaEstaFactura });
                     restante = Number((restante - pagoParaEstaFactura).toFixed(2));
                 }
@@ -369,15 +365,21 @@ export function AccountsPayable({ data }) {
                     });
                 }
             });
+
             closeModalAbono();
-        } catch (e) { 
-            alert("Error: " + e.message); 
+        } catch (e) {
+            alert("Error: " + e.message);
+        } finally {
+            isProcessingRef.current = false;
+            setLoading(false);
         }
-        setLoading(false);
     }, [closeModalAbono, montoAbono, paymentMethod, selectedFacturas, proveedorSeleccionado]);
 
     const handleDeleteAbono = useCallback(async (abonoDoc) => {
+        if (isProcessingRef.current) return;
         if (!window.confirm(`¿Anular abono #${abonoDoc.secuencia}?`)) return;
+
+        isProcessingRef.current = true;
         setLoading(true);
         try {
             await runTransaction(db, async (transaction) => {
@@ -402,30 +404,32 @@ export function AccountsPayable({ data }) {
                 }
                 transaction.delete(doc(db, 'abonos_pagar', abonoDoc.id));
             });
-        } catch (e) { 
-            alert("Error: " + e.message); 
+        } catch (e) {
+            alert("Error: " + e.message);
+        } finally {
+            isProcessingRef.current = false;
+            setLoading(false);
         }
-        setLoading(false);
     }, []);
 
     const handleDeleteFactura = useCallback(async (factura) => {
-        if (!window.confirm('Eliminar esta factura y su compra vinculada?')) return;
+        if (isProcessingRef.current) return;
+        if (!window.confirm('¿Eliminar esta factura y su compra vinculada?')) return;
 
+        isProcessingRef.current = true;
         setLoading(true);
         try {
             const result = await deletePayableTransaction(factura.id);
-
             if (result?.blocked) {
                 const abonosLabel = (result.blockingAbonos || [])
-                    .map((abono) => `#${abono.secuencia || abono.id}`)
+                    .map(a => `#${a.secuencia || a.id}`)
                     .join(', ');
-
-                alert(`No se puede eliminar esta factura porque ya tiene abono(s) ${abonosLabel}. Anulalos primero desde Historial Abonos.`);
-                return;
+                alert(`No se puede eliminar: tiene abono(s) ${abonosLabel}. Anulalos primero desde Historial Abonos.`);
             }
         } catch (e) {
             alert('Error: ' + e.message);
         } finally {
+            isProcessingRef.current = false;
             setLoading(false);
         }
     }, []);
@@ -437,140 +441,163 @@ export function AccountsPayable({ data }) {
         try {
             await addDoc(collection(db, 'proveedores'), { nombre: nuevoProveedor.trim().toUpperCase() });
             setNuevoProveedor('');
-        } catch (e) { 
-            console.error(e); 
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [nuevoProveedor]);
 
     // --- HELPERS ---
     const getVencimientoInfo = (fechaVenc) => {
-        if (!fechaVenc) return { text: 'Sin vencimiento', variant: 'default', days: null };
+        if (!fechaVenc) return { text: 'Sin vencimiento', variant: 'default' };
         const hoy = new Date();
-        hoy.setHours(0,0,0,0);
+        hoy.setHours(0, 0, 0, 0);
         const venc = new Date(fechaVenc);
         const diffDays = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays < 0) return { text: `${Math.abs(diffDays)} días vencida`, variant: 'danger', days: diffDays };
-        if (diffDays === 0) return { text: 'Vence hoy', variant: 'warning', days: diffDays };
-        if (diffDays <= 3) return { text: `${diffDays} días por vencer`, variant: 'warning', days: diffDays };
-        return { text: `${diffDays} días restantes`, variant: 'success', days: diffDays };
+        if (diffDays < 0) return { text: `${Math.abs(diffDays)}d vencida`, variant: 'danger' };
+        if (diffDays === 0) return { text: 'Vence hoy', variant: 'warning' };
+        if (diffDays <= 3) return { text: `${diffDays}d por vencer`, variant: 'warning' };
+        return { text: `${diffDays} días`, variant: 'success' };
     };
 
     const tabs = [
-        { id: 'Ingresar Factura', icon: 'plus', label: 'Nueva Factura' },
-        { id: 'Estado de Cuenta', icon: 'trendingDown', label: 'Estado' },
-        { id: 'Historial Abonos', icon: 'receipt', label: 'Abonos' },
-        { id: 'Base de Proveedores', icon: 'users', label: 'Proveedores' }
+        { id: 'Ingresar Factura',    icon: 'plus',         label: 'Nueva Factura' },
+        { id: 'Estado de Cuenta',    icon: 'trendingDown',  label: 'Estado de Cuenta' },
+        { id: 'Historial Abonos',    icon: 'receipt',       label: 'Historial Abonos' },
+        { id: 'Base de Proveedores', icon: 'users',         label: 'Proveedores' }
     ];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-4 md:p-8">
-            {/* CSS PARA ANIMACIONES */}
+        <div className="min-h-screen p-4 md:p-8">
             <style>{`
                 @keyframes fade-in {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
+                    from { opacity: 0; transform: translateY(14px); }
+                    to   { opacity: 1; transform: translateY(0); }
                 }
                 @keyframes slide-in {
-                    from { opacity: 0; transform: translateX(20px); }
-                    to { opacity: 1; transform: translateX(0); }
+                    from { opacity: 0; transform: translateX(14px); }
+                    to   { opacity: 1; transform: translateX(0); }
                 }
-                .animate-fade-in { animation: fade-in 0.5s ease-out; }
-                .animate-slide-in { animation: slide-in 0.4s ease-out; }
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+                .animate-fade-in { animation: fade-in 0.35s ease-out; }
+                .animate-slide-in { animation: slide-in 0.3s ease-out; }
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: #f5f5f5; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
             `}</style>
 
             <div className="max-w-7xl mx-auto">
-                {/* HEADER */}
-                <FadeIn className="mb-8">
-                    <h1 className="text-4xl font-black text-slate-800 mb-2 tracking-tight">
-                        Cuentas por <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-800">Pagar</span>
-                    </h1>
-                    <p className="text-slate-500 font-medium">Gestión de facturas y pagos a proveedores</p>
+
+                {/* ── ENCABEZADO CORPORATIVO ── */}
+                <FadeIn className="mb-7">
+                    <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+                        <div className="h-1 bg-gradient-to-r from-[#a81d24] via-[#f2b635] to-[#a81d24]" />
+                        <div className="px-7 py-5 flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a81d24] mb-1">
+                                    Carnes Amparito — Sistema de Gestión
+                                </p>
+                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Cuentas por Pagar</h1>
+                                <p className="text-xs text-slate-400 mt-0.5">Gestión de facturas y pagos a proveedores</p>
+                            </div>
+                            <div className="hidden md:flex items-center gap-3">
+                                <div className="text-right">
+                                    <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Total pendiente</div>
+                                    <div className="text-2xl font-bold text-[#a81d24]">{fmt(saldoTotalGeneral)}</div>
+                                </div>
+                                <div className="w-11 h-11 bg-[#fff0f0] rounded-xl flex items-center justify-center">
+                                    <Icon path={Icons.trendingDown} className="w-5 h-5 text-[#a81d24]" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </FadeIn>
 
-                {/* STATS CARDS */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <FadeIn delay={100} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-xl shadow-slate-900/20">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-slate-400 text-sm font-bold uppercase tracking-wider">Saldo Total</span>
-                            <Icon path={Icons.trendingDown} className="w-5 h-5 text-red-400" />
+                {/* ── TARJETAS DE RESUMEN ── */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <FadeIn delay={60} className="bg-[#a81d24] rounded-xl p-5 text-white shadow-md shadow-red-900/20">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-red-200 text-[10px] font-bold uppercase tracking-widest">Saldo Total</span>
+                            <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center">
+                                <Icon path={Icons.trendingDown} className="w-4 h-4 text-white" />
+                            </div>
                         </div>
-                        <div className="text-3xl font-black">{fmt(saldoTotalGeneral)}</div>
-                        <div className="text-slate-400 text-xs mt-1">{stats.count} facturas pendientes</div>
+                        <div className="text-2xl font-bold">{fmt(saldoTotalGeneral)}</div>
+                        <div className="text-red-200 text-xs mt-1.5">
+                            {stats.count} {stats.count === 1 ? 'factura pendiente' : 'facturas pendientes'}
+                        </div>
                     </FadeIn>
 
-                    <FadeIn delay={200} className="bg-white rounded-2xl p-6 border border-red-100 shadow-lg shadow-red-500/10">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-red-600 text-sm font-bold uppercase tracking-wider">Vencidas</span>
-                            <Icon path={Icons.alertCircle} className="w-5 h-5 text-red-500" />
+                    <FadeIn delay={120} className="bg-white rounded-xl p-5 border border-stone-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-red-600 text-[10px] font-bold uppercase tracking-widest">Vencidas</span>
+                            <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
+                                <Icon path={Icons.alertCircle} className="w-4 h-4 text-red-500" />
+                            </div>
                         </div>
-                        <div className="text-3xl font-black text-red-600">{fmt(stats.vencidas)}</div>
-                        <div className="text-red-400 text-xs mt-1">Requieren atención inmediata</div>
+                        <div className="text-2xl font-bold text-red-600">{fmt(stats.vencidas)}</div>
+                        <div className="text-slate-400 text-xs mt-1.5">Requieren atención inmediata</div>
                     </FadeIn>
 
-                    <FadeIn delay={300} className="bg-white rounded-2xl p-6 border border-amber-100 shadow-lg shadow-amber-500/10">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-amber-600 text-sm font-bold uppercase tracking-wider">Por Vencer (3d)</span>
-                            <Icon path={Icons.calendar} className="w-5 h-5 text-amber-500" />
+                    <FadeIn delay={180} className="bg-white rounded-xl p-5 border border-stone-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-amber-600 text-[10px] font-bold uppercase tracking-widest">Por Vencer (3d)</span>
+                            <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
+                                <Icon path={Icons.calendar} className="w-4 h-4 text-amber-500" />
+                            </div>
                         </div>
-                        <div className="text-3xl font-black text-amber-600">{fmt(stats.porVencer)}</div>
-                        <div className="text-amber-400 text-xs mt-1">Próximas a vencer</div>
+                        <div className="text-2xl font-bold text-amber-600">{fmt(stats.porVencer)}</div>
+                        <div className="text-slate-400 text-xs mt-1.5">Próximas a vencer</div>
                     </FadeIn>
                 </div>
 
-                {/* NAVEGACIÓN TABS */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 mb-6">
-                    <div className="flex flex-wrap gap-2">
+                {/* ── NAVEGACIÓN TABS ── */}
+                <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-1.5 mb-6">
+                    <div className="flex flex-wrap gap-1.5">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 ${
-                                    activeTab === tab.id 
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' 
-                                        : 'text-slate-600 hover:bg-slate-100'
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs transition-all duration-200 ${
+                                    activeTab === tab.id
+                                        ? 'bg-[#a81d24] text-white shadow-sm shadow-red-900/20'
+                                        : 'text-slate-500 hover:bg-stone-50 hover:text-slate-700'
                                 }`}
                             >
-                                <Icon path={Icons[tab.icon]} className="w-4 h-4" />
+                                <Icon path={Icons[tab.icon]} className="w-3.5 h-3.5" />
                                 {tab.label}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {/* CONTENIDO TABS */}
-                <div className="relative">
+                {/* ── CONTENIDO TABS ── */}
+                <div>
+
+                    {/* TAB: Nueva Factura */}
                     {activeTab === 'Ingresar Factura' && (
                         <SlideIn className="max-w-2xl mx-auto">
                             <Card title="Registrar Nueva Factura" icon="fileText">
-                                <form onSubmit={handleSaveFactura} className="space-y-6">
-                                    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-                                        Las facturas registradas aqui se contabilizan como costo a credito.
+                                <form onSubmit={handleSaveFactura} className="space-y-5">
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                                        Las facturas registradas aquí se contabilizan como costo a crédito en {DEFAULT_BRANCH_NAME}.
                                     </div>
-                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                                        Todo quedara unificado en {DEFAULT_BRANCH_NAME}.
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <Select
-                                            label="Proveedor"
-                                            value={facturaForm.proveedor}
-                                            onChange={e => setFacturaForm({...facturaForm, proveedor: e.target.value})}
-                                            required
-                                            options={
-                                                <>
-                                                    <option value="">Seleccionar proveedor...</option>
-                                                    {listaProveedores.sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(p => (
-                                                        <option key={p.id} value={p.nombre}>{p.nombre}</option>
-                                                    ))}
-                                                </>
-                                            }
-                                        />
-                                    </div>
+
+                                    <Select
+                                        label="Proveedor"
+                                        value={facturaForm.proveedor}
+                                        onChange={e => setFacturaForm({ ...facturaForm, proveedor: e.target.value })}
+                                        required
+                                        options={
+                                            <>
+                                                <option value="">Seleccionar proveedor...</option>
+                                                {listaProveedores
+                                                    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                                    .map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)
+                                                }
+                                            </>
+                                        }
+                                    />
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <Input
@@ -578,7 +605,7 @@ export function AccountsPayable({ data }) {
                                             type="date"
                                             icon="calendar"
                                             value={facturaForm.fecha}
-                                            onChange={e => setFacturaForm({...facturaForm, fecha: e.target.value})}
+                                            onChange={e => setFacturaForm({ ...facturaForm, fecha: e.target.value })}
                                             required
                                         />
                                         <Input
@@ -586,7 +613,7 @@ export function AccountsPayable({ data }) {
                                             type="date"
                                             icon="calendar"
                                             value={facturaForm.vencimiento}
-                                            onChange={e => setFacturaForm({...facturaForm, vencimiento: e.target.value})}
+                                            onChange={e => setFacturaForm({ ...facturaForm, vencimiento: e.target.value })}
                                         />
                                     </div>
 
@@ -596,97 +623,101 @@ export function AccountsPayable({ data }) {
                                             icon="fileText"
                                             placeholder="Ej: 001-001-000000001"
                                             value={facturaForm.numero}
-                                            onChange={e => setFacturaForm({...facturaForm, numero: e.target.value})}
+                                            onChange={e => setFacturaForm({ ...facturaForm, numero: e.target.value })}
                                         />
                                         <Input
-                                            label="Monto Total"
+                                            label="Monto Total (C$)"
                                             type="number"
                                             step="0.01"
                                             icon="creditCard"
                                             placeholder="0.00"
-                                            className="text-2xl font-black text-blue-600"
                                             value={facturaForm.monto}
-                                            onChange={e => setFacturaForm({...facturaForm, monto: e.target.value})}
+                                            onChange={e => setFacturaForm({ ...facturaForm, monto: e.target.value })}
                                             required
                                         />
                                     </div>
 
-                                    <Button type="submit" disabled={loading} className="w-full py-4 text-lg">
-                                        {loading ? 'Guardando...' : 'Guardar Factura'}
+                                    <Button type="submit" disabled={loading} className="w-full py-3">
+                                        {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Guardando...</span> : 'Guardar Factura'}
                                     </Button>
                                 </form>
                             </Card>
                         </SlideIn>
                     )}
 
+                    {/* TAB: Estado de Cuenta */}
                     {activeTab === 'Estado de Cuenta' && (
-                        <div className="space-y-6">
-                            {Object.entries(facturasPorProveedor).map(([prov, data], idx) => (
-                                <FadeIn key={prov} delay={idx * 100}>
-                                    <Card 
-                                        title={prov} 
+                        <div className="space-y-5">
+                            {Object.entries(facturasPorProveedor).map(([prov, provData], idx) => (
+                                <FadeIn key={prov} delay={idx * 70}>
+                                    <Card
+                                        title={prov}
                                         icon="building"
                                         right={
-                                            <div className="text-right">
-                                                <div className="text-2xl font-black text-red-600">{fmt(data.saldoTotal)}</div>
-                                                <div className="text-xs text-slate-400 font-bold uppercase">{data.items.length} facturas</div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-right hidden sm:block">
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                        {provData.items.length} {provData.items.length === 1 ? 'factura' : 'facturas'}
+                                                    </div>
+                                                    <div className="text-lg font-bold text-[#a81d24]">{fmt(provData.saldoTotal)}</div>
+                                                </div>
+                                                <Button
+                                                    variant="success"
+                                                    disabled={loading}
+                                                    onClick={() => {
+                                                        setProveedorSeleccionado(prov);
+                                                        setSelectedFacturas([]);
+                                                        setMontoAbono('');
+                                                        setMontoPrevisualizado(0);
+                                                        setPaymentMethod('transferencia');
+                                                        setShowModalAbono(true);
+                                                    }}
+                                                    className="flex items-center gap-1.5"
+                                                >
+                                                    <Icon path={Icons.creditCard} className="w-3.5 h-3.5" />
+                                                    Abonar
+                                                </Button>
                                             </div>
                                         }
                                     >
-                                        <div className="mb-4 flex justify-end">
-                                            <Button 
-                                                variant="success" 
-                                                onClick={() => { 
-                                                    setProveedorSeleccionado(prov);
-                                                    setSelectedFacturas([]);
-                                                    setMontoAbono('');
-                                                    setMontoPrevisualizado(0);
-                                                    setPaymentMethod('transferencia');
-                                                    setShowModalAbono(true); 
-                                                }}
-                                                className="flex items-center gap-2"
-                                            >
-                                                <Icon path={Icons.creditCard} className="w-4 h-4" />
-                                                Realizar Abono
-                                            </Button>
-                                        </div>
-
-                                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                                        <div className="overflow-x-auto rounded-lg border border-stone-200">
                                             <table className="w-full text-sm">
-                                                <thead className="bg-slate-50 border-b border-slate-200">
+                                                <thead className="bg-stone-50 border-b border-stone-200">
                                                     <tr>
-                                                        <th className="p-4 text-left font-bold text-slate-600">Factura</th>
-                                                        <th className="p-4 text-left font-bold text-slate-600">Emisión</th>
-                                                        <th className="p-4 text-left font-bold text-slate-600">Vencimiento</th>
-                                                        <th className="p-4 text-right font-bold text-slate-600">Monto</th>
-                                                        <th className="p-4 text-right font-bold text-slate-600">Abonado</th>
-                                                        <th className="p-4 text-right font-bold text-slate-600">Saldo</th>
-                                                        <th className="p-4 text-center font-bold text-slate-600">Acción</th>
+                                                        {['N° Factura', 'Emisión', 'Vencimiento', 'Monto', 'Abonado', 'Saldo', 'Estado', ''].map(h => (
+                                                            <th key={h} className={`px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === '' || h === 'Monto' || h === 'Abonado' || h === 'Saldo' ? 'text-right' : h === 'Estado' ? 'text-center' : 'text-left'}`}>
+                                                                {h}
+                                                            </th>
+                                                        ))}
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {data.items.map(f => {
+                                                <tbody className="divide-y divide-stone-100">
+                                                    {provData.items.map(f => {
                                                         const vencInfo = getVencimientoInfo(f.vencimiento);
                                                         return (
-                                                            <tr key={f.id} className="hover:bg-slate-50/80 transition-colors group">
-                                                                <td className="p-4 font-bold text-slate-800">{f.numero}</td>
-                                                                <td className="p-4 text-slate-600">{f.fecha}</td>
-                                                                <td className="p-4">
-                                                                    <Badge variant={vencInfo.variant}>
-                                                                        {vencInfo.text}
+                                                            <tr key={f.id} className="hover:bg-stone-50/70 transition-colors group">
+                                                                <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">{f.numero}</td>
+                                                                <td className="px-4 py-3 text-xs text-slate-500">{f.fecha}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <Badge variant={vencInfo.variant}>{vencInfo.text}</Badge>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-right text-xs text-slate-500 font-medium">{fmt(f.monto)}</td>
+                                                                <td className="px-4 py-3 text-right text-xs font-semibold text-emerald-600">
+                                                                    {f.yaAbonado > 0 ? fmt(f.yaAbonado) : <span className="text-stone-300">—</span>}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-right font-bold text-[#a81d24]">{fmt(f.saldo)}</td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <Badge variant={f.estado === 'parcial' ? 'warning' : 'danger'}>
+                                                                        {f.estado === 'parcial' ? 'Parcial' : 'Pendiente'}
                                                                     </Badge>
                                                                 </td>
-                                                                <td className="p-4 text-right font-medium text-slate-600">{fmt(f.monto)}</td>
-                                                                <td className="p-4 text-right font-bold text-emerald-600">
-                                                                    {f.yaAbonado > 0 ? fmt(f.yaAbonado) : '-'}
-                                                                </td>
-                                                                <td className="p-4 text-right font-black text-red-600 text-lg">{fmt(f.saldo)}</td>
-                                                                <td className="p-4 text-center">
-                                                                    <button 
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <button
                                                                         onClick={() => handleDeleteFactura(f)}
-                                                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                                        disabled={loading}
+                                                                        className="p-1.5 text-stone-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 disabled:opacity-20"
                                                                     >
-                                                                        <Icon path={Icons.trash} className="w-4 h-4" />
+                                                                        <Icon path={Icons.trash} className="w-3.5 h-3.5" />
                                                                     </button>
                                                                 </td>
                                                             </tr>
@@ -698,276 +729,291 @@ export function AccountsPayable({ data }) {
                                     </Card>
                                 </FadeIn>
                             ))}
-                            
+
                             {Object.keys(facturasPorProveedor).length === 0 && (
-                                <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
-                                    <Icon path={Icons.checkCircle} className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                                    <h3 className="text-xl font-bold text-slate-600">Todo al día</h3>
-                                    <p className="text-slate-400">No hay facturas pendientes por pagar</p>
+                                <div className="text-center py-16 bg-white rounded-xl border border-dashed border-stone-300">
+                                    <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <Icon path={Icons.checkCircle} className="w-7 h-7 text-emerald-500" />
+                                    </div>
+                                    <h3 className="text-base font-bold text-slate-700">Todo al día</h3>
+                                    <p className="text-sm text-slate-400 mt-1">No hay facturas pendientes por pagar</p>
                                 </div>
                             )}
                         </div>
                     )}
 
+                    {/* TAB: Historial Abonos */}
                     {activeTab === 'Historial Abonos' && (
                         <SlideIn>
                             <Card title="Historial de Abonos" icon="receipt">
-                                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                                    <table className="w-full text-sm">
-                                        <thead className="bg-slate-50 border-b border-slate-200">
-                                            <tr>
-                                                <th className="p-4 text-left font-bold text-slate-600">Recibo #</th>
-                                                <th className="p-4 text-left font-bold text-slate-600">Fecha</th>
-                                                <th className="p-4 text-left font-bold text-slate-600">Proveedor</th>
-                                                <th className="p-4 text-left font-bold text-slate-600">Metodo</th>
-                                                <th className="p-4 text-right font-bold text-slate-600">Monto Abonado</th>
-                                                <th className="p-4 text-center font-bold text-slate-600">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {abonos.sort((a,b) => b.secuencia - a.secuencia).map(a => (
-                                                <tr key={a.id} className="hover:bg-slate-50">
-                                                    <td className="p-4 font-mono font-bold text-blue-600 text-lg">#{a.secuencia}</td>
-                                                    <td className="p-4 text-slate-600">{a.fecha}</td>
-                                                    <td className="p-4 font-bold text-slate-800">{a.proveedor}</td>
-                                                    <td className="p-4">
-                                                        <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
-                                                            {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="p-4 text-right font-black text-emerald-600 text-lg">{fmt(a.montoTotal)}</td>
-                                                    <td className="p-4 text-center">
-                                                        <button 
-                                                            onClick={() => handleDeleteAbono(a)}
-                                                            className="text-red-500 hover:text-red-700 font-bold text-xs uppercase px-3 py-1 hover:bg-red-50 rounded-lg transition-colors"
-                                                        >
-                                                            Anular
-                                                        </button>
-                                                    </td>
+                                {abonos.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <Icon path={Icons.receipt} className="w-10 h-10 mx-auto mb-3 text-stone-300" />
+                                        <p className="text-sm font-medium text-slate-400">No hay abonos registrados</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto rounded-lg border border-stone-200">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-stone-50 border-b border-stone-200">
+                                                <tr>
+                                                    {['Recibo #', 'Fecha', 'Proveedor', 'Método', 'Monto', 'Acción'].map(h => (
+                                                        <th key={h} className={`px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === 'Monto' ? 'text-right' : h === 'Acción' ? 'text-center' : 'text-left'}`}>
+                                                            {h}
+                                                        </th>
+                                                    ))}
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-stone-100">
+                                                {abonos.sort((a, b) => b.secuencia - a.secuencia).map(a => (
+                                                    <tr key={a.id} className="hover:bg-stone-50 transition-colors">
+                                                        <td className="px-4 py-3 font-mono font-bold text-[#a81d24]">#{a.secuencia}</td>
+                                                        <td className="px-4 py-3 text-xs text-slate-500">{a.fecha}</td>
+                                                        <td className="px-4 py-3 font-semibold text-slate-800 text-xs">{a.proveedor}</td>
+                                                        <td className="px-4 py-3">
+                                                            <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
+                                                                {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-bold text-emerald-600">{fmt(a.montoTotal)}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <button
+                                                                onClick={() => handleDeleteAbono(a)}
+                                                                disabled={loading}
+                                                                className="text-red-500 hover:text-red-700 font-semibold text-xs uppercase px-3 py-1 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                            >
+                                                                Anular
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </Card>
                         </SlideIn>
                     )}
 
+                    {/* TAB: Base de Proveedores */}
                     {activeTab === 'Base de Proveedores' && (
                         <SlideIn className="max-w-2xl mx-auto">
                             <Card title="Directorio de Proveedores" icon="users">
-                                <form onSubmit={handleAddProveedor} className="flex gap-3 mb-6">
-                                    <div className="flex-1 relative">
-                                        <input
-                                            type="text"
-                                            placeholder="Nombre del nuevo proveedor..."
-                                            className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 font-semibold uppercase outline-none focus:border-blue-500 focus:bg-white transition-all"
-                                            value={nuevoProveedor}
-                                            onChange={e => setNuevoProveedor(e.target.value)}
-                                        />
-                                    </div>
-                                    <Button type="submit" disabled={loading || !nuevoProveedor.trim()}>
-                                        <Icon path={Icons.plus} className="w-5 h-5" />
+                                <form onSubmit={handleAddProveedor} className="flex gap-2 mb-5">
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre del nuevo proveedor..."
+                                        className="flex-1 bg-stone-50 border border-stone-300 rounded-lg px-3.5 py-2.5 text-sm font-medium uppercase outline-none focus:border-[#a81d24] focus:bg-white transition-all"
+                                        value={nuevoProveedor}
+                                        onChange={e => setNuevoProveedor(e.target.value)}
+                                    />
+                                    <Button type="submit" disabled={loading || !nuevoProveedor.trim()} className="flex items-center gap-1.5">
+                                        <Icon path={Icons.plus} className="w-4 h-4" />
+                                        Agregar
                                     </Button>
                                 </form>
 
                                 <div className="space-y-2">
-                                    {listaProveedores.sort((a,b)=>a.nombre.localeCompare(b.nombre)).map((p, idx) => (
-                                        <FadeIn key={p.id} delay={idx * 50}>
-                                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all group">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                                        {p.nombre.charAt(0)}
+                                    {listaProveedores
+                                        .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                        .map((p, idx) => (
+                                            <FadeIn key={p.id} delay={idx * 25}>
+                                                <div className="flex items-center justify-between px-4 py-3 bg-stone-50 rounded-lg border border-stone-200 hover:border-[#a81d24]/30 hover:shadow-sm transition-all group">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 bg-[#a81d24] rounded-lg flex items-center justify-center text-white font-bold text-xs">
+                                                            {p.nombre.charAt(0)}
+                                                        </div>
+                                                        <span className="font-semibold text-slate-700 text-sm">{p.nombre}</span>
                                                     </div>
-                                                    <span className="font-bold text-slate-700">{p.nombre}</span>
+                                                    <button
+                                                        onClick={() => deleteDoc(doc(db, 'proveedores', p.id))}
+                                                        className="p-1.5 text-stone-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                    >
+                                                        <Icon path={Icons.trash} className="w-3.5 h-3.5" />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    onClick={() => deleteDoc(doc(db, 'proveedores', p.id))}
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                >
-                                                    <Icon path={Icons.trash} className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </FadeIn>
-                                    ))}
+                                            </FadeIn>
+                                        ))
+                                    }
                                 </div>
                             </Card>
                         </SlideIn>
                     )}
                 </div>
 
-                {/* MODAL ABONO */}
+                {/* ── MODAL ABONO ── */}
                 {showModalAbono && (
-                    <div 
-                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in"
+                    <div
+                        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in"
                         onClick={closeModalAbono}
                     >
-                        <div 
-                            className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar animate-slide-in"
+                        <div
+                            className="bg-white rounded-xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar animate-slide-in"
                             onClick={e => e.stopPropagation()}
                         >
-                            <div className="flex items-center justify-between mb-6">
-                                <div>
-                                    <h3 className="text-2xl font-black text-slate-800">Realizar Abono</h3>
-                                    <p className="text-slate-500 font-medium">{proveedorSeleccionado}</p>
-                                </div>
-                                <button 
-                                    onClick={closeModalAbono}
-                                    className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-                                >
-                                    <Icon path={Icons.x} className="w-6 h-6 text-slate-400" />
-                                </button>
-                            </div>
-
-                            {/* RESUMEN DE SELECCIÓN */}
-                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-2xl border-2 border-blue-200 mb-6">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <Icon path={Icons.calculator} className="w-5 h-5 text-blue-600" />
-                                        <span className="font-bold text-slate-700">Resumen de Selección</span>
+                            {/* Modal header con franja de color */}
+                            <div className="h-1 bg-gradient-to-r from-[#a81d24] via-[#f2b635] to-[#a81d24]" />
+                            <div className="px-6 py-5">
+                                <div className="flex items-start justify-between mb-5">
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a81d24] mb-0.5">Registrar Pago</p>
+                                        <h3 className="text-lg font-bold text-slate-900">Realizar Abono</h3>
+                                        <p className="text-sm text-slate-500">{proveedorSeleccionado}</p>
                                     </div>
                                     <button
-                                        onClick={handleSeleccionarTodas}
-                                        className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                                        onClick={closeModalAbono}
+                                        disabled={loading}
+                                        className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors disabled:opacity-40"
                                     >
-                                        {selectedFacturas.length === (facturasPorProveedor[proveedorSeleccionado]?.items || []).length ? (
-                                            <><Icon path={Icons.checkSquare} className="w-4 h-4" /> Desmarcar todas</>
-                                        ) : (
-                                            <><Icon path={Icons.square} className="w-4 h-4" /> Seleccionar todas</>
-                                        )}
+                                        <Icon path={Icons.x} className="w-5 h-5 text-slate-400" />
                                     </button>
                                 </div>
-                                
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white p-3 rounded-xl border border-blue-100">
-                                        <div className="text-xs text-slate-500 font-bold uppercase mb-1">Facturas Seleccionadas</div>
-                                        <div className="text-2xl font-black text-blue-600">
-                                            {selectedFacturas.length} <span className="text-sm font-medium text-slate-400">/ {facturasPorProveedor[proveedorSeleccionado]?.items.length || 0}</span>
-                                        </div>
+
+                                {/* Resumen de selección */}
+                                <div className="bg-stone-50 rounded-lg border border-stone-200 p-4 mb-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Facturas a incluir</span>
+                                        <button
+                                            onClick={handleSeleccionarTodas}
+                                            className="text-xs font-semibold text-[#a81d24] hover:text-[#7f1218] transition-colors"
+                                        >
+                                            {selectedFacturas.length === (facturasPorProveedor[proveedorSeleccionado]?.items || []).length
+                                                ? 'Desmarcar todas'
+                                                : 'Seleccionar todas'}
+                                        </button>
                                     </div>
-                                    <div className="bg-white p-3 rounded-xl border border-blue-100">
-                                        <div className="text-xs text-slate-500 font-bold uppercase mb-1">Monto Total Seleccionado</div>
-                                        <div className="text-2xl font-black text-emerald-600">
-                                            {fmt(montoPrevisualizado)}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-white rounded-lg border border-stone-200 p-3">
+                                            <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Seleccionadas</div>
+                                            <div className="text-xl font-bold text-slate-800">
+                                                {selectedFacturas.length}
+                                                <span className="text-sm font-normal text-slate-400"> / {facturasPorProveedor[proveedorSeleccionado]?.items.length || 0}</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-lg border border-stone-200 p-3">
+                                            <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Total seleccionado</div>
+                                            <div className="text-xl font-bold text-[#a81d24]">{fmt(montoPrevisualizado)}</div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* LISTA DE FACTURAS */}
-                            <div className="space-y-2 mb-6 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                                {facturasPorProveedor[proveedorSeleccionado]?.items.map(f => (
-                                    <label
-                                        key={f.id}
-                                        className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                                            selectedFacturas.includes(f.id)
-                                                ? 'border-blue-500 bg-blue-50 shadow-md'
-                                                : 'border-slate-200 hover:border-blue-300 bg-white hover:shadow-sm'
-                                        }`}
-                                    >
-                                        <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center mr-4 transition-colors ${
-                                            selectedFacturas.includes(f.id)
-                                                ? 'bg-blue-600 border-blue-600'
-                                                : 'border-slate-300 bg-white'
-                                        }`}>
-                                            {selectedFacturas.includes(f.id) && <Icon path={Icons.checkSquare} className="w-4 h-4 text-white" />}
-                                        </div>
-                                        <input
-                                            type="checkbox"
-                                            className="hidden"
-                                            checked={selectedFacturas.includes(f.id)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) {
-                                                    setSelectedFacturas([...selectedFacturas, f.id]);
-                                                } else {
-                                                    setSelectedFacturas(selectedFacturas.filter(id => id !== f.id));
-                                                }
-                                            }}
-                                        />
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="font-bold text-slate-800">Factura #{f.numero}</span>
-                                            </div>
-                                            <div className="text-xs text-slate-500">Emisión: {f.fecha}</div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="font-black text-red-600 text-lg">{fmt(f.saldo)}</div>
-                                            <div className="text-xs text-slate-400">Saldo pendiente</div>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-
-                            {/* MONTO A ABONAR */}
-                            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-200 mb-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <label className="text-xs font-bold uppercase text-slate-500">Monto a Abonar</label>
-                                    {selectedFacturas.length > 0 && (
-                                        <button
-                                            onClick={handleAbonarMontoSeleccionado}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-xs font-bold transition-colors"
+                                {/* Lista de facturas */}
+                                <div className="space-y-1.5 mb-4 max-h-48 overflow-y-auto custom-scrollbar">
+                                    {facturasPorProveedor[proveedorSeleccionado]?.items.map(f => (
+                                        <label
+                                            key={f.id}
+                                            className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                                                selectedFacturas.includes(f.id)
+                                                    ? 'border-[#a81d24] bg-[#fff5f5] shadow-sm'
+                                                    : 'border-stone-200 bg-white hover:border-stone-300'
+                                            }`}
                                         >
-                                            <Icon path={Icons.calculator} className="w-3 h-3" />
-                                            Abonar monto seleccionado ({fmt(montoPrevisualizado)})
-                                        </button>
+                                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center mr-3 flex-shrink-0 transition-colors ${
+                                                selectedFacturas.includes(f.id)
+                                                    ? 'bg-[#a81d24] border-[#a81d24]'
+                                                    : 'border-stone-300'
+                                            }`}>
+                                                {selectedFacturas.includes(f.id) && (
+                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3.5">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                className="hidden"
+                                                checked={selectedFacturas.includes(f.id)}
+                                                onChange={e => {
+                                                    if (e.target.checked) {
+                                                        setSelectedFacturas([...selectedFacturas, f.id]);
+                                                    } else {
+                                                        setSelectedFacturas(selectedFacturas.filter(id => id !== f.id));
+                                                    }
+                                                }}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-semibold text-slate-800 text-xs">Factura #{f.numero}</div>
+                                                <div className="text-[10px] text-slate-400">Emisión: {f.fecha}</div>
+                                            </div>
+                                            <div className="text-right ml-3">
+                                                <div className="font-bold text-[#a81d24] text-sm">{fmt(f.saldo)}</div>
+                                                <div className="text-[10px] text-slate-400">saldo</div>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+
+                                {/* Monto a abonar */}
+                                <div className="mb-4 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monto a Abonar</label>
+                                        {selectedFacturas.length > 0 && (
+                                            <button
+                                                onClick={handleAbonarMontoSeleccionado}
+                                                className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 px-2 py-1 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-1"
+                                            >
+                                                <Icon path={Icons.calculator} className="w-3 h-3" />
+                                                Usar total ({fmt(montoPrevisualizado)})
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-400">C$</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            className="w-full bg-stone-50 border-2 border-stone-200 rounded-lg pl-11 pr-4 py-3 text-xl font-bold text-[#a81d24] text-center outline-none focus:border-[#a81d24] focus:bg-white transition-all"
+                                            value={montoAbono}
+                                            onChange={e => setMontoAbono(e.target.value)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    {parseFloat(montoAbono) > montoPrevisualizado && montoPrevisualizado > 0 && (
+                                        <div className="text-xs text-amber-600 font-medium flex items-center gap-1.5">
+                                            <Icon path={Icons.alertCircle} className="w-3.5 h-3.5" />
+                                            El monto supera el total seleccionado.
+                                        </div>
                                     )}
                                 </div>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-400">C$</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        className="w-full bg-white border-2 border-slate-200 rounded-xl pl-12 pr-4 py-4 text-3xl font-black text-blue-600 text-center outline-none focus:border-blue-500 focus:shadow-lg transition-all"
-                                        value={montoAbono}
-                                        onChange={e => setMontoAbono(e.target.value)}
-                                        placeholder="0.00"
+
+                                {/* Método de pago */}
+                                <div className="mb-5">
+                                    <Select
+                                        label="Método de Pago"
+                                        value={paymentMethod}
+                                        onChange={e => setPaymentMethod(e.target.value)}
+                                        options={
+                                            <>
+                                                <option value="transferencia">Transferencia</option>
+                                                <option value="efectivo">Efectivo</option>
+                                            </>
+                                        }
                                     />
+                                    <p className="text-xs text-slate-400 mt-1.5">
+                                        {paymentMethod === 'efectivo'
+                                            ? 'Se registrará también en Gastos Diarios como salida de caja.'
+                                            : 'Solo actualiza el saldo de la cuenta por pagar.'}
+                                    </p>
                                 </div>
-                                {parseFloat(montoAbono) > montoPrevisualizado && (
-                                    <div className="mt-2 text-xs text-amber-600 font-bold flex items-center gap-1">
-                                        <Icon path={Icons.alertCircle} className="w-4 h-4" />
-                                        El monto ingresado supera el total seleccionado. El excedente quedará como saldo a favor.
-                                    </div>
-                                )}
-                            </div>
 
-                            <div className="bg-white p-4 rounded-2xl border-2 border-slate-200 mb-6">
-                                <Select
-                                    label="Metodo de Pago"
-                                    value={paymentMethod}
-                                    onChange={e => setPaymentMethod(e.target.value)}
-                                    options={
-                                        <>
-                                            <option value="transferencia">Transferencia</option>
-                                            <option value="efectivo">Efectivo</option>
-                                        </>
-                                    }
-                                />
-                                <div className="mt-3 text-xs font-medium text-slate-500">
-                                    {paymentMethod === 'efectivo'
-                                        ? 'Este abono tambien se registrara en Gastos Diarios como ABONO para reflejar la salida de caja en efectivo.'
-                                        : 'La transferencia mantiene el flujo actual y no genera movimiento adicional en Gastos Diarios.'}
+                                {/* Botones de acción */}
+                                <div className="flex gap-2 pt-4 border-t border-stone-100">
+                                    <Button variant="ghost" onClick={closeModalAbono} disabled={loading} className="flex-1">
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        variant="success"
+                                        onClick={handleRealizarAbono}
+                                        disabled={loading || !montoAbono || parseFloat(montoAbono) <= 0 || selectedFacturas.length === 0}
+                                        className="flex-[2] flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? (
+                                            <><Spinner /> Procesando...</>
+                                        ) : (
+                                            <><Icon path={Icons.arrowRightCircle} className="w-4 h-4" />
+                                            Confirmar {montoAbono ? fmt(parseFloat(montoAbono)) : ''}</>
+                                        )}
+                                    </Button>
                                 </div>
-                            </div>
-
-                            {/* BOTONES */}
-                            <div className="flex gap-3">
-                                <Button
-                                    variant="ghost"
-                                    onClick={closeModalAbono}
-                                    className="flex-1"
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    variant="success"
-                                    onClick={handleRealizarAbono}
-                                    disabled={loading || !montoAbono || selectedFacturas.length === 0}
-                                    className="flex-[2] flex items-center justify-center gap-2"
-                                >
-                                    <Icon path={Icons.arrowRightCircle} className="w-5 h-5" />
-                                    {loading ? 'Procesando...' : `Confirmar Pago ${montoAbono ? fmt(parseFloat(montoAbono)) : ''}`}
-                                </Button>
                             </div>
                         </div>
                     </div>
