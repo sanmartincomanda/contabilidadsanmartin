@@ -13,6 +13,7 @@ import { BankReconciliation } from './components/BankReconciliation';
 import Reports from './components/Reports';
 import CategoryManager from './components/CategoryManager';
 import { AccountsPayable } from './components/AccountsPayable';
+import { fmt } from './constants';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
@@ -44,49 +45,145 @@ const REPORT_COLLECTIONS = [
     'cuentas_por_pagar',
 ];
 
-const Dashboard = () => (
-    <div className="overflow-hidden rounded-[2rem] border border-[#e6c9b8] bg-gradient-to-br from-[#fff8f2] via-white to-[#f7e5d9] shadow-[0_25px_80px_rgba(127,18,24,0.12)]">
-        <div className="grid gap-8 p-8 lg:grid-cols-[1.3fr_0.7fr] lg:p-12">
-            <div className="space-y-6">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#f2b635]/40 bg-[#fdf1d6] px-4 py-2 text-xs font-bold uppercase tracking-[0.35em] text-[#8a141b]">
-                    Carnes Amparito
-                </div>
-                <div className="space-y-3">
-                    <h1 className="text-4xl font-black leading-tight text-[#7f1218] lg:text-5xl">
-                        Centro Contable y de Gestion
-                    </h1>
-                    <p className="max-w-2xl text-base font-medium leading-7 text-[#5f4540] lg:text-lg">
-                        Administra ingresos, costos, cuentas por pagar y reportes con una imagen alineada a la historia y calidad de Carnes Amparito.
-                    </p>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-[#ead6ca] bg-white/80 p-4">
-                        <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">Marca</div>
-                        <div className="mt-2 text-lg font-black text-[#7f1218]">Identidad Amparito</div>
+const DASHBOARD_COLLECTIONS = [
+    'ingresos',
+    'gastos',
+    'compras',
+    'cuentas_por_pagar',
+];
+
+// --- DASHBOARD ---
+
+const Dashboard = ({ data = {} }) => {
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const today = new Date().toISOString().substring(0, 10);
+    const mes = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+    const ingresos = data.ingresos || [];
+    const gastos = data.gastos || [];
+    const compras = data.compras || [];
+    const facturas = data.cuentas_por_pagar || [];
+
+    const mesIngresos = ingresos.filter(i => (i.month || (i.date || '').substring(0, 7)) === currentMonth);
+    const mesGastos = gastos.filter(g => (g.date || '').substring(0, 7) === currentMonth);
+    const mesCompras = compras.filter(c => (c.month || (c.date || '').substring(0, 7)) === currentMonth);
+
+    const totalIngresos = mesIngresos.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    const totalGastos = mesGastos.reduce((s, g) => s + (Number(g.amount) || 0), 0);
+    const totalCompras = mesCompras.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+    const utilidad = totalIngresos - totalGastos - totalCompras;
+
+    const facturasPendientes = facturas.filter(f => (Number(f.saldo) || 0) > 0.01);
+    const totalPendiente = facturasPendientes.reduce((s, f) => s + (Number(f.saldo) || 0), 0);
+    const vencidas = facturasPendientes.filter(f => f.vencimiento && f.vencimiento < today);
+
+    const KPICard = ({ title, value, subtitle, bg, textColor, borderColor }) => (
+        <div className={`rounded-xl border ${borderColor} ${bg} p-5`}>
+            <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d] mb-2">{title}</div>
+            <div className={`text-2xl font-black ${textColor}`}>{value}</div>
+            {subtitle && <div className="text-xs font-medium text-[#8b6a5f] mt-1">{subtitle}</div>}
+        </div>
+    );
+
+    return (
+        <div className="space-y-5">
+            {/* Brand header */}
+            <div className="overflow-hidden rounded-xl border border-[#e6c9b8] bg-white shadow-sm">
+                <div className="h-1 bg-gradient-to-r from-[#a81d24] via-[#f2b635] to-[#a81d24]" />
+                <div className="flex items-center justify-between p-6">
+                    <div>
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#f2b635]/40 bg-[#fdf1d6] px-3 py-1 text-xs font-bold uppercase tracking-[0.3em] text-[#8a141b] mb-3">
+                            Carnes Amparito
+                        </div>
+                        <h1 className="text-2xl font-black text-[#7f1218]">Centro Contable y de Gestión</h1>
+                        <p className="mt-1 text-sm font-medium capitalize text-[#5f4540]">{mes}</p>
                     </div>
-                    <div className="rounded-2xl border border-[#ead6ca] bg-white/80 p-4">
-                        <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">Operacion</div>
-                        <div className="mt-2 text-lg font-black text-[#7f1218]">Caja y compras</div>
-                    </div>
-                    <div className="rounded-2xl border border-[#ead6ca] bg-white/80 p-4">
-                        <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">Control</div>
-                        <div className="mt-2 text-lg font-black text-[#7f1218]">Reportes claros</div>
-                    </div>
-                </div>
-            </div>
-            <div className="relative flex items-center justify-center">
-                <div className="absolute inset-8 rounded-full bg-[#a81d24]/10 blur-3xl" />
-                <div className="relative rounded-[2rem] border border-white/70 bg-white/90 p-4 shadow-2xl shadow-[#7f1218]/15">
                     <img
                         src={BRAND_LOGO}
                         alt="Carnes Amparito"
-                        className="mx-auto h-auto w-full max-w-xs rounded-[1.5rem] object-cover"
+                        className="hidden h-16 w-16 rounded-xl border border-[#edd5c5] object-cover sm:block"
                     />
                 </div>
             </div>
+
+            {/* KPI grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <KPICard
+                    title="Ingresos del Mes"
+                    value={fmt(totalIngresos)}
+                    subtitle={`${mesIngresos.length} registros`}
+                    bg="bg-[#f0fdf4]"
+                    textColor="text-[#166534]"
+                    borderColor="border-[#bbf7d0]"
+                />
+                <KPICard
+                    title="Gastos del Mes"
+                    value={fmt(totalGastos)}
+                    subtitle={`${mesGastos.length} registros`}
+                    bg="bg-[#fff0f0]"
+                    textColor="text-[#7f1218]"
+                    borderColor="border-[#fecaca]"
+                />
+                <KPICard
+                    title="Compras del Mes"
+                    value={fmt(totalCompras)}
+                    subtitle={`${mesCompras.length} registros`}
+                    bg="bg-[#faf5ff]"
+                    textColor="text-[#581c87]"
+                    borderColor="border-[#e9d5ff]"
+                />
+                <KPICard
+                    title="Cuentas por Pagar"
+                    value={fmt(totalPendiente)}
+                    subtitle={vencidas.length > 0 ? `${vencidas.length} factura(s) vencida(s)` : `${facturasPendientes.length} pendientes`}
+                    bg={vencidas.length > 0 ? 'bg-[#fffbeb]' : 'bg-[#fefce8]'}
+                    textColor="text-[#92400e]"
+                    borderColor={vencidas.length > 0 ? 'border-[#fde68a]' : 'border-[#fef08a]'}
+                />
+            </div>
+
+            {/* Utilidad del mes */}
+            <div className={`rounded-xl border p-5 ${utilidad >= 0 ? 'border-[#bbf7d0] bg-[#f0fdf4]' : 'border-[#fecaca] bg-[#fff5f5]'}`}>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="mb-1 text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">
+                            Resultado del Mes
+                        </div>
+                        <div className="text-xs text-[#7a5a52] mb-2">Ingresos − Gastos − Compras</div>
+                        <div className={`text-3xl font-black ${utilidad >= 0 ? 'text-[#166534]' : 'text-[#7f1218]'}`}>
+                            {fmt(utilidad)}
+                        </div>
+                    </div>
+                    <div className={`rounded-full px-4 py-2 text-sm font-black ${utilidad >= 0 ? 'bg-[#bbf7d0] text-[#166534]' : 'bg-[#fecaca] text-[#7f1218]'}`}>
+                        {utilidad >= 0 ? 'Positivo' : 'Negativo'}
+                    </div>
+                </div>
+            </div>
+
+            {/* Alertas de vencimientos */}
+            {vencidas.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+                    <div className="mb-3 text-sm font-bold text-amber-800">
+                        Facturas vencidas — requieren atención ({vencidas.length})
+                    </div>
+                    <div className="space-y-2">
+                        {vencidas.slice(0, 6).map(f => (
+                            <div key={f.id} className="flex items-center justify-between rounded-lg border border-amber-200 bg-white p-3">
+                                <div>
+                                    <div className="text-sm font-bold text-slate-800">{f.proveedor || f.supplier || 'Sin proveedor'}</div>
+                                    <div className="text-xs text-slate-500">
+                                        {f.numero || f.invoiceNumber || ''}{f.vencimiento ? ` — Venció: ${f.vencimiento}` : ''}
+                                    </div>
+                                </div>
+                                <div className="text-sm font-black text-amber-800">{fmt(f.saldo)}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
-    </div>
-);
+    );
+};
 
 const AppLoadingState = () => (
     <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#fff8f3] px-6 text-center text-[#7f1218]">
@@ -239,6 +336,7 @@ function AppContent() {
     const accountsPayableEnabled = !!user && currentPath === '/cuentas-pagar';
     const reportsEnabled = !!user && isAdmin && currentPath === '/reportes';
     const categoriesEnabled = !!user && needsCategories;
+    const dashboardEnabled = !!user && isAdmin && currentPath === '/';
 
     const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, categoriesEnabled, true);
     const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(
@@ -254,6 +352,11 @@ function AppContent() {
     const { data: reportsData, loading: reportsLoading, error: reportsError } = useFirestoreCollections(
         REPORT_COLLECTIONS,
         reportsEnabled,
+        false
+    );
+    const { data: dashboardData, loading: dashboardLoading } = useFirestoreCollections(
+        DASHBOARD_COLLECTIONS,
+        dashboardEnabled,
         false
     );
     const categoriesList = categoriesData.categorias || [];
@@ -275,7 +378,24 @@ function AppContent() {
             <main className="p-4 md:p-6">
                 <Routes>
                     <Route path="/login" element={<Navigate to="/" replace />} />
-                    <Route path="/" element={<PrivateRoute element={<Dashboard />} />} />
+                    <Route
+                        path="/"
+                        element={
+                            <PrivateRoute
+                                element={
+                                    isAdmin ? (
+                                        dashboardLoading ? (
+                                            <AppLoadingState />
+                                        ) : (
+                                            <Dashboard data={dashboardData} />
+                                        )
+                                    ) : (
+                                        <Navigate to="/cuentas-pagar" />
+                                    )
+                                }
+                            />
+                        }
+                    />
                     <Route
                         path="/ingresar"
                         element={

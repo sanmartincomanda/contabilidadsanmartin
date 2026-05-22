@@ -1,8 +1,9 @@
 // src/components/DataEntry.jsx
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { db } from '../firebase';
-import { 
-    collection, addDoc, Timestamp, query, where, getDocs, orderBy, doc, deleteDoc, updateDoc 
+import {
+    collection, addDoc, Timestamp, query, where, getDocs, orderBy, doc, deleteDoc, updateDoc
 } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../constants';
@@ -49,46 +50,42 @@ const Icon = ({ path, className = "w-5 h-5" }) => (
 
 // --- COMPONENTES UI ---
 
-const FadeIn = ({ children, delay = 0, className = "" }) => (
-    <div className={`animate-fade-in ${className}`} style={{ animationDelay: `${delay}ms`, animationFillMode: 'both' }}>
-        {children}
-    </div>
-);
-
 const Card = ({ title, children, className = "", right, icon, gradient = false }) => (
-    <div className={`rounded-2xl shadow-lg border border-slate-200/60 bg-white overflow-hidden ${className}`}>
-        <div className={`flex justify-between items-center px-6 py-4 border-b border-slate-100 ${gradient ? 'bg-slate-800' : 'bg-slate-50'}`}>
+    <div className={`rounded-xl shadow-md border border-[#e6c9b8]/60 bg-white overflow-hidden ${className}`}>
+        <div className={`flex justify-between items-center px-5 py-3 border-b ${gradient ? 'bg-[#7f1218] border-[#5e1318]' : 'bg-stone-50 border-[#ead5c5]'}`}>
             <div className="flex items-center gap-3">
                 {icon && (
-                    <div className={`p-2 rounded-lg ${gradient ? 'bg-white/10' : 'bg-blue-100'}`}>
-                        <Icon path={Icons[icon]} className={`w-5 h-5 ${gradient ? 'text-white' : 'text-blue-600'}`} />
+                    <div className={`p-2 rounded-lg ${gradient ? 'bg-white/10' : 'bg-[#fff0f0]'}`}>
+                        <Icon path={Icons[icon]} className={`w-4 h-4 ${gradient ? 'text-white' : 'text-[#a81d24]'}`} />
                     </div>
                 )}
-                <div>
-                    <h3 className={`text-lg font-bold ${gradient ? 'text-white' : 'text-slate-800'}`}>{title}</h3>
-                </div>
+                <h3 className={`text-sm font-bold uppercase tracking-wider ${gradient ? 'text-white' : 'text-[#5f1a1f]'}`}>{title}</h3>
             </div>
             {right}
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-5">{children}</div>
     </div>
 );
 
 const Button = ({ children, variant = 'primary', className = '', disabled, size = 'md', ...props }) => {
-    const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2', lg: 'px-6 py-3' };
+    const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-sm' };
     const variants = {
-        primary: 'bg-blue-600 hover:bg-blue-700 text-white',
+        primary: 'bg-[#a81d24] hover:bg-[#7f1218] text-white shadow-sm shadow-red-900/20',
         success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
         danger: 'bg-rose-600 hover:bg-rose-700 text-white',
         warning: 'bg-amber-500 hover:bg-amber-600 text-white',
         purple: 'bg-purple-600 hover:bg-purple-700 text-white',
         sky: 'bg-sky-600 hover:bg-sky-700 text-white',
-        ghost: 'bg-transparent hover:bg-slate-100 text-slate-600 border border-slate-200',
-        dark: 'bg-slate-800 hover:bg-slate-900 text-white'
+        ghost: 'bg-transparent hover:bg-stone-100 text-stone-600 border border-stone-200',
+        dark: 'bg-[#2b1113] hover:bg-[#1a0a0b] text-white'
     };
-    
+
     return (
-        <button disabled={disabled} className={`${sizes[size]} rounded-lg font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] ${variants[variant]} ${className}`} {...props}>
+        <button
+            disabled={disabled}
+            className={`${sizes[size]} rounded-lg font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+            {...props}
+        >
             {children}
         </button>
     );
@@ -96,34 +93,41 @@ const Button = ({ children, variant = 'primary', className = '', disabled, size 
 
 const Input = ({ label, icon, type = "text", className = '', ...props }) => (
     <div className="space-y-1">
-        {label && <label className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</label>}
+        {label && <label className="text-xs font-bold uppercase tracking-wider text-stone-500">{label}</label>}
         <div className="relative group">
-            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />}
-            <input type={type} className={`w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${icon ? 'pl-10' : ''} ${className}`} {...props} />
+            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-[#a81d24] transition-colors" />}
+            <input
+                type={type}
+                className={`w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm font-semibold text-stone-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 ${icon ? 'pl-10' : ''} ${className}`}
+                {...props}
+            />
         </div>
     </div>
 );
 
 const Select = ({ label, icon, options, ...props }) => (
     <div className="space-y-1">
-        {label && <label className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</label>}
+        {label && <label className="text-xs font-bold uppercase tracking-wider text-stone-500">{label}</label>}
         <div className="relative">
-            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />}
-            <select className={`w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer ${icon ? 'pl-10' : ''}`} {...props}>
+            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />}
+            <select
+                className={`w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm font-semibold text-stone-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 appearance-none cursor-pointer ${icon ? 'pl-10' : ''}`}
+                {...props}
+            >
                 {options}
             </select>
-            <Icon path={Icons.chevronRight} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90 pointer-events-none" />
+            <Icon path={Icons.chevronRight} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 rotate-90 pointer-events-none" />
         </div>
     </div>
 );
 
 const Badge = ({ children, variant = 'default' }) => {
     const variants = {
-        default: 'bg-slate-100 text-slate-600',
+        default: 'bg-stone-100 text-stone-600',
         success: 'bg-emerald-100 text-emerald-700',
         danger: 'bg-rose-100 text-rose-700',
         warning: 'bg-amber-100 text-amber-700',
-        info: 'bg-blue-100 text-blue-700',
+        info: 'bg-[#fff0f0] text-[#a81d24]',
         purple: 'bg-purple-100 text-purple-700'
     };
     return <span className={`px-2 py-1 rounded-full text-xs font-bold ${variants[variant]}`}>{children}</span>;
@@ -133,21 +137,19 @@ const normalizeFilterText = (value) => (
     String(value ?? '')
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[̀-ͯ]/g, '')
         .trim()
 );
 
-// --- COMPONENTE: EDITABLE LIST (INTEGRADO) ---
+// --- COMPONENTE: EDITABLE LIST ---
 
 const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState(item);
     const [loading, setLoading] = useState(false);
-    const buildBlockingMessage = (blockingAbonos = []) => {
-        const abonosLabel = blockingAbonos
-            .map((abono) => `#${abono.secuencia || abono.id}`)
-            .join(', ');
 
+    const buildBlockingMessage = (blockingAbonos = []) => {
+        const abonosLabel = blockingAbonos.map((abono) => `#${abono.secuencia || abono.id}`).join(', ');
         return `No se puede eliminar esta compra porque la factura asociada ya tiene abono(s) ${abonosLabel}. Anulalos primero desde Cuentas por Pagar.`;
     };
 
@@ -166,7 +168,6 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
                     dataToSave[key] = editData[key];
                 }
             }
-            
             await updateDoc(doc(db, collectionName, item.id), dataToSave);
             setIsEditing(false);
             onUpdate(item.id, dataToSave);
@@ -199,7 +200,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
             setLoading(false);
         }
     };
-    
+
     const renderValue = (key, value) => {
         const field = fields[key];
         if (value === null || value === undefined) return '—';
@@ -213,15 +214,15 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
 
     const renderInput = (key, value) => {
         const field = fields[key];
-        if (key === 'timestamp') return <span className='text-slate-400 text-xs'>No editable</span>;
-        if (field?.readonly) return <span className='text-slate-400 text-xs'>No editable</span>;
+        if (key === 'timestamp') return <span className='text-stone-400 text-xs'>No editable</span>;
+        if (field?.readonly) return <span className='text-stone-400 text-xs'>No editable</span>;
 
         if (field?.type === 'branch') {
             return (
                 <select
                     value={value === null || value === undefined ? '' : String(value)}
                     onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
-                    className="w-full rounded border border-blue-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded border border-[#a81d24]/40 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#a81d24]/30"
                     disabled={loading}
                 >
                     <option value="">Seleccionar...</option>
@@ -240,20 +241,20 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
                 step={type === 'number' ? '0.01' : undefined}
                 value={value === null || value === undefined ? '' : String(value)}
                 onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
-                className="w-full rounded border border-blue-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded border border-[#a81d24]/40 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#a81d24]/30"
                 disabled={loading}
             />
         );
     };
 
     return (
-        <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+        <tr className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
             {Object.keys(fields).map(key => (
-                <td key={key} className="py-3 px-3 text-sm">
+                <td key={key} className="py-2.5 px-3 text-sm">
                     {isEditing ? renderInput(key, editData[key]) : renderValue(key, item[key])}
                 </td>
             ))}
-            <td className="py-3 px-3 whitespace-nowrap">
+            <td className="py-2.5 px-3 whitespace-nowrap">
                 {isEditing ? (
                     <div className='flex gap-1'>
                         <Button onClick={handleSave} disabled={loading || !item.id} variant="success" size="sm" className="flex items-center gap-1">
@@ -316,13 +317,12 @@ const EditableList = ({
     const itemMatchesText = (item, keys = [], filterText = '') => {
         const normalizedFilter = normalizeFilterText(filterText);
         if (!normalizedFilter) return true;
-
         return keys.some((key) => normalizeFilterText(item[key]).includes(normalizedFilter));
     };
 
     const filteredData = useMemo(() => {
         let result = localData;
-        
+
         if (filterValue) {
             result = localData.filter(item => {
                 const itemDate = item.date || item.month || item.fecha || item.mes;
@@ -351,10 +351,9 @@ const EditableList = ({
             if (['dateFrom', 'dateTo'].includes(filterField.key)) return;
             const fieldValue = advancedFilters[filterField.key];
             if (!fieldValue) return;
-
             result = result.filter((item) => itemMatchesText(item, filterField.keys || [filterField.key], fieldValue));
         });
-        
+
         return result.sort((a, b) => {
             const dateA = getItemDate(a);
             const dateB = getItemDate(b);
@@ -365,20 +364,20 @@ const EditableList = ({
     const hasData = filteredData && filteredData.length > 0;
 
     return (
-        <div className="mt-6">
+        <div className="mt-4">
             {onFilterChange && (
-                <div className="mb-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-4 space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
                     <div className="flex flex-wrap items-center gap-3">
-                        <label className="text-sm font-bold text-slate-600 uppercase">{filterLabel}:</label>
+                        <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">{filterLabel}:</label>
                         <input
                             type={filterType}
                             value={filterValue}
                             onChange={(e) => onFilterChange(e.target.value)}
-                            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                            className="bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-stone-700 focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 outline-none"
                         />
                         {filterValue && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => onFilterChange('')}>
-                                Limpiar fecha rapida
+                                Limpiar
                             </Button>
                         )}
                     </div>
@@ -387,7 +386,7 @@ const EditableList = ({
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                             {advancedFilterConfig.map((filterField) => (
                                 <div key={filterField.key} className="space-y-1">
-                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-stone-500">
                                         {filterField.label}
                                     </label>
                                     <input
@@ -395,7 +394,7 @@ const EditableList = ({
                                         value={advancedFilters[filterField.key] || ''}
                                         placeholder={filterField.placeholder || ''}
                                         onChange={(e) => onAdvancedFiltersChange(filterField.key, e.target.value)}
-                                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-stone-700 focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 outline-none"
                                     />
                                 </div>
                             ))}
@@ -403,32 +402,31 @@ const EditableList = ({
                     )}
                 </div>
             )}
-            
+
             {!hasData ? (
-                <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 text-slate-400 text-center">
-                    <Icon path={Icons.alertCircle} className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="font-medium">
+                <div className="p-8 border-2 border-dashed border-stone-200 rounded-xl bg-stone-50 text-stone-400 text-center">
+                    <Icon path={Icons.alertCircle} className="w-10 h-10 mx-auto mb-3 text-stone-300" />
+                    <p className="font-medium text-sm">
                         {filterValue ? `No hay registros para ${filterValue}` : "No hay registros recientes"}
                     </p>
-                    <p className="text-sm mt-1">¡Empieza a registrar datos!</p>
                 </div>
             ) : (
-                <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
+                <div className="overflow-x-auto border border-stone-200 rounded-xl shadow-sm">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="text-left bg-slate-100 border-b border-slate-200">
+                            <tr className="text-left bg-stone-100 border-b border-stone-200">
                                 {Object.values(fields).map(field => (
-                                    <th key={field.label} className="py-3 px-3 font-bold text-slate-600 text-xs uppercase tracking-wider">{field.label}</th>
+                                    <th key={field.label} className="py-2.5 px-3 font-bold text-stone-600 text-xs uppercase tracking-wider">{field.label}</th>
                                 ))}
-                                <th className="py-3 px-3 font-bold text-slate-600 text-xs uppercase tracking-wider">Acciones</th>
+                                <th className="py-2.5 px-3 font-bold text-stone-600 text-xs uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredData.map(item => (
-                                <EditableRow 
-                                    key={item.id} 
-                                    item={item} 
-                                    collectionName={collectionName} 
+                                <EditableRow
+                                    key={item.id}
+                                    item={item}
+                                    collectionName={collectionName}
                                     fields={fields}
                                     onUpdate={handleUpdate}
                                     onDelete={handleDelete}
@@ -492,7 +490,6 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
             const syncedTotal = Number(result?.totalAmount || 0);
             const syncedCount = Number(result?.syncedCount || 0);
             const syncedDate = result?.startDate || syncDate;
-
             alert(`SICAR sincronizado para ${syncedDate}: ${syncedCount} registro(s) por ${fmt(syncedTotal)}.`);
             onSuccess?.();
         } catch (error) {
@@ -502,36 +499,33 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
             setSyncLoading(false);
         }
     };
-    
+
     return (
         <div className="space-y-4">
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-                Todo se registrara en {DEFAULT_BRANCH_NAME}.
+            <div className="rounded-lg border border-[#f2c5c5] bg-[#fff8f8] px-4 py-2.5 text-xs font-semibold text-[#7f1218]">
+                Todo se registra en {DEFAULT_BRANCH_NAME}.
             </div>
 
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                 <div className="mb-3">
-                    <h4 className="text-sm font-bold text-emerald-800">Ingresos diarios desde SICAR</h4>
-                    <p className="text-xs text-emerald-700">Sincroniza el total diario de Carnes Amparito sin duplicar el ingreso manual del mismo dia.</p>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-800">Sincronizar desde SICAR</h4>
+                    <p className="text-xs text-emerald-700 mt-0.5">Sincroniza el total diario sin duplicar el ingreso manual del mismo dia.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input label="Fecha SICAR" type="date" icon="calendar" value={syncDate} onChange={e => setSyncDate(e.target.value)} required />
+                    <Input label="Fecha SICAR" type="date" icon="calendar" value={syncDate} onChange={e => setSyncDate(e.target.value)} />
                     <Button type="button" variant="success" disabled={syncLoading} className="self-end w-full" onClick={handleSyncIncome}>
                         {syncLoading ? 'Sincronizando...' : 'Sincronizar SICAR'}
                     </Button>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-                <div>
-                    <h4 className="text-sm font-bold text-slate-800">Ingreso manual</h4>
-                    <p className="text-xs text-slate-500">Registra cada ingreso por dia con su detalle para que el historial quede mas claro.</p>
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-stone-600">Ingreso manual</h4>
                 <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
-                <Input label="Detalle del ingreso" icon="fileText" placeholder="Ej: Venta del dia, deposito, transferencia..." value={description} onChange={e => setDescription(e.target.value)} required />
-                <Input label="Referencia" icon="receipt" placeholder="Ej: Cierre caja, deposito BAC, nota interna..." value={reference} onChange={e => setReference(e.target.value)} />
+                <Input label="Detalle del ingreso" icon="fileText" placeholder="Ej: Venta del dia, deposito..." value={description} onChange={e => setDescription(e.target.value)} required />
+                <Input label="Referencia" icon="receipt" placeholder="Ej: Cierre caja, nota interna..." value={reference} onChange={e => setReference(e.target.value)} />
                 <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-emerald-600" value={amount} onChange={e => setAmount(e.target.value)} required />
-                <Button type="submit" variant="success" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Ingreso Manual'}</Button>
+                <Button type="submit" variant="success" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Ingreso'}</Button>
             </form>
         </div>
     );
@@ -570,7 +564,7 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
             setLoading(false);
         }
     };
-    
+
     const handleCSVUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -604,9 +598,9 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
 
     return (
         <div className="space-y-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-                    Todo se registrara en {DEFAULT_BRANCH_NAME}.
+            <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="rounded-lg border border-[#f2c5c5] bg-[#fff8f8] px-4 py-2.5 text-xs font-semibold text-[#7f1218]">
+                    Todo se registra en {DEFAULT_BRANCH_NAME}.
                 </div>
                 <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
                 <Input label="Descripción" icon="fileText" placeholder="Ej: Pago de servicios..." value={description} onChange={e => setDescription(e.target.value)} required />
@@ -616,11 +610,11 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
                 </div>
                 <Button type="submit" variant="danger" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Gasto'}</Button>
             </form>
-            <div className="border-t border-slate-200 pt-4">
+            <div className="border-t border-stone-200 pt-4">
                 <div className="bg-amber-50 border border-dashed border-amber-300 rounded-xl p-4 text-center">
-                    <Icon path={Icons.upload} className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                    <h4 className="font-bold text-slate-700 text-sm mb-1">Carga Masiva CSV</h4>
-                    <input type="file" accept=".csv" onChange={handleCSVUpload} disabled={loading} className="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 cursor-pointer" />
+                    <Icon path={Icons.upload} className="w-7 h-7 text-amber-500 mx-auto mb-2" />
+                    <h4 className="font-bold text-stone-700 text-xs uppercase tracking-wider mb-2">Carga Masiva CSV</h4>
+                    <input type="file" accept=".csv" onChange={handleCSVUpload} disabled={loading} className="block w-full text-xs text-stone-500 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 cursor-pointer" />
                 </div>
             </div>
         </div>
@@ -628,6 +622,11 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
 };
 
 // --- OTROS FORMULARIOS ---
+
+const getCurrentMonth = () => {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
 
 const InventoryForm = ({ loading, setLoading, onSuccess }) => {
     const [month, setMonth] = useState(getCurrentMonth());
@@ -650,11 +649,11 @@ const InventoryForm = ({ loading, setLoading, onSuccess }) => {
         } catch (error) { alert('Error'); }
         finally { setLoading(false); }
     };
-    
+
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-                Todo se registrara en {DEFAULT_BRANCH_NAME}.
+        <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="rounded-lg border border-[#f2c5c5] bg-[#fff8f8] px-4 py-2.5 text-xs font-semibold text-[#7f1218]">
+                Todo se registra en {DEFAULT_BRANCH_NAME}.
             </div>
             <Input label="Mes" type="month" icon="calendar" value={month} onChange={e => setMonth(e.target.value)} required />
             <Select label="Tipo" icon="box" value={type} onChange={e => setType(e.target.value)} options={<><option value="inicial">Inicial</option><option value="final">Final</option></>} />
@@ -673,11 +672,9 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const numAmount = Number(amount);
-
         if (!supplier.trim() || isNaN(numAmount) || numAmount <= 0) {
             return alert('Complete proveedor y monto.');
         }
-
         setLoading(true);
         try {
             await addDoc(collection(db, 'compras'), {
@@ -703,14 +700,14 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
             setLoading(false);
         }
     };
-    
+
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+        <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-700">
                 Las compras registradas aqui se contabilizan como costo de contado.
             </div>
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-                Todo se registrara en {DEFAULT_BRANCH_NAME}.
+            <div className="rounded-lg border border-[#f2c5c5] bg-[#fff8f8] px-4 py-2.5 text-xs font-semibold text-[#7f1218]">
+                Todo se registra en {DEFAULT_BRANCH_NAME}.
             </div>
             <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
             <Input label="Proveedor" icon="users" placeholder="Nombre del proveedor" value={supplier} onChange={e => setSupplier(e.target.value)} required />
@@ -740,7 +737,7 @@ const BudgetForm = ({ categories, loading, setLoading, onSuccess }) => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
             <Input label="Mes" type="month" icon="calendar" value={month} onChange={e => setMonth(e.target.value)} required />
             <Select label="Categoría" icon="tag" value={categoryId} onChange={e => setCategoryId(e.target.value)} required options={<><option value="">Seleccionar...</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</>} />
             <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} required />
@@ -765,7 +762,7 @@ const ReceivableForm = ({ loading, setLoading, onSuccess }) => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
             <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
             <Input label="Cliente/Concepto" icon="users" placeholder="Nombre..." value={description} onChange={e => setDescription(e.target.value)} required />
             <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-sky-600" value={amount} onChange={e => setAmount(e.target.value)} required />
@@ -790,7 +787,7 @@ const EquityForm = ({ loading, setLoading, onSuccess }) => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
             <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
             <Input label="Descripción" icon="scale" placeholder="Capital, aporte..." value={description} onChange={e => setDescription(e.target.value)} required />
             <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-emerald-600" value={amount} onChange={e => setAmount(e.target.value)} required />
@@ -799,17 +796,25 @@ const EquityForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const getCurrentMonth = () => {
-    const date = new Date();
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-};
-
 // --- COMPONENTE PRINCIPAL ---
 
+const VALID_TABS = ['Ingresos', 'Gastos', 'Inventario', 'Compras', 'Presupuesto', 'Cuentas por Cobrar', 'Patrimonio'];
+
 export function DataEntry({ categories, data }) {
-    const [activeTab, setActiveTab] = useState('Ingresos');
+    const [searchParams] = useSearchParams();
+    const urlTab = searchParams.get('tab');
+
+    const [activeTab, setActiveTab] = useState(() => {
+        return VALID_TABS.includes(urlTab) ? urlTab : 'Ingresos';
+    });
     const [loading, setLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+
+    useEffect(() => {
+        if (urlTab && VALID_TABS.includes(urlTab)) {
+            setActiveTab(urlTab);
+        }
+    }, [urlTab]);
 
     const [filterMonth, setFilterMonth] = useState({
         Ingresos: new Date().toISOString().substring(0, 10),
@@ -832,13 +837,13 @@ export function DataEntry({ categories, data }) {
     });
 
     const tabsConfig = {
-        'Ingresos': { icon: 'trendingUp', label: 'Ingresos', color: 'emerald' },
-        'Gastos': { icon: 'trendingDown', label: 'Gastos', color: 'rose' },
-        'Inventario': { icon: 'box', label: 'Inventario', color: 'blue' },
-        'Compras': { icon: 'shoppingCart', label: 'Compras Contado', color: 'purple' },
-        'Presupuesto': { icon: 'target', label: 'Presupuesto', color: 'amber' },
-        'Cuentas por Cobrar': { icon: 'handCoin', label: 'Cuentas por Cobrar', color: 'sky' },
-        'Patrimonio': { icon: 'scale', label: 'Patrimonio', color: 'emerald' }
+        'Ingresos': { icon: 'trendingUp', label: 'Ingresos' },
+        'Gastos': { icon: 'trendingDown', label: 'Gastos' },
+        'Inventario': { icon: 'box', label: 'Inventario' },
+        'Compras': { icon: 'shoppingCart', label: 'Compras' },
+        'Presupuesto': { icon: 'target', label: 'Presupuesto' },
+        'Cuentas por Cobrar': { icon: 'handCoin', label: 'C. Cobrar' },
+        'Patrimonio': { icon: 'scale', label: 'Patrimonio' }
     };
 
     const filterConfig = {
@@ -851,9 +856,7 @@ export function DataEntry({ categories, data }) {
         Patrimonio: { type: 'month', label: 'Filtrar por Mes' },
     };
 
-    const handleSuccess = () => {
-        setRefreshKey(prev => prev + 1);
-    };
+    const handleSuccess = () => setRefreshKey(prev => prev + 1);
 
     const handleFilterChange = (tab, value) => {
         setFilterMonth(prev => ({ ...prev, [tab]: value }));
@@ -862,10 +865,7 @@ export function DataEntry({ categories, data }) {
     const handleAdvancedFilterChange = (tab, key, value) => {
         setAdvancedFilters((prev) => ({
             ...prev,
-            [tab]: {
-                ...(prev[tab] || {}),
-                [key]: value,
-            },
+            [tab]: { ...(prev[tab] || {}), [key]: value },
         }));
     };
 
@@ -984,65 +984,74 @@ export function DataEntry({ categories, data }) {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+        <div className="space-y-5">
             <style>{`
-                @keyframes fade-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-                .animate-fade-in { animation: fade-in 0.5s ease-out; }
+                @keyframes fade-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fade-in { animation: fade-in 0.4s ease-out; }
                 @media print { .no-print { display: none !important; } }
             `}</style>
 
-            <div className="max-w-7xl mx-auto">
-                <FadeIn className="mb-8">
-                    <h1 className="text-4xl font-black text-slate-800 mb-2">Registro de <span className="text-blue-600">Datos</span></h1>
-                    <p className="text-slate-500">Ingresa ingresos, gastos, inventarios y más</p>
-                </FadeIn>
-
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 mb-6 no-print">
-                    <div className="flex flex-wrap gap-2">
-                        {Object.entries(tabsConfig).map(([tab, config]) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-sm transition-all ${
-                                    activeTab === tab ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-600 hover:bg-slate-100'
-                                }`}
-                            >
-                                <Icon path={Icons[config.icon]} className="w-4 h-4" />
-                                {config.label}
-                            </button>
-                        ))}
+            {/* Page header */}
+            <div className="overflow-hidden rounded-xl border border-[#e6c9b8] bg-white shadow-sm no-print">
+                <div className="h-1 bg-gradient-to-r from-[#a81d24] via-[#f2b635] to-[#a81d24]" />
+                <div className="px-6 py-4">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#f2b635]/40 bg-[#fdf1d6] px-3 py-1 text-xs font-bold uppercase tracking-[0.3em] text-[#8a141b] mb-2">
+                        Carnes Amparito
                     </div>
+                    <h1 className="text-xl font-black text-[#7f1218]">Registro de <span className="text-[#a81d24]">Datos</span></h1>
+                    <p className="text-xs font-medium text-[#8b6a5f] mt-0.5">Ingresos, gastos, inventarios y mas</p>
+                </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="overflow-hidden rounded-xl border border-[#e6c9b8] bg-white shadow-sm p-2 no-print">
+                <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(tabsConfig).map(([tab, config]) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${
+                                activeTab === tab
+                                    ? 'bg-[#a81d24] text-white shadow-sm shadow-red-900/20'
+                                    : 'text-stone-600 hover:bg-stone-100'
+                            }`}
+                        >
+                            <Icon path={Icons[config.icon]} className="w-3.5 h-3.5" />
+                            {config.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Main content */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="no-print animate-fade-in">
+                    <Card title={`Nuevo — ${tabsConfig[activeTab].label}`} icon={tabsConfig[activeTab].icon} gradient={true}>
+                        {activeTab === 'Ingresos' && <IncomeForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Gastos' && <ExpenseForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Inventario' && <InventoryForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Compras' && <PurchasesForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Presupuesto' && <BudgetForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Cuentas por Cobrar' && <ReceivableForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Patrimonio' && <EquityForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                    </Card>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <FadeIn className="no-print">
-                        <Card title={`Nuevo ${tabsConfig[activeTab].label}`} icon={tabsConfig[activeTab].icon} gradient={true}>
-                            {activeTab === 'Ingresos' && <IncomeForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                            {activeTab === 'Gastos' && <ExpenseForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                            {activeTab === 'Inventario' && <InventoryForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                            {activeTab === 'Compras' && <PurchasesForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                            {activeTab === 'Presupuesto' && <BudgetForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                            {activeTab === 'Cuentas por Cobrar' && <ReceivableForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                            {activeTab === 'Patrimonio' && <EquityForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        </Card>
-                    </FadeIn>
-
-                    <FadeIn delay={100}>
-                        <Card title={`Historial de ${tabsConfig[activeTab].label}`} icon="receipt">
-                            <EditableList 
-                                data={getListData()}
-                                collectionName={getCollectionName()}
-                                fields={fieldsConfig[activeTab]}
-                                filterValue={filterMonth[activeTab]}
-                                filterType={filterConfig[activeTab].type}
-                                filterLabel={filterConfig[activeTab].label}
-                                onFilterChange={(value) => handleFilterChange(activeTab, value)}
-                                advancedFilters={advancedFilters[activeTab] || {}}
-                                advancedFilterConfig={advancedFilterConfig[activeTab] || []}
-                                onAdvancedFiltersChange={(key, value) => handleAdvancedFilterChange(activeTab, key, value)}
-                            />
-                        </Card>
-                    </FadeIn>
+                <div className="animate-fade-in">
+                    <Card title={`Historial — ${tabsConfig[activeTab].label}`} icon="receipt">
+                        <EditableList
+                            data={getListData()}
+                            collectionName={getCollectionName()}
+                            fields={fieldsConfig[activeTab]}
+                            filterValue={filterMonth[activeTab]}
+                            filterType={filterConfig[activeTab].type}
+                            filterLabel={filterConfig[activeTab].label}
+                            onFilterChange={(value) => handleFilterChange(activeTab, value)}
+                            advancedFilters={advancedFilters[activeTab] || {}}
+                            advancedFilterConfig={advancedFilterConfig[activeTab] || []}
+                            onAdvancedFiltersChange={(key, value) => handleAdvancedFilterChange(activeTab, key, value)}
+                        />
+                    </Card>
                 </div>
             </div>
         </div>
