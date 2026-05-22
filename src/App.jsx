@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { db } from './firebase';
 import { collection, query, onSnapshot, getDocs } from 'firebase/firestore';
@@ -32,6 +32,8 @@ const ACCOUNTS_PAYABLE_COLLECTIONS = [
     'abonos_pagar',
     'proveedores',
 ];
+
+const CATEGORY_COLLECTIONS = ['categorias'];
 
 const REPORT_COLLECTIONS = [
     'ingresos',
@@ -120,21 +122,29 @@ const AppErrorState = () => (
     </div>
 );
 
+const hasCollectionData = (currentData, collections = []) => (
+    collections.every((collectionName) => Array.isArray(currentData?.[collectionName]))
+);
+
 const useFirestoreCollections = (collections = [], enabled = true, live = true) => {
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(enabled);
     const [error, setError] = useState(null);
+    const dataRef = useRef(data);
+
+    useEffect(() => {
+        dataRef.current = data;
+    }, [data]);
 
     useEffect(() => {
         if (!enabled || !db || collections.length === 0) {
-            setData({});
             setLoading(false);
             setError(null);
             return;
         }
 
-        setData({});
-        setLoading(true);
+        const hasCachedData = hasCollectionData(dataRef.current, collections);
+        setLoading(!hasCachedData);
         setError(null);
 
         const unsubscribes = [];
@@ -170,6 +180,11 @@ const useFirestoreCollections = (collections = [], enabled = true, live = true) 
                 markCollectionAsLoaded(collectionName);
             }
         };
+
+        if (!live && hasCachedData) {
+            setLoading(false);
+            return;
+        }
 
         collections.forEach((collectionName) => {
             if (!live) {
@@ -225,7 +240,7 @@ function AppContent() {
     const reportsEnabled = !!user && isAdmin && currentPath === '/reportes';
     const categoriesEnabled = !!user && needsCategories;
 
-    const { data: categoriesData } = useFirestoreCollections(['categorias'], categoriesEnabled, true);
+    const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, categoriesEnabled, true);
     const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(
         DATA_ENTRY_COLLECTIONS,
         dataEntryEnabled,
