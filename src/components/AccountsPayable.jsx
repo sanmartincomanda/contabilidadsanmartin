@@ -267,13 +267,23 @@ export function AccountsPayable({ data }) {
     const [montoPrevisualizado, setMontoPrevisualizado] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState('transferencia');
 
-    const closeModalAbono = useCallback(() => {
-        setShowModalAbono(false);
+    const resetAbonoDraft = useCallback((nextProveedor = '') => {
+        setProveedorSeleccionado(nextProveedor);
         setSelectedFacturas([]);
         setMontoAbono('');
         setMontoPrevisualizado(0);
         setPaymentMethod('transferencia');
     }, []);
+
+    const closeModalAbono = useCallback(() => {
+        setShowModalAbono(false);
+        resetAbonoDraft('');
+    }, [resetAbonoDraft]);
+
+    const openModalAbono = useCallback((proveedor) => {
+        resetAbonoDraft(proveedor);
+        setShowModalAbono(true);
+    }, [resetAbonoDraft]);
 
     useEffect(() => {
         const items = facturasPorProveedor[proveedorSeleccionado]?.items || [];
@@ -383,8 +393,14 @@ export function AccountsPayable({ data }) {
         setLoading(true);
         try {
             await runTransaction(db, async (transaction) => {
+                const abonoRef = doc(db, 'abonos_pagar', abonoDoc.id);
+                const abonoSnap = await transaction.get(abonoRef);
+                if (!abonoSnap.exists()) {
+                    throw new Error('Este abono ya fue anulado. Actualiza la pantalla.');
+                }
+                const currentAbono = { id: abonoDoc.id, ...abonoSnap.data() };
                 const facturasParaActualizar = [];
-                for (const item of abonoDoc.detalleAfectado || []) {
+                for (const item of currentAbono.detalleAfectado || []) {
                     const fRef = doc(db, 'cuentas_por_pagar', item.id);
                     const fDoc = await transaction.get(fRef);
                     if (fDoc.exists()) {
@@ -399,10 +415,10 @@ export function AccountsPayable({ data }) {
                         estado: nuevoSaldo >= dataF.monto ? 'pendiente' : 'parcial'
                     });
                 }
-                if (abonoDoc.paymentMethod === 'efectivo' && abonoDoc.linkedGastoDiarioId) {
-                    transaction.delete(doc(db, 'gastosDiarios', abonoDoc.linkedGastoDiarioId));
+                if (currentAbono.paymentMethod === 'efectivo' && currentAbono.linkedGastoDiarioId) {
+                    transaction.delete(doc(db, 'gastosDiarios', currentAbono.linkedGastoDiarioId));
                 }
-                transaction.delete(doc(db, 'abonos_pagar', abonoDoc.id));
+                transaction.delete(abonoRef);
             });
         } catch (e) {
             alert("Error: " + e.message);
@@ -664,14 +680,7 @@ export function AccountsPayable({ data }) {
                                                 <Button
                                                     variant="success"
                                                     disabled={loading}
-                                                    onClick={() => {
-                                                        setProveedorSeleccionado(prov);
-                                                        setSelectedFacturas([]);
-                                                        setMontoAbono('');
-                                                        setMontoPrevisualizado(0);
-                                                        setPaymentMethod('transferencia');
-                                                        setShowModalAbono(true);
-                                                    }}
+                                                    onClick={() => openModalAbono(prov)}
                                                     className="flex items-center gap-1.5"
                                                 >
                                                     <Icon path={Icons.creditCard} className="w-3.5 h-3.5" />
