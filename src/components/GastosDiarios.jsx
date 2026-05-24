@@ -5,6 +5,7 @@ import {
     collection, Timestamp, getDocs, doc, deleteDoc, writeBatch
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
+import { getLocalDateString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -120,14 +121,14 @@ export default function GastosDiarios({ categories = [] }) {
     const [refreshKey, setRefreshKey] = useState(0);
 
     // Formulario
-    const [fecha, setFecha] = useState(new Date().toISOString().substring(0, 10));
+    const [fecha, setFecha] = useState(getLocalDateString());
     const [descripcion, setDescripcion] = useState('');
     const [monto, setMonto] = useState('');
     const [tipo, setTipo] = useState('Gasto');
     const [categoriaId, setCategoriaId] = useState('');
 
     // Historial
-    const [filtroFecha, setFiltroFecha] = useState(new Date().toISOString().substring(0, 10));
+    const [filtroFecha, setFiltroFecha] = useState(getLocalDateString());
     const [registros, setRegistros] = useState([]);
 
     const cargarRegistros = useCallback(async () => {

@@ -10,6 +10,7 @@ import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../cons
 import { resolveIncomeEntries } from '../services/incomeAggregation';
 import { syncSicarDailyIncome } from '../services/sicarIncomeSync';
 import { deletePurchaseTransaction } from '../services/linkedTransactions';
+import { getLocalDateString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -443,11 +444,11 @@ const EditableList = ({
 // --- FORMULARIOS ---
 
 const IncomeForm = ({ loading, setLoading, onSuccess }) => {
-    const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('VENTA DEL DIA');
     const [reference, setReference] = useState('');
     const [amount, setAmount] = useState('');
-    const [syncDate, setSyncDate] = useState(new Date().toISOString().substring(0, 10));
+    const [syncDate, setSyncDate] = useState(getLocalDateString());
     const [syncLoading, setSyncLoading] = useState(false);
 
     const handleSubmit = async (e) => {
@@ -532,7 +533,7 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
 };
 
 const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
-    const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [categoryId, setCategoryId] = useState('');
@@ -574,7 +575,7 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
             complete: async ({ data, errors }) => {
                 if (errors.length) return alert("Error en CSV.");
                 const validData = data.filter(row => row['Monto'] && !isNaN(parseFloat(row['Monto']))).map(row => ({
-                    date: row['Fecha'] || new Date().toISOString().substring(0, 10),
+                    date: row['Fecha'] || getLocalDateString(),
                     description: row['Descripcion'] || 'Sin Descripción',
                     amount: parseFloat(row['Monto']),
                     category: row['Categoria'] || 'Otros',
@@ -664,7 +665,7 @@ const InventoryForm = ({ loading, setLoading, onSuccess }) => {
 };
 
 const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
-    const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [date, setDate] = useState(getLocalDateString());
     const [supplier, setSupplier] = useState('');
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [amount, setAmount] = useState('');
@@ -747,7 +748,7 @@ const BudgetForm = ({ categories, loading, setLoading, onSuccess }) => {
 };
 
 const ReceivableForm = ({ loading, setLoading, onSuccess }) => {
-    const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
 
@@ -772,7 +773,7 @@ const ReceivableForm = ({ loading, setLoading, onSuccess }) => {
 };
 
 const EquityForm = ({ loading, setLoading, onSuccess }) => {
-    const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+    const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
 
@@ -817,7 +818,7 @@ export function DataEntry({ categories, data }) {
     }, [urlTab]);
 
     const [filterMonth, setFilterMonth] = useState({
-        Ingresos: new Date().toISOString().substring(0, 10),
+        Ingresos: getLocalDateString(),
         Gastos: getCurrentMonth(),
         Inventario: getCurrentMonth(),
         Compras: getCurrentMonth(),

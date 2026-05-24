@@ -15,6 +15,7 @@ import CategoryManager from './components/CategoryManager';
 import { AccountsPayable } from './components/AccountsPayable';
 import { fmt } from './constants';
 import { resolveReportIncomeEntries } from './services/incomeAggregation';
+import { getLocalDateString, getLocalMonthString } from './utils/localDate';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
@@ -265,8 +266,8 @@ const Dashboard = ({ data = {} }) => {
 
     // --- KPI calculations ---
     const now = new Date();
-    const currentMonth = now.toISOString().substring(0, 7);
-    const today = now.toISOString().substring(0, 10);
+    const currentMonth = getLocalMonthString(now);
+    const today = getLocalDateString(now);
     const dayOfMonth = now.getDate();
     const hour = now.getHours();
 

@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { deletePayableTransaction } from '../services/linkedTransactions';
+import { getLocalDateString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
 const Icon = ({ path, className = "w-5 h-5" }) => (
@@ -158,7 +159,7 @@ export function AccountsPayable({ data }) {
     const listaProveedores = data.proveedores || [];
 
     const [facturaForm, setFacturaForm] = useState({
-        fecha: new Date().toISOString().substring(0, 10),
+        fecha: getLocalDateString(),
         proveedor: '',
         numero: '',
         vencimiento: '',
@@ -313,7 +314,7 @@ export function AccountsPayable({ data }) {
         isProcessingRef.current = true;
         setLoading(true);
         try {
-            const fechaAbono = new Date().toISOString().substring(0, 10);
+            const fechaAbono = getLocalDateString();
             const q = query(collection(db, 'abonos_pagar'), orderBy('secuencia', 'desc'), limit(1));
             const snap = await getDocs(q);
             const nuevaSecuencia = snap.empty ? 1 : (snap.docs[0].data().secuencia + 1);
