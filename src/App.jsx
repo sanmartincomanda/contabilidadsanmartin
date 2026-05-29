@@ -40,24 +40,23 @@ const DEFAULT_REMINDERS = [
 const CONFIG_DOC_PATH = 'configuracion/dashboard';
 
 const DASHBOARD_STYLES = `
-@keyframes dash-slide-up{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dash-slide-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes dash-fade{from{opacity:0}to{opacity:1}}
-@keyframes dash-check{0%{transform:scale(0) rotate(-45deg)}60%{transform:scale(1.25) rotate(0)}100%{transform:scale(1) rotate(0)}}
-@keyframes dash-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes dash-check{0%{transform:scale(0)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes dash-pulse{0%,100%{opacity:1}50%{opacity:.5}}
 @keyframes dash-gradient{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @keyframes dash-slide-right{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-.dash-up{animation:dash-slide-up .55s cubic-bezier(.22,1,.36,1) both}
-.dash-up-1{animation-delay:60ms}.dash-up-2{animation-delay:120ms}.dash-up-3{animation-delay:180ms}.dash-up-4{animation-delay:240ms}
-.dash-up-5{animation-delay:300ms}.dash-up-6{animation-delay:360ms}
-.dash-fade{animation:dash-fade .4s ease both}
-.dash-check{animation:dash-check .35s cubic-bezier(.22,1,.36,1) both}
+.dash-up{animation:dash-slide-up .28s ease-out both}
+.dash-up-1{animation-delay:30ms}.dash-up-2{animation-delay:60ms}.dash-up-3{animation-delay:90ms}.dash-up-4{animation-delay:120ms}
+.dash-up-5{animation-delay:150ms}.dash-up-6{animation-delay:180ms}
+.dash-fade{animation:dash-fade .22s ease both}
+.dash-check{animation:dash-check .22s ease both}
 .dash-pulse{animation:dash-pulse 2s ease-in-out infinite}
-.dash-mesh{background:linear-gradient(135deg,#1a0a0b 0%,#3b1114 25%,#5e1318 50%,#7f1218 75%,#2b1113 100%);background-size:300% 300%;animation:dash-gradient 12s ease infinite}
-.dash-panel{animation:dash-slide-right .35s cubic-bezier(.22,1,.36,1) both}
-.dash-dots{background-image:radial-gradient(circle,rgba(242,182,53,.07) 1px,transparent 1px);background-size:20px 20px}
-.dash-glass{background:rgba(255,255,255,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-.dash-kpi:hover{transform:translateY(-4px);box-shadow:0 20px 40px -12px rgba(127,18,24,.18)}
-.dash-kpi{transition:all .3s cubic-bezier(.22,1,.36,1)}
+.dash-mesh{background:linear-gradient(135deg,#1a0a0b 0%,#3b1114 25%,#5e1318 50%,#7f1218 75%,#2b1113 100%);background-size:300% 300%;animation:dash-gradient 14s ease infinite}
+.dash-panel{animation:dash-slide-right .22s ease-out both}
+.dash-glass{background:rgba(255,255,255,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.dash-kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px -6px rgba(15,23,42,.12)}
+.dash-kpi{transition:transform .18s ease-out,box-shadow .18s ease-out}
 @media print{.no-print{display:none!important}}
 `;
 
@@ -157,23 +156,23 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
                     )}
 
                     {reminders.map(r => (
-                        <div key={r.id} className={`rounded-xl border p-3 transition-all ${r.activo ? 'border-[#e6c9b8] bg-white' : 'border-stone-200 bg-stone-50 opacity-60'}`}>
+                        <div key={r.id} className={`rounded-lg border p-3 transition-all ${r.activo ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-bold text-stone-800 truncate">{r.texto}</div>
+                                    <div className="text-sm font-semibold text-slate-800 truncate">{r.texto}</div>
                                     <div className="flex items-center gap-3 mt-2">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Día:</label>
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Día:</label>
                                         <input
                                             type="number"
                                             min="1"
                                             max="28"
                                             value={r.diaDelMes}
                                             onChange={e => updateDay(r.id, e.target.value)}
-                                            className="w-14 rounded-lg border border-stone-200 px-2 py-1 text-xs font-bold text-stone-700 text-center focus:border-[#a81d24] focus:ring-1 focus:ring-[#a81d24]/20 outline-none"
+                                            className="w-14 rounded-md border border-slate-300 px-2 py-1 text-xs font-bold text-slate-700 text-center focus:border-[#a81d24] focus:ring-1 focus:ring-[#a81d24]/20 outline-none bg-white"
                                         />
                                         <button
                                             onClick={() => toggleReminder(r.id)}
-                                            className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${r.activo ? 'bg-[#a81d24]' : 'bg-stone-300'}`}
+                                            className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${r.activo ? 'bg-[#a81d24]' : 'bg-slate-300'}`}
                                         >
                                             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${r.activo ? 'left-[18px]' : 'left-0.5'}`} />
                                         </button>
@@ -181,7 +180,7 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
                                 </div>
                                 <button
                                     onClick={() => removeReminder(r.id)}
-                                    className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition flex-shrink-0"
+                                    className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
                                 >
                                     <Icon d={ICON.trash} className="w-4 h-4" />
                                 </button>
@@ -190,30 +189,30 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
                     ))}
 
                     {/* Add new */}
-                    <div className="rounded-xl border-2 border-dashed border-stone-200 p-4 space-y-3">
-                        <div className="text-xs font-bold uppercase tracking-wider text-stone-400">Agregar recordatorio</div>
+                    <div className="rounded-lg border border-dashed border-slate-300 p-4 space-y-3 bg-slate-50">
+                        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Agregar recordatorio</div>
                         <input
                             type="text"
                             placeholder="Ej: PAGO DE AGUA, ALQUILER..."
                             value={newText}
                             onChange={e => setNewText(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && addReminder()}
-                            className="w-full rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 placeholder:text-stone-300 focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 outline-none"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 outline-none"
                         />
                         <div className="flex items-center gap-3">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Día del mes:</label>
+                            <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Día del mes:</label>
                             <input
                                 type="number"
                                 min="1"
                                 max="28"
                                 value={newDay}
                                 onChange={e => setNewDay(e.target.value)}
-                                className="w-16 rounded-lg border border-stone-200 px-2 py-1.5 text-sm font-bold text-stone-700 text-center focus:border-[#a81d24] focus:ring-1 focus:ring-[#a81d24]/20 outline-none"
+                                className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-bold text-slate-700 text-center focus:border-[#a81d24] focus:ring-1 focus:ring-[#a81d24]/20 outline-none"
                             />
                             <button
                                 onClick={addReminder}
                                 disabled={!newText.trim()}
-                                className="ml-auto flex items-center gap-2 rounded-xl bg-[#a81d24] px-4 py-2 text-xs font-bold text-white disabled:opacity-40 hover:bg-[#7f1218] transition"
+                                className="ml-auto flex items-center gap-2 rounded-lg bg-[#a81d24] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#7f1218] transition-colors"
                             >
                                 <Icon d={ICON.plus} className="w-3.5 h-3.5" /> Agregar
                             </button>
@@ -222,14 +221,14 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
                 </div>
 
                 {/* Footer */}
-                <div className="border-t border-[#ead5c5] bg-stone-50 px-5 py-4 flex items-center justify-between flex-shrink-0">
-                    <button onClick={onClose} className="rounded-xl border border-stone-200 px-5 py-2.5 text-xs font-bold text-stone-600 hover:bg-stone-100 transition">
+                <div className="border-t border-slate-200 bg-slate-50 px-5 py-4 flex items-center justify-between flex-shrink-0">
+                    <button onClick={onClose} className="rounded-lg border border-slate-300 px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
                         Cancelar
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="rounded-xl bg-[#a81d24] px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-[#a81d24]/25 hover:bg-[#7f1218] disabled:opacity-50 transition"
+                        className="rounded-lg bg-[#a81d24] px-6 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#7f1218] disabled:opacity-50 transition-colors"
                     >
                         {saving ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
@@ -332,10 +331,10 @@ const Dashboard = ({ data = {} }) => {
                 : 'Gastos superan ingresos este periodo';
 
     const kpis = [
-        { label: 'Ingresos', value: totalIngresos, count: mesIngresos.length, icon: ICON.trending_up, color: 'emerald', bg: 'from-emerald-500/10 to-emerald-500/5', accent: 'text-emerald-700', ring: 'ring-emerald-500/20' },
-        { label: 'Gastos', value: totalGastos, count: mesGastos.length, icon: ICON.trending_down, color: 'rose', bg: 'from-rose-500/10 to-rose-500/5', accent: 'text-rose-700', ring: 'ring-rose-500/20' },
-        { label: 'Compras', value: totalCompras, count: mesCompras.length, icon: ICON.cart, color: 'violet', bg: 'from-violet-500/10 to-violet-500/5', accent: 'text-violet-700', ring: 'ring-violet-500/20' },
-        { label: 'Por Pagar', value: totalPendiente, count: facturasPendientes.length, icon: ICON.wallet, color: 'amber', bg: 'from-amber-500/10 to-amber-500/5', accent: 'text-amber-700', ring: 'ring-amber-500/20', alert: vencidas.length > 0 },
+        { label: 'Ingresos', value: totalIngresos, count: mesIngresos.length, icon: ICON.trending_up, stripe: 'bg-emerald-500', numColor: 'text-emerald-700', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600' },
+        { label: 'Gastos', value: totalGastos, count: mesGastos.length, icon: ICON.trending_down, stripe: 'bg-[#a81d24]', numColor: 'text-[#a81d24]', iconBg: 'bg-[#fff0f0]', iconColor: 'text-[#a81d24]' },
+        { label: 'Compras', value: totalCompras, count: mesCompras.length, icon: ICON.cart, stripe: 'bg-[#f2b635]', numColor: 'text-amber-700', iconBg: 'bg-amber-50', iconColor: 'text-amber-600' },
+        { label: 'Por Pagar', value: totalPendiente, count: facturasPendientes.length, icon: ICON.wallet, stripe: 'bg-orange-500', numColor: 'text-orange-700', iconBg: 'bg-orange-50', iconColor: 'text-orange-600', alert: vencidas.length > 0 },
     ];
 
     return (
@@ -345,36 +344,28 @@ const Dashboard = ({ data = {} }) => {
             {showSettings && <SettingsPanel config={config} onClose={() => setShowSettings(false)} onSave={saveSettings} />}
 
             {/* ========= HERO HEADER ========= */}
-            <div className="dash-up overflow-hidden rounded-2xl shadow-xl shadow-[#7f1218]/12">
-                <div className="dash-mesh relative px-6 py-7 md:px-8 md:py-8 overflow-hidden">
-                    {/* Decorative dots overlay */}
-                    <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle, #f2b635 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
-
-                    <div className="relative flex items-start justify-between gap-4">
-                        <div className="space-y-3 flex-1">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-xl bg-white/10">
-                                    <Icon d={greetingIcon} className="w-5 h-5 text-[#f2b635]" />
-                                </div>
-                                <div>
-                                    <div className="text-sm font-black text-white tracking-wide">{greeting}</div>
-                                    <div className="text-xs text-white/40 font-medium capitalize">{mesLabel}</div>
-                                </div>
-                            </div>
-
-                            <div className="border-l-2 border-[#f2b635]/30 pl-4">
-                                <p className="text-xs text-white/60 font-medium">{insight}</p>
+            <div className="dash-up overflow-hidden rounded-xl shadow-lg shadow-[#1a0a0b]/20">
+                <div className="dash-mesh relative px-6 py-6 md:px-8 md:py-7 overflow-hidden">
+                    <div className="relative flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 flex-1">
+                            <img src={BRAND_LOGO} alt="Logo" className="hidden sm:block h-11 w-11 rounded-lg border border-white/15 object-cover flex-shrink-0" />
+                            <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#f2b635] mb-0.5">Carnes Amparito</div>
+                                <div className="text-base font-black text-white">{greeting}</div>
+                                <div className="text-xs text-white/40 capitalize mt-0.5">{mesLabel}</div>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            <img src={BRAND_LOGO} alt="Logo" className="hidden sm:block h-12 w-12 rounded-2xl border border-white/10 object-cover" />
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="hidden md:block border-l border-white/10 pl-4">
+                                <p className="text-xs text-white/50 max-w-[200px] leading-relaxed">{insight}</p>
+                            </div>
                             <button
                                 onClick={() => setShowSettings(true)}
-                                className="p-2.5 rounded-xl bg-white/8 border border-white/10 text-white/60 hover:bg-white/15 hover:text-[#f2b635] transition-all group"
+                                className="p-2 rounded-lg bg-white/8 border border-white/10 text-white/50 hover:bg-white/15 hover:text-[#f2b635] transition-colors group"
                                 title="Configuración"
                             >
-                                <svg className="w-5 h-5 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                <svg className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                                     <path strokeLinecap="round" strokeLinejoin="round" d={ICON.gear} />
                                     <path strokeLinecap="round" strokeLinejoin="round" d={ICON.gear_inner} />
                                 </svg>
@@ -387,70 +378,70 @@ const Dashboard = ({ data = {} }) => {
             {/* ========= KPI GRID ========= */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 {kpis.map((kpi, i) => (
-                    <div key={kpi.label} className={`dash-up dash-up-${i + 1} dash-kpi relative rounded-2xl border border-stone-200/80 bg-gradient-to-br ${kpi.bg} p-4 md:p-5 overflow-hidden`}>
+                    <div key={kpi.label} className={`dash-up dash-up-${i + 1} dash-kpi relative bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden`}>
                         {kpi.alert && (
                             <div className="absolute top-3 right-3">
                                 <span className="relative flex h-2.5 w-2.5">
-                                    <span className="dash-pulse absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                                    <span className="dash-pulse absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-500" />
                                 </span>
                             </div>
                         )}
-                        <div className={`p-2 rounded-xl bg-white shadow-sm ring-1 ${kpi.ring} w-fit mb-3`}>
-                            <Icon d={kpi.icon} className={`w-4 h-4 ${kpi.accent}`} />
+                        <div className={`h-0.5 ${kpi.stripe}`} />
+                        <div className="p-4 md:p-5">
+                            <div className={`p-2 rounded-lg ${kpi.iconBg} w-fit mb-3`}>
+                                <Icon d={kpi.icon} className={`w-4 h-4 ${kpi.iconColor}`} />
+                            </div>
+                            <div className={`text-xl md:text-2xl font-black ${kpi.numColor} font-mono tracking-tight`}>
+                                {fmt(kpi.value)}
+                            </div>
+                            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mt-1">{kpi.label}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{kpi.count} registro{kpi.count !== 1 ? 's' : ''}</div>
                         </div>
-                        <div className={`text-xl md:text-2xl font-black ${kpi.accent} font-mono tracking-tight`}>
-                            {fmt(kpi.value)}
-                        </div>
-                        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-1">{kpi.label}</div>
-                        <div className="text-[10px] text-stone-400 mt-0.5">{kpi.count} registro{kpi.count !== 1 ? 's' : ''}</div>
                     </div>
                 ))}
             </div>
 
             {/* ========= UTILIDAD ========= */}
-            <div className={`dash-up dash-up-5 rounded-2xl border p-5 md:p-6 overflow-hidden relative ${
-                utilidad >= 0
-                    ? 'border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-emerald-50'
-                    : 'border-rose-200 bg-gradient-to-r from-rose-50 via-white to-rose-50'
-            }`}>
-                <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="dash-up dash-up-5 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className={`h-0.5 ${utilidad >= 0 ? 'bg-emerald-500' : 'bg-[#a81d24]'}`} />
+                <div className="p-5 md:p-6 flex items-center justify-between flex-wrap gap-4">
                     <div>
-                        <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#b98b2d] mb-1">Resultado del Mes</div>
-                        <div className="text-xs text-stone-400 mb-2">Ingresos − Gastos − Compras</div>
-                        <div className={`text-3xl md:text-4xl font-black font-mono tracking-tighter ${utilidad >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Resultado del Mes</div>
+                        <div className="text-xs text-slate-400 mb-3">Ingresos − Gastos − Compras</div>
+                        <div className={`text-3xl md:text-4xl font-black font-mono tracking-tighter ${utilidad >= 0 ? 'text-emerald-700' : 'text-[#a81d24]'}`}>
                             {fmt(utilidad)}
                         </div>
                     </div>
-                    <div className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider ${
-                        utilidad >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                    <div className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                        utilidad >= 0
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-red-50 text-[#a81d24] border-red-200'
                     }`}>
                         {utilidad >= 0 ? 'Positivo' : 'Negativo'}
                     </div>
                 </div>
-                {/* Subtle decorative line */}
-                <div className={`absolute bottom-0 left-0 right-0 h-1 ${utilidad >= 0 ? 'bg-gradient-to-r from-transparent via-emerald-400 to-transparent' : 'bg-gradient-to-r from-transparent via-rose-400 to-transparent'}`} style={{ opacity: 0.3 }} />
             </div>
 
             {/* ========= BOTTOM GRID: Reminders + Alerts ========= */}
             <div className="dash-up dash-up-6 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
                 {/* --- REMINDERS --- */}
-                <div className="rounded-2xl border border-[#e6c9b8] bg-white overflow-hidden shadow-sm">
-                    <div className="flex items-center justify-between px-5 py-3 border-b border-[#ead5c5] bg-gradient-to-r from-stone-50 to-white">
+                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
                         <div className="flex items-center gap-2.5">
                             <div className="p-1.5 rounded-lg bg-[#fff0f0]">
                                 <Icon d={ICON.bell} className="w-4 h-4 text-[#a81d24]" />
                             </div>
                             <div>
-                                <div className="text-xs font-bold uppercase tracking-wider text-[#5f1a1f]">Recordatorios</div>
+                                <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">Recordatorios</div>
                                 {allReminders.length > 0 && (
-                                    <div className="text-[10px] text-stone-400 font-medium">{doneCount} de {allReminders.length} completados</div>
+                                    <div className="text-[10px] text-slate-400">{doneCount} de {allReminders.length} completados</div>
                                 )}
                             </div>
                         </div>
                         <button
                             onClick={() => setShowSettings(true)}
-                            className="p-1.5 rounded-lg text-stone-400 hover:text-[#a81d24] hover:bg-[#fff0f0] transition"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#a81d24] hover:bg-[#fff0f0] transition-colors"
                             title="Configurar"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -462,29 +453,29 @@ const Dashboard = ({ data = {} }) => {
 
                     <div className="p-4 space-y-1.5 max-h-72 overflow-y-auto">
                         {configLoading ? (
-                            <div className="text-center py-6 text-stone-300 text-xs">Cargando...</div>
+                            <div className="text-center py-6 text-slate-300 text-xs">Cargando...</div>
                         ) : allReminders.length === 0 ? (
                             <div className="text-center py-8">
-                                <Icon d={ICON.bell} className="w-8 h-8 text-stone-200 mx-auto mb-2" />
-                                <p className="text-xs text-stone-400">
+                                <Icon d={ICON.bell} className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                                <p className="text-xs text-slate-400">
                                     {dayOfMonth < 7 ? 'Los recordatorios aparecen a partir del día 7' : 'No hay recordatorios configurados'}
                                 </p>
                             </div>
                         ) : pendingReminders.length === 0 ? (
                             <div className="text-center py-8">
-                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                                <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-3">
                                     <Icon d={ICON.check} className="w-5 h-5 text-emerald-600" />
                                 </div>
                                 <p className="text-sm font-bold text-emerald-700">Todos completados</p>
-                                <p className="text-xs text-stone-400 mt-0.5">No quedan recordatorios pendientes este mes</p>
+                                <p className="text-xs text-slate-400 mt-0.5">No quedan recordatorios pendientes este mes</p>
                             </div>
                         ) : (
                             <>
                                 {allReminders.length > 0 && (
                                     <div className="mb-3">
-                                        <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
+                                        <div className="h-1 rounded-full bg-slate-100 overflow-hidden">
                                             <div
-                                                className="h-full rounded-full bg-gradient-to-r from-[#a81d24] to-[#f2b635] transition-all duration-700"
+                                                className="h-full rounded-full bg-[#a81d24] transition-all duration-500"
                                                 style={{ width: `${allReminders.length > 0 ? (doneCount / allReminders.length) * 100 : 0}%` }}
                                             />
                                         </div>
@@ -493,20 +484,20 @@ const Dashboard = ({ data = {} }) => {
                                 {pendingReminders.map(r => (
                                     <div
                                         key={r.id}
-                                        className={`group flex items-center gap-3 rounded-xl border border-stone-100 px-3.5 py-2.5 transition-all hover:border-[#e6c9b8] hover:bg-[#fffaf7] ${justCompleted === r.id ? 'opacity-40 scale-95' : ''}`}
+                                        className={`group flex items-center gap-3 rounded-lg border border-slate-100 px-3.5 py-2.5 transition-all hover:border-slate-200 hover:bg-slate-50 ${justCompleted === r.id ? 'opacity-40 scale-95' : ''}`}
                                     >
                                         <button
                                             onClick={() => markAsDone(r.id)}
-                                            className="w-5 h-5 rounded-md border-2 border-stone-300 flex items-center justify-center flex-shrink-0 group-hover:border-[#a81d24] transition-colors"
+                                            className="w-5 h-5 rounded border-2 border-slate-300 flex items-center justify-center flex-shrink-0 group-hover:border-[#a81d24] transition-colors"
                                         >
                                             {justCompleted === r.id && (
                                                 <Icon d={ICON.check} className="w-3 h-3 text-[#a81d24] dash-check" />
                                             )}
                                         </button>
-                                        <span className="text-sm font-semibold text-stone-700 flex-1">{r.texto}</span>
+                                        <span className="text-sm font-medium text-slate-700 flex-1">{r.texto}</span>
                                         <button
                                             onClick={() => markAsDone(r.id)}
-                                            className="text-[10px] font-bold text-stone-400 uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+                                            className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
                                         >
                                             Hecho
                                         </button>
@@ -518,14 +509,14 @@ const Dashboard = ({ data = {} }) => {
                 </div>
 
                 {/* --- FACTURAS VENCIDAS / PENDIENTES --- */}
-                <div className="rounded-2xl border border-[#e6c9b8] bg-white overflow-hidden shadow-sm">
-                    <div className="flex items-center gap-2.5 px-5 py-3 border-b border-[#ead5c5] bg-gradient-to-r from-stone-50 to-white">
-                        <div className={`p-1.5 rounded-lg ${vencidas.length > 0 ? 'bg-amber-100' : 'bg-stone-100'}`}>
-                            <Icon d={ICON.alert} className={`w-4 h-4 ${vencidas.length > 0 ? 'text-amber-600' : 'text-stone-400'}`} />
+                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                    <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+                        <div className={`p-1.5 rounded-lg ${vencidas.length > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-100'}`}>
+                            <Icon d={ICON.alert} className={`w-4 h-4 ${vencidas.length > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
                         </div>
                         <div>
-                            <div className="text-xs font-bold uppercase tracking-wider text-[#5f1a1f]">Cuentas por Pagar</div>
-                            <div className="text-[10px] text-stone-400 font-medium">
+                            <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">Cuentas por Pagar</div>
+                            <div className="text-[10px] text-slate-400">
                                 {facturasPendientes.length} pendientes{vencidas.length > 0 ? ` · ${vencidas.length} vencida(s)` : ''}
                             </div>
                         </div>
@@ -533,15 +524,15 @@ const Dashboard = ({ data = {} }) => {
 
                     <div className="p-4 space-y-2 max-h-72 overflow-y-auto">
                         {vencidas.length > 0 && (
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 mb-3">
-                                <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-1.5 flex items-center gap-1.5">
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 mb-3">
+                                <div className="text-[10px] font-semibold uppercase tracking-widest text-amber-700 mb-2 flex items-center gap-1.5">
                                     <span className="relative flex h-2 w-2"><span className="dash-pulse absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" /></span>
                                     Facturas vencidas
                                 </div>
                                 {vencidas.slice(0, 5).map(f => (
                                     <div key={f.id} className="flex items-center justify-between py-1.5 border-t border-amber-200/50 first:border-0">
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-xs font-bold text-stone-800 truncate">{f.proveedor || f.supplier || 'Sin proveedor'}</div>
+                                            <div className="text-xs font-semibold text-slate-800 truncate">{f.proveedor || f.supplier || 'Sin proveedor'}</div>
                                             <div className="text-[10px] text-amber-600">{f.numero || ''}{f.vencimiento ? ` · Venció ${f.vencimiento}` : ''}</div>
                                         </div>
                                         <div className="text-xs font-black text-amber-800 flex-shrink-0 ml-3 font-mono">{fmt(f.saldo)}</div>
@@ -552,20 +543,20 @@ const Dashboard = ({ data = {} }) => {
 
                         {facturasPendientes.length === 0 ? (
                             <div className="text-center py-8">
-                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                                <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-3">
                                     <Icon d={ICON.check} className="w-5 h-5 text-emerald-600" />
                                 </div>
                                 <p className="text-sm font-bold text-emerald-700">Sin pendientes</p>
-                                <p className="text-xs text-stone-400 mt-0.5">Todas las cuentas están al día</p>
+                                <p className="text-xs text-slate-400 mt-0.5">Todas las cuentas están al día</p>
                             </div>
                         ) : (
                             facturasPendientes.filter(f => !vencidas.includes(f)).slice(0, 6).map(f => (
-                                <div key={f.id} className="flex items-center justify-between rounded-xl border border-stone-100 px-3.5 py-2.5">
+                                <div key={f.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3.5 py-2.5 hover:bg-slate-50 transition-colors">
                                     <div className="min-w-0 flex-1">
-                                        <div className="text-xs font-bold text-stone-700 truncate">{f.proveedor || f.supplier || 'Sin proveedor'}</div>
-                                        <div className="text-[10px] text-stone-400">{f.numero || ''}{f.vencimiento ? ` · Vence ${f.vencimiento}` : ''}</div>
+                                        <div className="text-xs font-semibold text-slate-700 truncate">{f.proveedor || f.supplier || 'Sin proveedor'}</div>
+                                        <div className="text-[10px] text-slate-400">{f.numero || ''}{f.vencimiento ? ` · Vence ${f.vencimiento}` : ''}</div>
                                     </div>
-                                    <div className="text-xs font-black text-stone-800 flex-shrink-0 ml-3 font-mono">{fmt(f.saldo)}</div>
+                                    <div className="text-xs font-black text-slate-800 flex-shrink-0 ml-3 font-mono">{fmt(f.saldo)}</div>
                                 </div>
                             ))
                         )}
@@ -579,21 +570,21 @@ const Dashboard = ({ data = {} }) => {
 // --- LOADING / ERROR ---
 
 const AppLoadingState = () => (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#fff8f3] px-6 text-center text-[#7f1218]">
-        <img src={BRAND_LOGO} alt="Carnes Amparito" className="h-28 w-28 rounded-[1.75rem] border border-[#edd5c5] bg-white p-2 shadow-xl shadow-[#7f1218]/10" />
+    <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-6 text-center">
+        <img src={BRAND_LOGO} alt="Carnes Amparito" className="h-24 w-24 rounded-xl border border-slate-200 bg-white p-2 shadow-lg shadow-slate-900/8" />
         <div>
-            <p className="text-xs font-bold uppercase tracking-[0.45em] text-[#b98b2d]">Carnes Amparito</p>
-            <p className="mt-3 text-2xl font-black">Cargando informacion contable...</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[#f2b635]">Carnes Amparito</p>
+            <p className="mt-2 text-xl font-black text-slate-800">Cargando informacion contable...</p>
         </div>
     </div>
 );
 
 const AppErrorState = () => (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#fff4f1] p-6 text-center">
-        <img src={BRAND_LOGO} alt="Carnes Amparito" className="mb-6 h-32 w-32 rounded-[2rem] border border-[#f0d3c8] bg-white p-2 shadow-xl shadow-[#7f1218]/10" />
-        <h1 className="text-3xl font-black text-[#8a141b]">Error de conexion</h1>
-        <p className="mt-3 max-w-md text-sm font-medium text-[#6f4d48]">No logramos cargar la informacion de Carnes Amparito. Revisa la conexion e intenta nuevamente.</p>
-        <button onClick={() => window.location.reload()} className="mt-6 rounded-full bg-[#a81d24] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#a81d24]/25 transition hover:bg-[#8c171d]">Reintentar</button>
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
+        <img src={BRAND_LOGO} alt="Carnes Amparito" className="mb-5 h-24 w-24 rounded-xl border border-slate-200 bg-white p-2 shadow-lg shadow-slate-900/8" />
+        <h1 className="text-2xl font-black text-slate-900">Error de conexion</h1>
+        <p className="mt-2 max-w-sm text-sm text-slate-500">No logramos cargar la informacion de Carnes Amparito. Revisa la conexion e intenta nuevamente.</p>
+        <button onClick={() => window.location.reload()} className="mt-5 rounded-lg bg-[#a81d24] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#7f1218]">Reintentar</button>
     </div>
 );
 

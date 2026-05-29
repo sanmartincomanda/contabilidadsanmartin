@@ -9,7 +9,7 @@ import Papa from 'papaparse';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../constants';
 import { resolveIncomeEntries } from '../services/incomeAggregation';
 import { syncSicarDailyIncome } from '../services/sicarIncomeSync';
-import { deletePurchaseTransaction } from '../services/linkedTransactions';
+import { deletePurchaseTransaction, updatePurchaseTransaction } from '../services/linkedTransactions';
 import { getLocalDateString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
@@ -51,16 +51,16 @@ const Icon = ({ path, className = "w-5 h-5" }) => (
 
 // --- COMPONENTES UI ---
 
-const Card = ({ title, children, className = "", right, icon, gradient = false }) => (
-    <div className={`rounded-xl shadow-md border border-[#e6c9b8]/60 bg-white overflow-hidden ${className}`}>
-        <div className={`flex justify-between items-center px-5 py-3 border-b ${gradient ? 'bg-[#7f1218] border-[#5e1318]' : 'bg-stone-50 border-[#ead5c5]'}`}>
+const Card = ({ title, children, className = "", right, icon }) => (
+    <div className={`rounded-xl shadow-sm border border-slate-200 bg-white overflow-hidden ${className}`}>
+        <div className="flex justify-between items-center px-5 py-3.5 border-b border-slate-100 bg-slate-50">
             <div className="flex items-center gap-3">
                 {icon && (
-                    <div className={`p-2 rounded-lg ${gradient ? 'bg-white/10' : 'bg-[#fff0f0]'}`}>
-                        <Icon path={Icons[icon]} className={`w-4 h-4 ${gradient ? 'text-white' : 'text-[#a81d24]'}`} />
+                    <div className="p-1.5 rounded-lg bg-[#fff0f0]">
+                        <Icon path={Icons[icon]} className="w-4 h-4 text-[#a81d24]" />
                     </div>
                 )}
-                <h3 className={`text-sm font-bold uppercase tracking-wider ${gradient ? 'text-white' : 'text-[#5f1a1f]'}`}>{title}</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">{title}</h3>
             </div>
             {right}
         </div>
@@ -69,22 +69,22 @@ const Card = ({ title, children, className = "", right, icon, gradient = false }
 );
 
 const Button = ({ children, variant = 'primary', className = '', disabled, size = 'md', ...props }) => {
-    const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-sm' };
+    const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5 text-sm' };
     const variants = {
-        primary: 'bg-[#a81d24] hover:bg-[#7f1218] text-white shadow-sm shadow-red-900/20',
+        primary: 'bg-[#a81d24] hover:bg-[#7f1218] text-white shadow-sm',
         success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
-        danger: 'bg-rose-600 hover:bg-rose-700 text-white',
+        danger: 'bg-red-600 hover:bg-red-700 text-white',
         warning: 'bg-amber-500 hover:bg-amber-600 text-white',
-        purple: 'bg-purple-600 hover:bg-purple-700 text-white',
+        purple: 'bg-violet-600 hover:bg-violet-700 text-white',
         sky: 'bg-sky-600 hover:bg-sky-700 text-white',
-        ghost: 'bg-transparent hover:bg-stone-100 text-stone-600 border border-stone-200',
-        dark: 'bg-[#2b1113] hover:bg-[#1a0a0b] text-white'
+        ghost: 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-300',
+        dark: 'bg-slate-900 hover:bg-slate-800 text-white'
     };
 
     return (
         <button
             disabled={disabled}
-            className={`${sizes[size]} rounded-lg font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+            className={`${sizes[size]} rounded-lg font-semibold transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] ${variants[variant]} ${className}`}
             {...props}
         >
             {children}
@@ -96,10 +96,10 @@ const Input = ({ label, icon, type = "text", className = '', ...props }) => (
     <div className="space-y-1">
         {label && <label className="text-xs font-bold uppercase tracking-wider text-stone-500">{label}</label>}
         <div className="relative group">
-            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-[#a81d24] transition-colors" />}
+            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#a81d24] transition-colors" />}
             <input
                 type={type}
-                className={`w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm font-semibold text-stone-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 ${icon ? 'pl-10' : ''} ${className}`}
+                className={`w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 ${icon ? 'pl-10' : ''} ${className}`}
                 {...props}
             />
         </div>
@@ -107,31 +107,31 @@ const Input = ({ label, icon, type = "text", className = '', ...props }) => (
 );
 
 const Select = ({ label, icon, options, ...props }) => (
-    <div className="space-y-1">
-        {label && <label className="text-xs font-bold uppercase tracking-wider text-stone-500">{label}</label>}
+    <div className="space-y-1.5">
+        {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
         <div className="relative">
-            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />}
+            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />}
             <select
-                className={`w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm font-semibold text-stone-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 appearance-none cursor-pointer ${icon ? 'pl-10' : ''}`}
+                className={`w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 appearance-none cursor-pointer pr-8 ${icon ? 'pl-10' : ''}`}
                 {...props}
             >
                 {options}
             </select>
-            <Icon path={Icons.chevronRight} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 rotate-90 pointer-events-none" />
+            <Icon path={Icons.chevronRight} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90 pointer-events-none" />
         </div>
     </div>
 );
 
 const Badge = ({ children, variant = 'default' }) => {
     const variants = {
-        default: 'bg-stone-100 text-stone-600',
-        success: 'bg-emerald-100 text-emerald-700',
-        danger: 'bg-rose-100 text-rose-700',
-        warning: 'bg-amber-100 text-amber-700',
-        info: 'bg-[#fff0f0] text-[#a81d24]',
-        purple: 'bg-purple-100 text-purple-700'
+        default: 'bg-slate-100 text-slate-600',
+        success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+        danger: 'bg-red-50 text-red-700 border border-red-200',
+        warning: 'bg-amber-50 text-amber-700 border border-amber-200',
+        info: 'bg-[#fff0f0] text-[#a81d24] border border-red-100',
+        purple: 'bg-violet-50 text-violet-700 border border-violet-200'
     };
-    return <span className={`px-2 py-1 rounded-full text-xs font-bold ${variants[variant]}`}>{children}</span>;
+    return <span className={`px-2 py-0.5 rounded text-xs font-semibold ${variants[variant]}`}>{children}</span>;
 };
 
 const normalizeFilterText = (value) => (
@@ -169,9 +169,20 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
                     dataToSave[key] = editData[key];
                 }
             }
-            await updateDoc(doc(db, collectionName, item.id), dataToSave);
+
+            let savedData = dataToSave;
+            if (collectionName === 'compras') {
+                const result = await updatePurchaseTransaction(item.id, dataToSave);
+                if (result?.missing) {
+                    throw new Error('La compra ya no existe.');
+                }
+                savedData = result?.purchase || dataToSave;
+            } else {
+                await updateDoc(doc(db, collectionName, item.id), dataToSave);
+            }
+
             setIsEditing(false);
-            onUpdate(item.id, dataToSave);
+            onUpdate(item.id, savedData);
         } catch (error) {
             console.error("Error al actualizar:", error);
             alert("Error al guardar: " + error.message);

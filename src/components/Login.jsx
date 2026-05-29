@@ -35,101 +35,90 @@ export default function Login() {
     };
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-[#fff8f2]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(242,182,53,0.18),transparent_28rem),radial-gradient(circle_at_bottom_right,rgba(168,29,36,0.15),transparent_24rem)]" />
-            <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-12 sm:px-6 lg:px-8">
-                <div className="grid w-full gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-                    <div className="flex flex-col justify-center">
-                        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#f2b635]/45 bg-[#fff1d5] px-4 py-2 text-xs font-bold uppercase tracking-[0.35em] text-[#8a141b]">
-                            Historia y calidad
-                        </div>
-                        <h1 className="mt-6 text-5xl font-black leading-tight text-[#7f1218] lg:text-6xl">
-                            Centro Contable Carnes Amparito
-                        </h1>
-                        <p className="mt-5 max-w-xl text-base font-medium leading-8 text-[#5f4540] lg:text-lg">
-                            Una experiencia visual alineada con la marca para gestionar ingresos, costos, cuentas por pagar y reportes desde un solo lugar.
-                        </p>
-                        <div className="mt-8 flex flex-wrap gap-4">
-                            <div className="rounded-2xl border border-[#ead6ca] bg-white/85 px-5 py-4 shadow-lg shadow-[#7f1218]/5">
-                                <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">Marca</div>
-                                <div className="mt-2 text-lg font-black text-[#7f1218]">Carnes Amparito</div>
-                            </div>
-                            <div className="rounded-2xl border border-[#ead6ca] bg-white/85 px-5 py-4 shadow-lg shadow-[#7f1218]/5">
-                                <div className="text-xs font-bold uppercase tracking-[0.25em] text-[#b98b2d]">Enfoque</div>
-                                <div className="mt-2 text-lg font-black text-[#7f1218]">Control financiero</div>
-                            </div>
-                        </div>
+        <div className="relative min-h-screen flex items-center justify-center px-4 py-12">
+            <div className="w-full max-w-md">
+
+                {/* Brand mark */}
+                <div className="flex flex-col items-center mb-8">
+                    <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-md mb-4">
+                        <img
+                            src={BRAND_LOGO}
+                            alt="Carnes Amparito"
+                            className="h-16 w-16 rounded-lg object-cover"
+                        />
                     </div>
-
-                    <div className="relative">
-                        <div className="absolute inset-6 rounded-[2.5rem] bg-[#a81d24]/10 blur-3xl" />
-                        <div className="relative overflow-hidden rounded-[2rem] border border-[#ebd4c8] bg-white/92 p-6 shadow-[0_30px_80px_rgba(127,18,24,0.16)] sm:p-8">
-                            <div className="mb-6 flex items-center gap-4">
-                                <div className="rounded-[1.5rem] border border-[#f0ddd2] bg-[#fff8f3] p-2 shadow-lg shadow-[#7f1218]/5">
-                                    <img
-                                        src={BRAND_LOGO}
-                                        alt="Carnes Amparito"
-                                        className="h-20 w-20 rounded-[1.1rem] object-cover"
-                                    />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#b98b2d]">Acceso seguro</p>
-                                    <h2 className="mt-2 text-2xl font-black text-[#7f1218]">Iniciar sesion</h2>
-                                </div>
-                            </div>
-
-                            {error && (
-                                <div className="mb-5 rounded-2xl border border-[#f0c9c3] bg-[#fff1ef] p-4 text-sm font-semibold text-[#8a141b]">
-                                    {error}
-                                </div>
-                            )}
-
-                            <form className="space-y-5" onSubmit={handleSubmit}>
-                                <div>
-                                    <label htmlFor="email" className="mb-2 block text-sm font-bold uppercase tracking-[0.22em] text-[#7f1218]">
-                                        Correo electronico
-                                    </label>
-                                    <input
-                                        id="email"
-                                        name="email"
-                                        type="email"
-                                        autoComplete="email"
-                                        required
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        disabled={isLoggingIn}
-                                        className="block w-full rounded-2xl border border-[#e7d5ca] bg-[#fffdfa] px-4 py-3 text-sm font-semibold text-[#392829] shadow-sm outline-none transition focus:border-[#a81d24] focus:ring-4 focus:ring-[#a81d24]/10"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label htmlFor="password" className="mb-2 block text-sm font-bold uppercase tracking-[0.22em] text-[#7f1218]">
-                                        Contrasena
-                                    </label>
-                                    <input
-                                        id="password"
-                                        name="password"
-                                        type="password"
-                                        autoComplete="current-password"
-                                        required
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        disabled={isLoggingIn}
-                                        className="block w-full rounded-2xl border border-[#e7d5ca] bg-[#fffdfa] px-4 py-3 text-sm font-semibold text-[#392829] shadow-sm outline-none transition focus:border-[#a81d24] focus:ring-4 focus:ring-[#a81d24]/10"
-                                    />
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={isLoggingIn}
-                                    className="w-full rounded-2xl bg-gradient-to-r from-[#a81d24] to-[#7f1218] px-4 py-3 text-sm font-black uppercase tracking-[0.28em] text-white shadow-lg shadow-[#a81d24]/25 transition hover:scale-[1.01] hover:from-[#b31f27] hover:to-[#8a141b] disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {isLoggingIn ? 'Ingresando...' : 'Entrar'}
-                                </button>
-                            </form>
-                        </div>
+                    <div className="text-center">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#f2b635]">Centro Contable</p>
+                        <h1 className="text-2xl font-black text-slate-900 mt-1">Carnes Amparito</h1>
+                        <p className="text-sm text-slate-400 mt-1">Sistema de gestion financiera</p>
                     </div>
                 </div>
+
+                {/* Login card */}
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="h-0.5 bg-gradient-to-r from-[#a81d24] via-[#f2b635] to-[#a81d24]" />
+                    <div className="p-6 sm:p-8">
+                        <div className="mb-6">
+                            <h2 className="text-lg font-black text-slate-900">Iniciar sesion</h2>
+                            <p className="text-xs text-slate-400 mt-0.5 uppercase tracking-wider font-medium">Acceso restringido — personal autorizado</p>
+                        </div>
+
+                        {error && (
+                            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm font-medium text-[#a81d24]">
+                                {error}
+                            </div>
+                        )}
+
+                        <form className="space-y-4" onSubmit={handleSubmit}>
+                            <div>
+                                <label htmlFor="email" className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+                                    Correo electronico
+                                </label>
+                                <input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    required
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    disabled={isLoggingIn}
+                                    className="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 disabled:opacity-60"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="password" className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+                                    Contrasena
+                                </label>
+                                <input
+                                    id="password"
+                                    name="password"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    disabled={isLoggingIn}
+                                    className="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 disabled:opacity-60"
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isLoggingIn}
+                                className="mt-2 w-full rounded-lg bg-[#a81d24] px-4 py-3 text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-[#7f1218] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isLoggingIn ? 'Verificando...' : 'Entrar al sistema'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {/* Footer note */}
+                <p className="mt-6 text-center text-xs text-slate-400">
+                    Uso exclusivo del personal de Carnes Amparito
+                </p>
             </div>
         </div>
     );

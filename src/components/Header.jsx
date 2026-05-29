@@ -30,7 +30,7 @@ const Icon = ({ path, className = 'w-5 h-5' }) => (
 );
 
 const dropdownBase =
-    'rounded-2xl border border-[#efd8c8] bg-white/95 shadow-2xl shadow-[#7f1218]/10 ring-1 ring-[#7f1218]/5 backdrop-blur';
+    'rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10';
 
 export default function Header() {
     const { user, logout } = useAuth();
@@ -82,10 +82,10 @@ export default function Header() {
         <Link
             to={to}
             onClick={onClick}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors duration-150 ${
                 active
-                    ? 'bg-[#a81d24] text-white shadow-lg shadow-[#a81d24]/30'
-                    : 'text-[#f8ece2] hover:bg-white/10 hover:text-white'
+                    ? 'bg-[#a81d24] text-white'
+                    : 'text-white/75 hover:bg-white/10 hover:text-white'
             }`}
         >
             {icon && <Icon path={Icons[icon]} className="w-4 h-4" />}
@@ -112,58 +112,58 @@ export default function Header() {
                 </button>
 
                 {isMenuOpen && (
-                    <div className={`absolute left-0 top-full z-50 mt-3 w-64 overflow-hidden ${dropdownBase}`}>
-                        <div className="border-b border-[#f1dfd1] bg-[#fff8f2] px-4 py-3">
-                            <div className="text-xs font-bold uppercase tracking-[0.3em] text-[#b98b2d]">Carnes Amparito</div>
-                            <div className="mt-1 text-sm font-black text-[#7f1218]">Registro operativo</div>
+                    <div className={`absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden ${dropdownBase}`}>
+                        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.35em] text-[#f2b635]">Carnes Amparito</div>
+                            <div className="mt-0.5 text-sm font-bold text-slate-800">Ingresar Datos</div>
                         </div>
-                        <div className="p-2">
+                        <div className="p-1.5">
                             <button
                                 onClick={() => handleDataEntryClick('Ingresos')}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[#5d413d] transition hover:bg-[#edf8f0] hover:text-[#166534]"
+                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800"
                             >
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e3f7e8] text-[#1e7a44]">
+                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
                                     <Icon path={Icons.trendingUp} className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-black">Ingresos</div>
-                                    <div className="text-xs text-[#92736f]">Ventas y movimientos del dia</div>
+                                    <div className="font-semibold text-sm">Ingresos</div>
+                                    <div className="text-xs text-slate-400">Ventas del dia</div>
                                 </div>
                             </button>
                             <button
                                 onClick={() => handleDataEntryClick('Gastos')}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[#5d413d] transition hover:bg-[#fff0ef] hover:text-[#8a141b]"
+                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-red-50 hover:text-red-800"
                             >
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fde2de] text-[#a81d24]">
+                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#fff0f0] text-[#a81d24]">
                                     <Icon path={Icons.trendingDown} className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-black">Gastos</div>
-                                    <div className="text-xs text-[#92736f]">Egresos y pagos operativos</div>
+                                    <div className="font-semibold text-sm">Gastos</div>
+                                    <div className="text-xs text-slate-400">Egresos operativos</div>
                                 </div>
                             </button>
                             <button
                                 onClick={() => handleDataEntryClick('Inventario')}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[#5d413d] transition hover:bg-[#fff7e7] hover:text-[#8a5a11]"
+                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-amber-50 hover:text-amber-800"
                             >
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fff0c8] text-[#b67812]">
+                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
                                     <Icon path={Icons.wallet} className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-black">Inventario</div>
-                                    <div className="text-xs text-[#92736f]">Control y valorizacion</div>
+                                    <div className="font-semibold text-sm">Inventario</div>
+                                    <div className="text-xs text-slate-400">Control y valorización</div>
                                 </div>
                             </button>
                             <button
                                 onClick={() => handleDataEntryClick('Presupuesto')}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[#5d413d] transition hover:bg-[#fff5ee] hover:text-[#9a4a0e]"
+                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100"
                             >
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ffe8d5] text-[#bb5d1f]">
+                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                                     <Icon path={Icons.chart} className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-black">Presupuesto</div>
-                                    <div className="text-xs text-[#92736f]">Planificacion mensual</div>
+                                    <div className="font-semibold text-sm">Presupuesto</div>
+                                    <div className="text-xs text-slate-400">Planificacion mensual</div>
                                 </div>
                             </button>
                         </div>
@@ -243,12 +243,12 @@ export default function Header() {
 
                                 <div className="ml-4 flex items-center gap-3 border-l border-white/15 pl-4">
                                     <div className="hidden lg:flex flex-col items-end">
-                                        <span className="text-sm font-black text-white">{user.email.split('@')[0]}</span>
-                                        <span className="text-xs font-medium text-[#f3d3c2]">{user.email}</span>
+                                        <span className="text-sm font-bold text-white">{user.email.split('@')[0]}</span>
+                                        <span className="text-xs text-white/40">{user.email}</span>
                                     </div>
                                     <button
                                         onClick={handleLogout}
-                                        className="flex items-center gap-2 rounded-xl border border-[#f2b635]/35 bg-[#f2b635]/12 px-4 py-2.5 text-sm font-bold text-[#ffe9b3] transition hover:bg-[#f2b635] hover:text-[#651317] hover:shadow-lg hover:shadow-[#f2b635]/20"
+                                        className="flex items-center gap-2 rounded-lg border border-[#f2b635]/30 bg-[#f2b635]/10 px-3.5 py-2 text-sm font-semibold text-[#f2b635] transition-colors hover:bg-[#f2b635] hover:text-[#651317]"
                                     >
                                         <Icon path={Icons.logout} className="w-4 h-4" />
                                         <span className="hidden sm:inline">Salir</span>

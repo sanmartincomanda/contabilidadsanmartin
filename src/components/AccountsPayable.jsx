@@ -51,35 +51,35 @@ const SlideIn = ({ children, className = "" }) => (
 
 // --- COMPONENTES UI ---
 const Card = ({ title, children, className = "", right, icon }) => (
-    <div className={`rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden ${className}`}>
-        <div className="flex justify-between items-center px-6 py-4 border-b border-stone-100 bg-stone-50">
+    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden ${className}`}>
+        <div className="flex justify-between items-center px-5 py-3.5 border-b border-slate-100 bg-slate-50">
             <div className="flex items-center gap-3">
                 {icon && (
-                    <div className="p-2 bg-[#fff0f0] rounded-lg">
+                    <div className="p-1.5 bg-[#fff0f0] rounded-lg">
                         <Icon path={Icons[icon]} className="w-4 h-4 text-[#a81d24]" />
                     </div>
                 )}
-                <h3 className="text-sm font-bold text-slate-800 tracking-tight">{title}</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">{title}</h3>
             </div>
             {right}
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-5">{children}</div>
     </div>
 );
 
 const Button = ({ children, variant = 'primary', className = '', disabled, ...props }) => {
     const variants = {
-        primary:   'bg-[#a81d24] hover:bg-[#7f1218] text-white shadow-sm shadow-red-900/20',
-        danger:    'bg-red-600 hover:bg-red-700 text-white shadow-sm shadow-red-500/20',
-        success:   'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-500/20',
-        ghost:     'bg-transparent hover:bg-stone-100 text-slate-600 border border-stone-300',
-        outline:   'bg-white border-2 border-stone-200 hover:border-[#a81d24] text-slate-700 hover:text-[#a81d24]',
-        secondary: 'bg-stone-100 hover:bg-stone-200 text-slate-700'
+        primary:   'bg-[#a81d24] hover:bg-[#7f1218] text-white shadow-sm',
+        danger:    'bg-red-600 hover:bg-red-700 text-white',
+        success:   'bg-emerald-600 hover:bg-emerald-700 text-white',
+        ghost:     'bg-white hover:bg-slate-50 text-slate-600 border border-slate-300',
+        outline:   'bg-white border border-slate-300 hover:border-[#a81d24] text-slate-700 hover:text-[#a81d24]',
+        secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-700'
     };
     return (
         <button
             disabled={disabled}
-            className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] ${variants[variant]} ${className}`}
+            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] ${variants[variant]} ${className}`}
             {...props}
         >
             {children}
@@ -89,11 +89,11 @@ const Button = ({ children, variant = 'primary', className = '', disabled, ...pr
 
 const Input = ({ label, icon, className = '', ...props }) => (
     <div className="space-y-1.5">
-        {label && <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</label>}
+        {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
         <div className="relative group">
             {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#a81d24] transition-colors" />}
             <input
-                className={`w-full bg-stone-50 border border-stone-300 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:bg-white focus:shadow-sm ${icon ? 'pl-10' : ''} ${className}`}
+                className={`w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 ${icon ? 'pl-10' : ''} ${className}`}
                 {...props}
             />
         </div>
@@ -102,10 +102,10 @@ const Input = ({ label, icon, className = '', ...props }) => (
 
 const Select = ({ label, options, ...props }) => (
     <div className="space-y-1.5">
-        {label && <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</label>}
+        {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
         <div className="relative">
             <select
-                className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:bg-white appearance-none cursor-pointer"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 appearance-none cursor-pointer pr-8"
                 {...props}
             >
                 {options}
@@ -117,14 +117,14 @@ const Select = ({ label, options, ...props }) => (
 
 const Badge = ({ children, variant = 'default' }) => {
     const variants = {
-        default: 'bg-stone-100 text-slate-600',
+        default: 'bg-slate-100 text-slate-600',
         danger:  'bg-red-50 text-red-700 border border-red-200',
         warning: 'bg-amber-50 text-amber-700 border border-amber-200',
         success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
         info:    'bg-sky-50 text-sky-700 border border-sky-200'
     };
     return (
-        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${variants[variant]}`}>
+        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${variants[variant]}`}>
             {children}
         </span>
     );
@@ -672,11 +672,14 @@ export function AccountsPayable({ data }) {
                                         icon="building"
                                         right={
                                             <div className="flex items-center gap-3">
-                                                <div className="text-right hidden sm:block">
+                                                <div className="rounded-lg border border-[#f3d8ca] bg-[#fff8f4] px-3 py-2 text-right">
                                                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                                        {provData.items.length} {provData.items.length === 1 ? 'factura' : 'facturas'}
+                                                        Saldo proveedor
                                                     </div>
                                                     <div className="text-lg font-bold text-[#a81d24]">{fmt(provData.saldoTotal)}</div>
+                                                    <div className="text-[10px] text-slate-400 font-medium">
+                                                        {provData.items.length} {provData.items.length === 1 ? 'factura' : 'facturas'}
+                                                    </div>
                                                 </div>
                                                 <Button
                                                     variant="success"
