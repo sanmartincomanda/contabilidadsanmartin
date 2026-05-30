@@ -324,10 +324,10 @@ export default function GastosDiarios({ categories = [] }) {
 
             {/* Tabs */}
             <div className="erp-command-strip rounded-[24px] p-1.5 no-print">
-                <div className="flex gap-1">
+                <div className="erp-mobile-tabs -mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:overflow-visible">
                     <button
                         onClick={() => setActiveTab('registro')}
-                        className={`erp-pressable flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
+                        className={`erp-pressable flex shrink-0 items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                             activeTab === 'registro'
                                 ? 'bg-[#152533] text-white shadow-[0_16px_26px_-18px_rgba(15,23,42,.8)]'
                                 : 'text-[#5b6e7b] hover:bg-white hover:text-[#16222d]'
@@ -338,7 +338,7 @@ export default function GastosDiarios({ categories = [] }) {
                     </button>
                     <button
                         onClick={() => setActiveTab('historial')}
-                        className={`erp-pressable flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
+                        className={`erp-pressable flex shrink-0 items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                             activeTab === 'historial'
                                 ? 'bg-[#152533] text-white'
                                 : 'text-[#5b6e7b] hover:bg-white hover:text-[#16222d]'
@@ -355,7 +355,7 @@ export default function GastosDiarios({ categories = [] }) {
                     <Card title="Captura de caja" icon="receipt" gradient={true}>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {/* Fecha + Tipo en la misma fila */}
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <Input
                                     label="Fecha"
                                     type="date"
@@ -445,7 +445,7 @@ export default function GastosDiarios({ categories = [] }) {
                     >
                         <div className="space-y-5">
                             {/* Filtros */}
-                            <div className="erp-filter-panel flex flex-wrap items-end gap-3 p-4">
+                            <div className="erp-filter-panel flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end">
                                 <Input
                                     label="Fecha"
                                     type="date"
@@ -457,7 +457,7 @@ export default function GastosDiarios({ categories = [] }) {
                                     onClick={cargarRegistros}
                                     variant="ghost"
                                     disabled={loading}
-                                    className="flex items-center gap-2"
+                                    className="flex w-full items-center justify-center gap-2 sm:w-auto"
                                 >
                                     <Icon path={Icons.refresh} className="w-4 h-4" /> Actualizar
                                 </Button>
@@ -496,7 +496,50 @@ export default function GastosDiarios({ categories = [] }) {
                             </div>
 
                             {/* Tabla */}
-                            <div className="erp-table-shell overflow-x-auto">
+                            <div className="space-y-3 md:hidden">
+                                {registros.length === 0 ? (
+                                    <div className="erp-empty-state px-5 py-10 text-center text-slate-400">
+                                        <Icon path={Icons.alertCircle} className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+                                        <p className="text-sm font-medium">No hay registros para esta fecha</p>
+                                    </div>
+                                ) : (
+                                    registros.map((reg) => (
+                                        <div key={reg.id} className="erp-mobile-record p-4">
+                                            <div className="mb-3 flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                                        {reg.timestamp?.toDate?.().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) || '--:--'}
+                                                    </div>
+                                                    <div className="mt-1 text-sm font-bold text-slate-800">{reg.descripcion}</div>
+                                                </div>
+                                                <Badge variant={reg.tipo === 'Gasto' ? 'danger' : reg.tipo === 'ABONO' ? 'warning' : 'purple'}>
+                                                    {reg.tipo}
+                                                </Badge>
+                                            </div>
+                                            <div className="erp-mobile-keyvalue">
+                                                <div className="erp-mobile-keyvalue-row">
+                                                    <span>Categoria</span>
+                                                    <span>{reg.categoria || '—'}</span>
+                                                </div>
+                                                <div className="erp-mobile-keyvalue-row">
+                                                    <span>Monto</span>
+                                                    <span className="erp-mono font-extrabold text-[#16222d]">{fmt(reg.monto)}</span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleEliminar(reg)}
+                                                className="erp-pressable mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-[#a81d24]"
+                                                disabled={loading}
+                                            >
+                                                <Icon path={Icons.trash} className="h-4 w-4" />
+                                                Eliminar registro
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <div className="erp-table-shell hidden overflow-x-auto md:block">
                                 <table className="w-full text-sm">
                                     <thead className="border-b border-slate-200">
                                         <tr>

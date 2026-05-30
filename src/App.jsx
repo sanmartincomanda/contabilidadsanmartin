@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from './firebase';
 import { collection, query, onSnapshot, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 
@@ -241,11 +241,15 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
 // --- DASHBOARD ---
 
 const Dashboard = ({ data = {} }) => {
+    const { user } = useAuth();
+    const navigate = useNavigate();
     const [config, setConfig] = useState(null);
     const [configLoading, setConfigLoading] = useState(true);
     const [showSettings, setShowSettings] = useState(false);
     const [justCompleted, setJustCompleted] = useState(null);
     const processingRef = useRef(false);
+    const isLimitedUser = user?.email === 'adriandiazc95@gmail.com';
+    const isAdmin = !isLimitedUser;
 
     useEffect(() => {
         const docRef = doc(db, CONFIG_DOC_PATH);
@@ -337,6 +341,45 @@ const Dashboard = ({ data = {} }) => {
         { label: 'Por Pagar', value: totalPendiente, count: facturasPendientes.length, icon: ICON.wallet, stripe: 'bg-orange-500', numColor: 'text-orange-700', iconBg: 'bg-orange-50', iconColor: 'text-orange-600', alert: vencidas.length > 0 },
     ];
 
+    const quickActions = [
+        isAdmin
+            ? {
+                id: 'mobile-income',
+                label: 'Nuevo ingreso',
+                hint: 'Captura diaria',
+                icon: ICON.plus,
+                accent: 'from-emerald-500/18 via-emerald-100 to-white',
+                action: () => navigate('/ingresar?tab=Ingresos'),
+            }
+            : null,
+        {
+            id: 'mobile-cash',
+            label: 'Caja diaria',
+            hint: 'Gastos y compras',
+            icon: ICON.wallet,
+            accent: 'from-sky-500/18 via-sky-100 to-white',
+            action: () => navigate('/gastos-diarios'),
+        },
+        {
+            id: 'mobile-payables',
+            label: 'Cuentas',
+            hint: 'Abonos y saldo',
+            icon: ICON.bell,
+            accent: 'from-orange-400/18 via-amber-100 to-white',
+            action: () => navigate('/cuentas-pagar'),
+        },
+        isAdmin
+            ? {
+                id: 'mobile-reports',
+                label: 'Reportes',
+                hint: 'Resultados',
+                icon: ICON.trending_up,
+                accent: 'from-[#173042]/20 via-slate-100 to-white',
+                action: () => navigate('/reportes'),
+            }
+            : null,
+    ].filter(Boolean);
+
     return (
         <div className="space-y-5 dash-dots min-h-[70vh]">
             <style>{DASHBOARD_STYLES}</style>
@@ -373,6 +416,29 @@ const Dashboard = ({ data = {} }) => {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 lg:hidden">
+                {quickActions.map((item) => (
+                    <button
+                        key={item.id}
+                        onClick={item.action}
+                        className={`erp-pressable erp-panel erp-soft-glow overflow-hidden rounded-[22px] border border-[#d9e3ea] bg-gradient-to-br ${item.accent} p-4 text-left`}
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7f8d]">
+                                    Acceso rapido
+                                </div>
+                                <div className="mt-2 text-sm font-extrabold tracking-tight text-[#16222d]">{item.label}</div>
+                                <div className="mt-1 text-xs text-[#5f7380]">{item.hint}</div>
+                            </div>
+                            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-white/80 shadow-[0_14px_24px_-20px_rgba(15,23,42,.45)]">
+                                <Icon d={item.icon} className="h-5 w-5 text-[#173042]" />
+                            </div>
+                        </div>
+                    </button>
+                ))}
             </div>
 
             {/* ========= KPI GRID ========= */}
@@ -697,7 +763,7 @@ function AppContent() {
     return (
         <>
             <Header />
-            <main className="erp-shell-enter min-h-screen px-3 pb-6 pt-[84px] lg:pl-[298px] lg:pr-6 lg:pt-[92px]">
+            <main className="erp-shell-enter min-h-screen px-3 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] pt-[84px] md:pb-6 lg:pl-[298px] lg:pr-6 lg:pt-[92px] lg:pb-6">
                 <div key={`${location.pathname}${location.search}`} className="erp-route-enter mx-auto max-w-[1580px]">
                     <Routes>
                         <Route path="/login" element={<Navigate to="/" replace />} />

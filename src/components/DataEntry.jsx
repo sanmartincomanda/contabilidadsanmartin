@@ -379,16 +379,16 @@ const EditableList = ({
         <div className="mt-4">
             {onFilterChange && (
                 <div className="erp-filter-panel mb-4 space-y-3 p-4">
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                         <label className="text-xs font-bold text-[#61727f] uppercase tracking-wider">{filterLabel}:</label>
                         <input
                             type={filterType}
                             value={filterValue}
                             onChange={(e) => onFilterChange(e.target.value)}
-                            className="erp-focus rounded-xl border border-[#ccd7df] bg-white px-3 py-1.5 text-sm font-semibold text-[#30414f] outline-none"
+                            className="erp-focus w-full rounded-xl border border-[#ccd7df] bg-white px-3 py-2 text-sm font-semibold text-[#30414f] outline-none sm:w-auto"
                         />
                         {filterValue && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => onFilterChange('')}>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => onFilterChange('')} className="w-full sm:w-auto">
                                 Limpiar
                             </Button>
                         )}
@@ -424,7 +424,7 @@ const EditableList = ({
                 </div>
             ) : (
                 <div className="erp-table-shell overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="min-w-[760px] w-full text-sm">
                         <thead>
                             <tr className="text-left border-b border-[#dbe2e8]">
                                 {Object.values(fields).map(field => (
@@ -1023,12 +1023,12 @@ export function DataEntry({ categories, data }) {
 
             {/* Tabs */}
             <div className="erp-command-strip rounded-[24px] p-2 no-print">
-                <div className="flex flex-wrap gap-1.5">
+                <div className="erp-mobile-tabs -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
                     {Object.entries(tabsConfig).map(([tab, config]) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`erp-pressable flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
+                            className={`erp-pressable flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                                 activeTab === tab
                                     ? 'bg-[#152533] text-white shadow-[0_16px_26px_-18px_rgba(15,23,42,.8)]'
                                     : 'text-[#5b6e7b] hover:bg-white'

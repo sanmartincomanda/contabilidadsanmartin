@@ -270,6 +270,56 @@ table {
   box-shadow: 0 16px 28px -26px rgba(15, 23, 42, 0.4);
 }
 
+.erp-mobile-tabs {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.erp-mobile-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.erp-mobile-tabs > * {
+  scroll-snap-align: start;
+}
+
+.erp-mobile-card-list {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.erp-mobile-record {
+  border: 1px solid #d9e2e9;
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 249, 252, 0.98) 100%);
+  box-shadow: 0 18px 30px -28px rgba(15, 23, 42, 0.35);
+}
+
+.erp-mobile-keyvalue {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.erp-mobile-keyvalue-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+}
+
+.erp-mobile-keyvalue-row span:first-child {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #728391;
+}
+
+.erp-mobile-keyvalue-row span:last-child {
+  text-align: right;
+  color: #1f2f3b;
+}
+
 .erp-soft-glow:hover::after,
 .erp-soft-glow:focus-within::after {
   opacity: 1;
@@ -322,5 +372,21 @@ table {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(24, 126, 168, 0.11), transparent 30%),
+      linear-gradient(180deg, #e3ebf1 0, #edf3f7 92px, #f4f8fb 100%);
+    background-size: auto, auto;
+  }
+
+  .erp-panel,
+  .erp-command-strip,
+  .erp-filter-panel,
+  .erp-empty-state {
+    border-radius: 22px;
   }
 }

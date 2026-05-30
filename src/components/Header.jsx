@@ -15,9 +15,8 @@ const Icons = {
     user: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
     menu: 'M4 6h16M4 12h16M4 18h16',
     x: 'M6 18L18 6M6 6l12 12',
-    dot: 'M12 12h.01M12 12h.01M12 12h.01',
     mail: 'M3 8l7.89 4.26a2 2 0 002.22 0L21 8m-2 10H5a2 2 0 01-2-2V8a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2z',
-    search: 'M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z',
+    spark: 'M12 3l1.912 5.813L20 10.5l-5.088 1.687L13 18l-1.912-5.813L6 10.5l5.088-1.687L12 3z',
 };
 
 const Icon = ({ path, className = 'h-4 w-4' }) => (
@@ -43,6 +42,20 @@ const SidebarLink = ({ icon, label, active, onClick, compact = false }) => (
             <Icon path={Icons[icon]} className="h-4 w-4" />
         </span>
         <span className="truncate">{label}</span>
+    </button>
+);
+
+const MobileNavButton = ({ icon, label, active, onClick }) => (
+    <button
+        onClick={onClick}
+        className={`erp-pressable flex min-w-0 flex-1 flex-col items-center gap-1 rounded-2xl px-2 py-2 text-center ${
+            active ? 'bg-[#152533] text-white shadow-[0_14px_26px_-18px_rgba(15,23,42,.7)]' : 'text-[#58707f]'
+        }`}
+    >
+        <span className={`flex h-9 w-9 items-center justify-center rounded-2xl ${active ? 'bg-white/12' : 'bg-[#edf4f8]'}`}>
+            <Icon path={Icons[icon]} className="h-4 w-4" />
+        </span>
+        <span className="truncate text-[10px] font-semibold uppercase tracking-[0.16em]">{label}</span>
     </button>
 );
 
@@ -86,6 +99,44 @@ export default function Header() {
         { tab: 'Cuentas por Cobrar', label: 'C. cobrar' },
         { tab: 'Patrimonio', label: 'Patrimonio' },
     ];
+
+    const mobilePrimaryMenu = [
+        { id: 'home', label: 'Inicio', icon: 'home', active: location.pathname === '/', onClick: () => navigate('/') },
+        isAdmin
+            ? {
+                id: 'capture',
+                label: 'Captura',
+                icon: 'plus',
+                active: location.pathname === '/ingresar',
+                onClick: () => navigate(`/ingresar?tab=${encodeURIComponent(currentDataTab || 'Ingresos')}`),
+            }
+            : null,
+        hasDailyExpensesAccess
+            ? {
+                id: 'cash',
+                label: 'Caja',
+                icon: 'cash',
+                active: location.pathname.startsWith('/gastos-diarios'),
+                onClick: () => navigate('/gastos-diarios'),
+            }
+            : null,
+        {
+            id: 'payables',
+            label: 'Pagar',
+            icon: 'wallet',
+            active: location.pathname.startsWith('/cuentas-pagar'),
+            onClick: () => navigate('/cuentas-pagar'),
+        },
+        isAdmin
+            ? {
+                id: 'reports',
+                label: 'Reportes',
+                icon: 'chart',
+                active: location.pathname.startsWith('/reportes'),
+                onClick: () => navigate('/reportes'),
+            }
+            : null,
+    ].filter(Boolean);
 
     const isActivePath = (path) =>
         location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -194,77 +245,100 @@ export default function Header() {
             </aside>
 
             <header className="erp-topbar-glow fixed inset-x-0 top-0 z-30 border-b border-[#d1dae2] bg-[rgba(248,251,253,0.92)] text-[#15222d] backdrop-blur lg:left-[288px]">
-                <div className="flex h-[74px] items-center justify-between px-4 lg:px-6">
+                <div className="flex h-[78px] items-center justify-between px-4 lg:h-[74px] lg:px-6">
                     <div className="flex min-w-0 items-center gap-3">
                         <button
                             onClick={() => setMobileOpen((prev) => !prev)}
-                            className="erp-pressable rounded-xl border border-[#d1dae2] bg-white p-2 text-[#1b3546] hover:border-[#b9c5d1] hover:bg-[#f5f8fb] lg:hidden"
+                            className="erp-pressable rounded-2xl border border-[#d1dae2] bg-white p-2.5 text-[#1b3546] hover:border-[#b9c5d1] hover:bg-[#f5f8fb] lg:hidden"
                         >
                             <Icon path={mobileOpen ? Icons.x : Icons.menu} className="h-5 w-5" />
                         </button>
 
                         <div className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-[#d7dfe6] bg-white lg:flex">
-                            <Icon path={Icons.dot} className="h-5 w-5 text-[#4d6372]" />
+                            <Icon path={Icons.spark} className="h-5 w-5 text-[#4d6372]" />
                         </div>
 
                         <div className="min-w-0">
                             <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#6d7f8d]">
                                 Operacion
                             </div>
-                            <div className="truncate text-lg font-semibold tracking-tight text-[#16222d]">{pageTitle}</div>
+                            <div className="truncate text-base font-semibold tracking-tight text-[#16222d] lg:text-lg">{pageTitle}</div>
                         </div>
                     </div>
 
                     <div className="hidden items-center gap-3 lg:flex">
                         <div className="erp-command-strip flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm text-[#4f6270]">
-                            <Icon path={Icons.search} className="h-4 w-4 text-[#6c8190]" />
+                            <Icon path={Icons.mail} className="h-4 w-4 text-[#6c8190]" />
                             <span className="text-sm font-medium">Carnes Amparito</span>
                         </div>
                         <div className="flex items-center gap-2 rounded-2xl border border-[#d7dfe6] bg-white px-3.5 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,.5)]">
-                            <Icon path={Icons.mail} className="h-4 w-4 text-[#6c8190]" />
+                            <Icon path={Icons.user} className="h-4 w-4 text-[#6c8190]" />
                             <span className="text-sm font-semibold text-[#304553]">{user.email.split('@')[0]}</span>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2 lg:hidden">
-                        <img
-                            src={BRAND_LOGO}
-                            alt="Carnes Amparito"
-                            className="h-10 w-10 rounded-2xl border border-[#d7dfe6] bg-white p-1 object-cover"
-                        />
+                        <div className="rounded-2xl border border-[#d7dfe6] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#58707f]">
+                            Web movil
+                        </div>
                     </div>
                 </div>
             </header>
 
+            <nav className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 lg:hidden">
+                <div className={`mx-auto grid max-w-md gap-2 rounded-[28px] border border-[#d7dfe6] bg-[rgba(248,251,253,0.96)] p-2 shadow-[0_26px_52px_-28px_rgba(12,20,29,.45)] backdrop-blur ${
+                    mobilePrimaryMenu.length >= 5 ? 'grid-cols-5' : 'grid-cols-4'
+                }`}>
+                    {mobilePrimaryMenu.map((item) => (
+                        <MobileNavButton
+                            key={item.id}
+                            icon={item.icon}
+                            label={item.label}
+                            active={item.active}
+                            onClick={item.onClick}
+                        />
+                    ))}
+                </div>
+            </nav>
+
             {mobileOpen && (
                 <div className="erp-pop-in fixed inset-0 z-40 bg-[#07111b]/56 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)}>
                     <div
-                        className="erp-shell-card h-full w-[88%] max-w-[320px] border-r border-[#1d2b38] shadow-2xl erp-route-enter"
+                        className="erp-shell-card absolute inset-x-0 bottom-0 max-h-[82vh] overflow-hidden rounded-t-[30px] border border-[#1d2b38] shadow-2xl erp-route-enter"
                         onClick={(event) => event.stopPropagation()}
                     >
                         <div className="border-b border-[#243443] px-5 py-5 text-white">
-                            <div className="flex items-center gap-3">
-                                <img
-                                    src={BRAND_LOGO}
-                                    alt="Carnes Amparito"
-                                    className="h-12 w-12 rounded-2xl border border-white/12 bg-white p-1.5 object-cover"
-                                />
-                                <div>
-                                    <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#6ea8bf]">
-                                        Executive ERP
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <img
+                                        src={BRAND_LOGO}
+                                        alt="Carnes Amparito"
+                                        className="h-12 w-12 rounded-2xl border border-white/12 bg-white p-1.5 object-cover"
+                                    />
+                                    <div>
+                                        <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#6ea8bf]">
+                                            Mobile suite
+                                        </div>
+                                        <div className="text-base font-bold text-[#f7fbfd]">Carnes Amparito</div>
+                                        <div className="mt-1 text-[11px] text-[#7f92a3]">Accesos completos</div>
                                     </div>
-                                    <div className="text-base font-bold text-[#f7fbfd]">Carnes Amparito</div>
                                 </div>
+                                <button
+                                    onClick={() => setMobileOpen(false)}
+                                    className="erp-pressable rounded-2xl border border-white/10 bg-white/8 p-2 text-white/80"
+                                >
+                                    <Icon path={Icons.x} className="h-5 w-5" />
+                                </button>
                             </div>
                         </div>
 
-                        <div className="max-h-[calc(100vh-180px)] overflow-y-auto px-4 py-4">
+                        <div className="max-h-[calc(82vh-160px)] overflow-y-auto px-4 py-4">
                             {isAdmin && (
                                 <>
-                                    <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#6f8393]">
+                                    <div className="mb-3 px-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#6f8393]">
                                         Captura
                                     </div>
-                                    <div className="mb-5 space-y-1.5">
+                                    <div className="mb-6 grid grid-cols-2 gap-2">
                                         {dataEntryItems.map((item) => (
                                             <SidebarLink
                                                 key={item.tab}
@@ -279,7 +353,7 @@ export default function Header() {
                                 </>
                             )}
 
-                            <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#6f8393]">
+                            <div className="mb-3 px-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#6f8393]">
                                 Modulos
                             </div>
                             <div className="space-y-1.5">
@@ -307,9 +381,18 @@ export default function Header() {
                         </div>
 
                         <div className="border-t border-[#243443] px-4 py-4">
+                            <div className="mb-3 flex items-center gap-3 rounded-2xl border border-[#22313f] bg-[#101c28] px-3.5 py-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#173042] text-[#83bdd5]">
+                                    <Icon path={Icons.user} className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold text-[#eef5f8]">{user.email.split('@')[0]}</div>
+                                    <div className="truncate text-xs text-[#7f92a3]">{user.email}</div>
+                                </div>
+                            </div>
                             <button
                                 onClick={handleLogout}
-                                className="erp-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-[#294154] bg-[#162330] px-3 py-2.5 text-sm font-semibold text-[#dbe8ee] hover:border-[#365a71]"
+                                className="erp-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-[#294154] bg-[#162330] px-3 py-3 text-sm font-semibold text-[#dbe8ee] hover:border-[#365a71]"
                             >
                                 <Icon path={Icons.logout} className="h-4 w-4" />
                                 Cerrar sesion

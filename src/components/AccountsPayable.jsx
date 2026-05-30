@@ -137,8 +137,36 @@ const Spinner = () => (
     </svg>
 );
 
+const useCompactViewport = (breakpoint = 1023) => {
+    const getMatches = () => (
+        typeof window !== 'undefined' ? window.innerWidth <= breakpoint : false
+    );
+
+    const [isCompact, setIsCompact] = useState(getMatches);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+
+        const media = window.matchMedia(`(max-width: ${breakpoint}px)`);
+        const sync = (event) => setIsCompact(event.matches);
+
+        setIsCompact(media.matches);
+
+        if (media.addEventListener) {
+            media.addEventListener('change', sync);
+            return () => media.removeEventListener('change', sync);
+        }
+
+        media.addListener(sync);
+        return () => media.removeListener(sync);
+    }, [breakpoint]);
+
+    return isCompact;
+};
+
 // --- COMPONENTE PRINCIPAL ---
 export function AccountsPayable({ data }) {
+    const isCompactViewport = useCompactViewport();
     const [activeTab, setActiveTab] = useState('Estado de Cuenta');
     const [loading, setLoading] = useState(false);
     const [nuevoProveedor, setNuevoProveedor] = useState('');
@@ -527,7 +555,7 @@ export function AccountsPayable({ data }) {
                 </FadeIn>
 
                 {/* ── TARJETAS DE RESUMEN ── */}
-                <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     <FadeIn delay={60} className="rounded-[24px] bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] p-5 text-white shadow-[0_22px_36px_-24px_rgba(15,23,42,.78)]">
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-[#9ec9da] text-[10px] font-bold uppercase tracking-widest">Saldo total</span>
@@ -565,13 +593,13 @@ export function AccountsPayable({ data }) {
                 </div>
 
                 {/* ── NAVEGACIÓN TABS ── */}
-                <div className="erp-command-strip rounded-[24px] p-1.5 mb-6">
-                    <div className="flex flex-wrap gap-1.5">
+                <div className="erp-command-strip mb-6 rounded-[24px] p-1.5">
+                    <div className="erp-mobile-tabs -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`erp-pressable flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
+                                className={`erp-pressable flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                                     activeTab === tab.id
                                         ? 'bg-[#152533] text-white shadow-[0_16px_26px_-18px_rgba(15,23,42,.8)]'
                                         : 'text-[#5b6e7b] hover:bg-white hover:text-[#16222d]'
@@ -612,7 +640,7 @@ export function AccountsPayable({ data }) {
                                         }
                                     />
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <Input
                                             label="Fecha Emisión"
                                             type="date"
@@ -630,7 +658,7 @@ export function AccountsPayable({ data }) {
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <Input
                                             label="N° Factura"
                                             icon="fileText"
@@ -666,8 +694,8 @@ export function AccountsPayable({ data }) {
                                     <Card
                                         title={prov}
                                         icon="building"
-                                        right={
-                                            <div className="flex items-center gap-3">
+                                        right={!isCompactViewport ? (
+                                            <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
                                                 <div className="rounded-lg border border-[#f3d8ca] bg-[#fff8f4] px-3 py-2 text-right">
                                                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                                         Saldo proveedor
@@ -681,14 +709,97 @@ export function AccountsPayable({ data }) {
                                                     variant="success"
                                                     disabled={loading}
                                                     onClick={() => openModalAbono(prov)}
-                                                    className="flex items-center gap-1.5"
+                                                    className="flex items-center justify-center gap-1.5"
                                                 >
                                                     <Icon path={Icons.creditCard} className="w-3.5 h-3.5" />
                                                     Abonar
                                                 </Button>
                                             </div>
-                                        }
+                                        ) : null}
                                     >
+                                        {isCompactViewport && (
+                                            <div className="mb-4 rounded-[22px] border border-[#f3d8ca] bg-[linear-gradient(180deg,#fffdfb_0%,#fff6f1_100%)] p-4">
+                                                <div className="flex flex-col gap-3">
+                                                    <div>
+                                                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                            Saldo proveedor
+                                                        </div>
+                                                        <div className="mt-1 text-2xl font-black text-[#a81d24] erp-mono">
+                                                            {fmt(provData.saldoTotal)}
+                                                        </div>
+                                                        <div className="mt-1 text-xs font-medium text-slate-500">
+                                                            {provData.items.length} {provData.items.length === 1 ? 'factura activa' : 'facturas activas'}
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        variant="success"
+                                                        disabled={loading}
+                                                        onClick={() => openModalAbono(prov)}
+                                                        className="flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <Icon path={Icons.creditCard} className="w-3.5 h-3.5" />
+                                                        Abonar proveedor
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {isCompactViewport ? (
+                                        <div className="space-y-3">
+                                            {provData.items.map((f) => {
+                                                const vencInfo = getVencimientoInfo(f.vencimiento);
+                                                return (
+                                                    <div key={f.id} className="erp-mobile-record p-4">
+                                                        <div className="mb-3 flex items-start justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Factura</div>
+                                                                <div className="mt-1 break-all text-sm font-black text-slate-800">{f.numero}</div>
+                                                            </div>
+                                                            <Badge variant={f.estado === 'parcial' ? 'warning' : 'danger'}>
+                                                                {f.estado === 'parcial' ? 'Parcial' : 'Pendiente'}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="erp-mobile-keyvalue">
+                                                            <div className="erp-mobile-keyvalue-row">
+                                                                <span>Emision</span>
+                                                                <span>{f.fecha}</span>
+                                                            </div>
+                                                            <div className="erp-mobile-keyvalue-row">
+                                                                <span>Vence</span>
+                                                                <span>
+                                                                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+                                                                        {vencInfo.text}
+                                                                    </span>
+                                                                </span>
+                                                            </div>
+                                                            <div className="erp-mobile-keyvalue-row">
+                                                                <span>Monto</span>
+                                                                <span className="erp-mono font-bold">{fmt(f.monto)}</span>
+                                                            </div>
+                                                            <div className="erp-mobile-keyvalue-row">
+                                                                <span>Abonado</span>
+                                                                <span className="erp-mono font-semibold text-emerald-600">
+                                                                    {f.yaAbonado > 0 ? fmt(f.yaAbonado) : '—'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="erp-mobile-keyvalue-row">
+                                                                <span>Saldo</span>
+                                                                <span className="erp-mono font-extrabold text-[#a81d24]">{fmt(f.saldo)}</span>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleDeleteFactura(f)}
+                                                            disabled={loading}
+                                                            className="erp-pressable mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-[#a81d24] disabled:opacity-30"
+                                                        >
+                                                            <Icon path={Icons.trash} className="h-4 w-4" />
+                                                            Eliminar factura
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        ) : (
                                         <div className="erp-table-shell overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
@@ -735,6 +846,7 @@ export function AccountsPayable({ data }) {
                                                 </tbody>
                                             </table>
                                         </div>
+                                        )}
                                     </Card>
                                 </FadeIn>
                             ))}
@@ -761,7 +873,46 @@ export function AccountsPayable({ data }) {
                                         <p className="text-sm font-medium text-slate-400">No hay abonos registrados</p>
                                     </div>
                                 ) : (
-                                    <div className="erp-table-shell overflow-x-auto">
+                                    isCompactViewport ? (
+                                        <div className="space-y-3">
+                                            {abonos.sort((a, b) => b.secuencia - a.secuencia).map(a => (
+                                                <div key={a.id} className="erp-mobile-record p-4">
+                                                    <div className="mb-3 flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Recibo</div>
+                                                            <div className="mt-1 text-sm font-black text-[#a81d24]">#{a.secuencia}</div>
+                                                        </div>
+                                                        <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
+                                                            {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="erp-mobile-keyvalue">
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Fecha</span>
+                                                            <span>{a.fecha}</span>
+                                                        </div>
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Proveedor</span>
+                                                            <span>{a.proveedor}</span>
+                                                        </div>
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Monto</span>
+                                                            <span className="erp-mono font-extrabold text-emerald-600">{fmt(a.montoTotal)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleDeleteAbono(a)}
+                                                        disabled={loading}
+                                                        className="erp-pressable mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-[#a81d24] disabled:opacity-30"
+                                                    >
+                                                        <Icon path={Icons.x} className="h-4 w-4" />
+                                                        Anular abono
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="erp-table-shell overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr>
@@ -798,6 +949,7 @@ export function AccountsPayable({ data }) {
                                             </tbody>
                                         </table>
                                     </div>
+                                    )
                                 )}
                             </Card>
                         </SlideIn>
@@ -807,7 +959,7 @@ export function AccountsPayable({ data }) {
                     {activeTab === 'Base de Proveedores' && (
                         <SlideIn className="max-w-2xl mx-auto">
                             <Card title="Directorio de Proveedores" icon="users">
-                                <form onSubmit={handleAddProveedor} className="flex gap-2 mb-5">
+                                <form onSubmit={handleAddProveedor} className="mb-5 flex flex-col gap-2 sm:flex-row">
                                     <input
                                         type="text"
                                         placeholder="Nombre del nuevo proveedor..."
@@ -815,7 +967,7 @@ export function AccountsPayable({ data }) {
                                         value={nuevoProveedor}
                                         onChange={e => setNuevoProveedor(e.target.value)}
                                     />
-                                    <Button type="submit" disabled={loading || !nuevoProveedor.trim()} className="flex items-center gap-1.5">
+                                    <Button type="submit" disabled={loading || !nuevoProveedor.trim()} className="flex items-center justify-center gap-1.5">
                                         <Icon path={Icons.plus} className="w-4 h-4" />
                                         Agregar
                                     </Button>
@@ -890,7 +1042,7 @@ export function AccountsPayable({ data }) {
                                                 : 'Seleccionar todas'}
                                         </button>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                         <div className="bg-white rounded-lg border border-stone-200 p-3">
                                             <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Seleccionadas</div>
                                             <div className="text-xl font-bold text-slate-800">

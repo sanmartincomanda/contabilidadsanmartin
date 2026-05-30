@@ -434,12 +434,12 @@ export default function Reports({ data }) {
 
             {/* Tabs */}
             <div className="erp-command-strip rounded-[24px] p-2">
-                <div className="flex flex-wrap gap-1.5">
+                <div className="erp-mobile-tabs -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
                     {Object.entries(tabsConfig).map(([tab, config]) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`erp-pressable flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
+                            className={`erp-pressable flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                                 activeTab === tab
                                     ? 'bg-[#152533] text-white shadow-[0_16px_26px_-18px_rgba(15,23,42,.8)]'
                                     : 'text-[#55717f] hover:bg-white'
@@ -629,7 +629,58 @@ export default function Reports({ data }) {
                                 subtitle="Haz clic en una categoría para ver el detalle"
                                 icon="receipt"
                             >
-                                <div className="overflow-x-auto custom-scrollbar">
+                                <div className="space-y-3 md:hidden">
+                                    {finalExpenseRows.map(([category, amount]) => {
+                                        const budget = currentBudgets[category] || 0;
+                                        const execPercent = budget > 0 ? (amount / budget) * 100 : 0;
+                                        const hasData = amount > 0;
+
+                                        return (
+                                            <button
+                                                key={category}
+                                                type="button"
+                                                disabled={!hasData}
+                                                onClick={() => hasData && setModalCategory(category)}
+                                                className={`erp-mobile-record w-full p-4 text-left ${hasData ? 'erp-pressable' : 'opacity-60'}`}
+                                            >
+                                                <div className="mb-3 flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Categoria</div>
+                                                        <div className="mt-1 text-sm font-black uppercase text-stone-700">{category}</div>
+                                                    </div>
+                                                    <div className={`inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-bold ${
+                                                        budget > 0
+                                                            ? execPercent > 100
+                                                                ? 'bg-rose-100 text-rose-700'
+                                                                : execPercent > 80
+                                                                    ? 'bg-amber-100 text-amber-700'
+                                                                    : 'bg-emerald-100 text-emerald-700'
+                                                            : 'bg-slate-100 text-slate-500'
+                                                    }`}>
+                                                        {budget > 0 ? `${execPercent.toFixed(1)}%` : 'Sin presupuesto'}
+                                                    </div>
+                                                </div>
+                                                <div className="erp-mobile-keyvalue">
+                                                    <div className="erp-mobile-keyvalue-row">
+                                                        <span>Real</span>
+                                                        <span className="erp-mono font-extrabold text-stone-800">{fmt(amount)}</span>
+                                                    </div>
+                                                    <div className="erp-mobile-keyvalue-row">
+                                                        <span>Presupuesto</span>
+                                                        <span>{budget > 0 ? fmt(budget) : '—'}</span>
+                                                    </div>
+                                                </div>
+                                                {hasData && (
+                                                    <div className="mt-3 text-[11px] font-bold uppercase tracking-[0.16em] text-[#a81d24]">
+                                                        Ver detalle
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="hidden overflow-x-auto custom-scrollbar md:block">
                                     <table className="w-full">
                                         <thead>
                                             <tr className="text-left border-b-2 border-[#ead5c5]">
