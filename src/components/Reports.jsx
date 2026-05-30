@@ -33,17 +33,17 @@ const Icon = ({ path, className = "w-5 h-5" }) => (
 // --- COMPONENTES UI ---
 
 const Card = ({ title, children, className = "", right, subtitle, icon }) => (
-    <div className={`rounded-xl shadow-sm border border-slate-200 bg-white overflow-hidden ${className}`}>
-        <div className="flex justify-between items-center px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+    <div className={`erp-panel erp-panel-hover rounded-[24px] overflow-hidden ${className}`}>
+        <div className="erp-panel-header flex justify-between items-center px-5 py-3.5 border-b border-[#c5dce7]">
             <div className="flex items-center gap-3">
                 {icon && (
-                    <div className="p-1.5 rounded-lg bg-[#fff0f0]">
-                        <Icon path={Icons[icon]} className="w-4 h-4 text-[#a81d24]" />
+                    <div className="rounded-xl bg-[#eaf7fc] p-2">
+                        <Icon path={Icons[icon]} className="w-4 h-4 text-[#0a628f]" />
                     </div>
                 )}
                 <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">{title}</h3>
-                    {subtitle && <p className="text-xs mt-0.5 text-slate-400">{subtitle}</p>}
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#5d7784]">{title}</h3>
+                    {subtitle && <p className="text-xs mt-0.5 text-[#7a919d]">{subtitle}</p>}
                 </div>
             </div>
             {right}
@@ -56,33 +56,33 @@ const Select = ({ label, icon, value, onChange, options = [] }) => (
     <div className="space-y-1.5">
         {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
         <div className="relative">
-            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />}
+            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] pointer-events-none" />}
             <select
                 value={value}
                 onChange={onChange}
-                className={`w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 appearance-none cursor-pointer pr-8 ${icon ? 'pl-10' : ''}`}
+                className={`w-full rounded-2xl border border-[#bdd5e1] bg-[#f7fbfd] px-3.5 py-2.5 text-sm font-medium text-[#173545] outline-none transition-all focus:border-[#0a628f] focus:ring-2 focus:ring-[#0a628f]/12 appearance-none cursor-pointer pr-8 ${icon ? 'pl-10' : ''}`}
             >
                 {options}
             </select>
-            <Icon path={Icons.chevronDown} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Icon path={Icons.chevronDown} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] pointer-events-none" />
         </div>
     </div>
 );
 
 const StatCard = ({ title, value, subtitle, icon, variant = 'default', trend }) => {
     const variants = {
-        default: 'bg-white border-slate-200',
-        wine: 'bg-[#a81d24] text-white border-[#7f1218]',
+        default: 'bg-white border-[#bdd5e1]',
+        wine: 'bg-[#173545] text-white border-[#173545]',
         success: 'bg-emerald-600 text-white border-emerald-700',
         danger: 'bg-red-600 text-white border-red-700',
-        warning: 'bg-amber-500 text-white border-amber-600',
-        dark: 'bg-slate-900 text-white border-slate-800'
+        warning: 'bg-gradient-to-br from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white border-[#0a628f]',
+        dark: 'bg-[#173545] text-white border-[#173545]'
     };
 
     const isColored = variant !== 'default';
 
     return (
-        <div className={`rounded-xl p-5 border shadow-sm ${variants[variant]}`}>
+        <div className={`erp-panel-hover rounded-xl border p-5 shadow-sm ${variants[variant]}`}>
             <div className="flex items-start justify-between mb-3">
                 <div className={`p-2.5 rounded-xl ${isColored ? 'bg-white/20' : 'bg-[#fff0f0]'}`}>
                     <Icon path={Icons[icon]} className={`w-5 h-5 ${isColored ? 'text-white' : 'text-[#a81d24]'}`} />
@@ -420,28 +420,29 @@ export default function Reports({ data }) {
             />
 
             {/* Page header */}
-            <div className="overflow-hidden rounded-xl border border-[#e6c9b8] bg-white shadow-sm">
-                <div className="h-1 bg-gradient-to-r from-[#a81d24] via-[#f2b635] to-[#a81d24]" />
-                <div className="px-6 py-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#f2b635]/40 bg-[#fdf1d6] px-3 py-1 text-xs font-bold uppercase tracking-[0.3em] text-[#8a141b] mb-2">
-                        Carnes Amparito
+            <div className="erp-panel overflow-hidden rounded-[24px]">
+                <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
+                    <div>
+                        <div className="erp-page-title">Reporting</div>
+                        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#173545]">Reportes financieros</h1>
                     </div>
-                    <h1 className="text-xl font-black text-[#7f1218]">Reportes <span className="text-[#a81d24]">Financieros</span></h1>
-                    <p className="text-xs font-medium text-[#8b6a5f] mt-0.5">Análisis de resultados, balance y métricas</p>
+                    <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
+                        {selectedMonth || 'Periodo'}
+                    </span>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="overflow-hidden rounded-xl border border-[#e6c9b8] bg-white shadow-sm p-2">
+            <div className="erp-panel rounded-[24px] p-2">
                 <div className="flex flex-wrap gap-1.5">
                     {Object.entries(tabsConfig).map(([tab, config]) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${
+                            className={`erp-pressable flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                                 activeTab === tab
-                                    ? 'bg-[#a81d24] text-white shadow-sm shadow-red-900/20'
-                                    : 'text-stone-600 hover:bg-stone-100'
+                                    ? 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_14px_28px_-18px_rgba(12,97,143,.8)]'
+                                    : 'text-[#55717f] hover:bg-[#eef7fb]'
                             }`}
                         >
                             <Icon path={Icons[config.icon]} className="w-3.5 h-3.5" />

@@ -32,15 +32,15 @@ const Icon = ({ path, className = "w-5 h-5" }) => (
 // --- COMPONENTES UI ---
 
 const Card = ({ title, children, className = "", right, icon }) => (
-    <div className={`rounded-xl shadow-sm border border-slate-200 bg-white overflow-hidden ${className}`}>
-        <div className="flex justify-between items-center px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+        <div className={`erp-panel erp-panel-hover rounded-[24px] overflow-hidden ${className}`}>
+        <div className="erp-panel-header flex justify-between items-center px-5 py-3.5 border-b border-[#c5dce7]">
             <div className="flex items-center gap-3">
                 {icon && (
-                    <div className="p-1.5 rounded-lg bg-[#fff0f0]">
-                        <Icon path={Icons[icon]} className="w-4 h-4 text-[#a81d24]" />
+                    <div className="rounded-xl bg-[#eaf7fc] p-2">
+                        <Icon path={Icons[icon]} className="w-4 h-4 text-[#0a628f]" />
                     </div>
                 )}
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">{title}</h3>
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#5d7784]">{title}</h3>
             </div>
             {right}
         </div>
@@ -51,18 +51,18 @@ const Card = ({ title, children, className = "", right, icon }) => (
 const Button = ({ children, variant = 'primary', className = '', disabled, size = 'md', ...props }) => {
     const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5 text-sm' };
     const variants = {
-        primary: 'bg-[#a81d24] hover:bg-[#7f1218] text-white shadow-sm',
+        primary: 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_16px_28px_-18px_rgba(12,97,143,.85)] hover:opacity-95',
         success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
         danger: 'bg-red-600 hover:bg-red-700 text-white',
-        warning: 'bg-amber-500 hover:bg-amber-600 text-white',
-        ghost: 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-300',
-        dark: 'bg-slate-900 hover:bg-slate-800 text-white'
+        warning: 'bg-[#a81d24] hover:bg-[#7f1218] text-white',
+        ghost: 'bg-white hover:bg-[#f3f9fc] text-[#45606d] border border-[#c5dce7]',
+        dark: 'bg-[#173545] hover:bg-[#102734] text-white'
     };
 
     return (
         <button
             disabled={disabled}
-            className={`${sizes[size]} rounded-lg font-semibold transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] ${variants[variant]} ${className}`}
+            className={`erp-pressable ${sizes[size]} rounded-lg font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`}
             {...props}
         >
             {children}
@@ -74,10 +74,10 @@ const Input = ({ label, icon, type = "text", className = '', ...props }) => (
     <div className="space-y-1.5">
         {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
         <div className="relative group">
-            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#a81d24] transition-colors" />}
+            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] group-focus-within:text-[#0a628f] transition-colors" />}
             <input
                 type={type}
-                className={`w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 ${icon ? 'pl-10' : ''} ${className}`}
+                className={`w-full rounded-2xl border border-[#bdd5e1] bg-[#f7fbfd] px-3.5 py-2.5 text-sm font-medium text-[#173545] outline-none transition-all focus:border-[#0a628f] focus:ring-2 focus:ring-[#0a628f]/12 ${icon ? 'pl-10' : ''} ${className}`}
                 {...props}
             />
         </div>
@@ -88,14 +88,14 @@ const Select = ({ label, icon, options, ...props }) => (
     <div className="space-y-1.5">
         {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
         <div className="relative">
-            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />}
+            {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] pointer-events-none" />}
             <select
-                className={`w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/10 appearance-none cursor-pointer pr-8 ${icon ? 'pl-10' : ''}`}
+                className={`w-full rounded-2xl border border-[#bdd5e1] bg-[#f7fbfd] px-3.5 py-2.5 text-sm font-medium text-[#173545] outline-none transition-all focus:border-[#0a628f] focus:ring-2 focus:ring-[#0a628f]/12 appearance-none cursor-pointer pr-8 ${icon ? 'pl-10' : ''}`}
                 {...props}
             >
                 {options}
             </select>
-            <Icon path={Icons.chevronRight} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90 pointer-events-none" />
+            <Icon path={Icons.chevronRight} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] rotate-90 pointer-events-none" />
         </div>
     </div>
 );
@@ -310,39 +310,42 @@ export default function GastosDiarios({ categories = [] }) {
             `}</style>
 
             {/* Page header */}
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-print">
-                <div className="h-0.5 bg-gradient-to-r from-[#a81d24] via-[#f2b635] to-[#a81d24]" />
-                <div className="px-6 py-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#f2b635] mb-1">Carnes Amparito</p>
-                    <h1 className="text-lg font-black text-slate-900">Gastos Diarios</h1>
-                    <p className="text-xs text-slate-400 mt-0.5">Registro de caja diaria y compras — {CAJA}</p>
+            <div className="erp-panel overflow-hidden rounded-[24px] no-print">
+                <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
+                    <div>
+                        <div className="erp-page-title">Caja diaria</div>
+                        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#173545]">Gastos y compras</h1>
+                    </div>
+                    <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
+                        {CAJA}
+                    </span>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm p-1.5 no-print">
+            <div className="erp-panel rounded-[24px] p-1.5 no-print">
                 <div className="flex gap-1">
                     <button
                         onClick={() => setActiveTab('registro')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-xs uppercase tracking-widest transition-colors ${
+                        className={`erp-pressable flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                             activeTab === 'registro'
-                                ? 'bg-[#a81d24] text-white shadow-sm'
-                                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                                ? 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_14px_28px_-18px_rgba(12,97,143,.8)]'
+                                : 'text-[#55717f] hover:bg-[#eef7fb] hover:text-[#173545]'
                         }`}
                     >
                         <Icon path={Icons.receipt} className="w-3.5 h-3.5" />
-                        Nuevo Registro
+                        Registro
                     </button>
                     <button
                         onClick={() => setActiveTab('historial')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-xs uppercase tracking-widest transition-colors ${
+                        className={`erp-pressable flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                             activeTab === 'historial'
-                                ? 'bg-slate-900 text-white'
-                                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                                ? 'bg-[#173545] text-white'
+                                : 'text-[#55717f] hover:bg-[#eef7fb] hover:text-[#173545]'
                         }`}
                     >
                         <Icon path={Icons.calendar} className="w-3.5 h-3.5" />
-                        Reporte / Historial
+                        Historial
                     </button>
                 </div>
             </div>

@@ -1,406 +1,329 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import React, { useState, useEffect, useRef } from 'react';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
 const Icons = {
-    home: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
-    plus: "M12 4v16m8-8H4",
-    wallet: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
-    creditCard: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
-    chart: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
-    tag: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
-    check: "M5 13l4 4L19 7",
-    menu: "M4 6h16M4 12h16M4 18h16",
-    x: "M6 18L18 6M6 6l12 12",
-    logout: "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
-    user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
-    chevronDown: "M19 9l-7 7-7-7",
-    cash: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z",
-    receipt: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
-    trendingUp: "M13 7h8m0 0v8m0-8l-8-8-4 4-6-6",
-    trendingDown: "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"
+    home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+    plus: 'M12 4v16m8-8H4',
+    cash: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+    wallet: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
+    chart: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+    tag: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z',
+    logout: 'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
+    user: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+    menu: 'M4 6h16M4 12h16M4 18h16',
+    x: 'M6 18L18 6M6 6l12 12',
+    chevron: 'M9 5l7 7-7 7',
+    dot: 'M12 12h.01M12 12h.01M12 12h.01',
+    mail: 'M3 8l7.89 4.26a2 2 0 002.22 0L21 8m-2 10H5a2 2 0 01-2-2V8a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2z',
+    search: 'M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z',
 };
 
-const Icon = ({ path, className = 'w-5 h-5' }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+const Icon = ({ path, className = 'h-4 w-4' }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.9">
         <path strokeLinecap="round" strokeLinejoin="round" d={path} />
     </svg>
 );
 
-const dropdownBase =
-    'rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10';
+const SidebarLink = ({ icon, label, active, onClick, compact = false }) => (
+    <button
+        onClick={onClick}
+        className={`erp-pressable erp-soft-glow flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left ${
+            active
+                ? 'border-[#8bc4da] bg-[#e9f7fc] text-[#0a628f] shadow-sm'
+                : 'border-transparent text-[#3c5a68] hover:border-[#d5e8f1] hover:bg-[#f5fafc]'
+        } ${compact ? 'text-[13px] font-medium' : 'text-sm font-semibold'}`}
+    >
+        <span
+            className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                active ? 'bg-[#0c618f] text-white' : 'bg-[#eff7fb] text-[#0c618f]'
+            }`}
+        >
+            <Icon path={Icons[icon]} className="h-4 w-4" />
+        </span>
+        <span className="truncate">{label}</span>
+    </button>
+);
 
 export default function Header() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [isScrolled, setIsScrolled] = useState(false);
-    const dropdownRef = useRef(null);
+    const [mobileOpen, setMobileOpen] = useState(false);
 
     const isAdmin = user?.email !== 'adriandiazc95@gmail.com';
     const hasDailyExpensesAccess = user?.email === 'adriandiazc95@gmail.com' || isAdmin;
+    const currentDataTab = useMemo(
+        () => new URLSearchParams(location.search).get('tab') || 'Ingresos',
+        [location.search]
+    );
 
-    useEffect(() => {
-        const handleScroll = () => setIsScrolled(window.scrollY > 10);
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+    const pageTitle = useMemo(() => {
+        if (location.pathname === '/ingresar') return `Data Entry · ${currentDataTab}`;
+        if (location.pathname === '/gastos-diarios') return 'Caja diaria';
+        if (location.pathname === '/cuentas-pagar') return 'Cuentas por pagar';
+        if (location.pathname === '/conciliacion') return 'Conciliacion';
+        if (location.pathname === '/reportes') return 'Reportes';
+        if (location.pathname.startsWith('/maestros')) return 'Maestros';
+        return 'Cockpit financiero';
+    }, [currentDataTab, location.pathname]);
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsMenuOpen(false);
-            }
-        };
+    const mainMenu = [
+        { id: 'home', label: 'Inicio', icon: 'home', allowed: true, action: () => navigate('/') },
+        { id: 'cash', label: 'Caja diaria', icon: 'cash', allowed: hasDailyExpensesAccess, action: () => navigate('/gastos-diarios') },
+        { id: 'payables', label: 'Cuentas por pagar', icon: 'wallet', allowed: true, action: () => navigate('/cuentas-pagar') },
+        { id: 'reports', label: 'Reportes', icon: 'chart', allowed: isAdmin, action: () => navigate('/reportes') },
+        { id: 'masters', label: 'Categorias', icon: 'tag', allowed: isAdmin, action: () => navigate('/maestros/categorias') },
+    ].filter((item) => item.allowed);
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    const dataEntryItems = [
+        { tab: 'Ingresos', label: 'Ingresos' },
+        { tab: 'Gastos', label: 'Gastos' },
+        { tab: 'Inventario', label: 'Inventario' },
+        { tab: 'Compras', label: 'Compras' },
+        { tab: 'Presupuesto', label: 'Presupuesto' },
+        { tab: 'Cuentas por Cobrar', label: 'C. cobrar' },
+        { tab: 'Patrimonio', label: 'Patrimonio' },
+    ];
+
+    const isActivePath = (path) =>
+        location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+    const handleNavigate = (path) => {
+        navigate(path);
+        setMobileOpen(false);
+    };
+
+    const handleDataEntry = (tab) => {
+        navigate(`/ingresar?tab=${encodeURIComponent(tab)}`);
+        setMobileOpen(false);
+    };
 
     const handleLogout = async () => {
         try {
             await logout();
             navigate('/login');
-        } catch (e) {
-            console.error('Error al cerrar sesion', e);
+        } catch (error) {
+            console.error('Error al cerrar sesion', error);
         }
     };
 
-    const isActive = (path) => location.pathname === path || location.pathname.startsWith(path);
-
-    const handleDataEntryClick = (tab) => {
-        navigate(`/ingresar?tab=${tab}`);
-        setIsMenuOpen(false);
-        setIsMobileMenuOpen(false);
-    };
-
-    const NavLink = ({ to, children, icon, active = false, onClick }) => (
-        <Link
-            to={to}
-            onClick={onClick}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors duration-150 ${
-                active
-                    ? 'bg-[#a81d24] text-white'
-                    : 'text-white/75 hover:bg-white/10 hover:text-white'
-            }`}
-        >
-            {icon && <Icon path={Icons[icon]} className="w-4 h-4" />}
-            {children}
-        </Link>
-    );
-
-    const DataEntryButton = () => {
-        if (!isAdmin) return null;
-
-        return (
-            <div className="relative" ref={dropdownRef}>
-                <button
-                    onClick={() => setIsMenuOpen((prev) => !prev)}
-                    className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${
-                        isMenuOpen || location.pathname === '/ingresar'
-                            ? 'bg-[#f2b635] text-[#651317] shadow-lg shadow-[#f2b635]/25'
-                            : 'text-[#f8ece2] hover:bg-white/10 hover:text-white'
-                    }`}
-                >
-                    <Icon path={Icons.plus} className="w-4 h-4" />
-                    Ingresar Datos
-                    <Icon path={Icons.chevronDown} className={`w-3 h-3 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {isMenuOpen && (
-                    <div className={`absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden ${dropdownBase}`}>
-                        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.35em] text-[#f2b635]">Carnes Amparito</div>
-                            <div className="mt-0.5 text-sm font-bold text-slate-800">Ingresar Datos</div>
-                        </div>
-                        <div className="p-1.5">
-                            <button
-                                onClick={() => handleDataEntryClick('Ingresos')}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800"
-                            >
-                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                                    <Icon path={Icons.trendingUp} className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <div className="font-semibold text-sm">Ingresos</div>
-                                    <div className="text-xs text-slate-400">Ventas del dia</div>
-                                </div>
-                            </button>
-                            <button
-                                onClick={() => handleDataEntryClick('Gastos')}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-red-50 hover:text-red-800"
-                            >
-                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#fff0f0] text-[#a81d24]">
-                                    <Icon path={Icons.trendingDown} className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <div className="font-semibold text-sm">Gastos</div>
-                                    <div className="text-xs text-slate-400">Egresos operativos</div>
-                                </div>
-                            </button>
-                            <button
-                                onClick={() => handleDataEntryClick('Inventario')}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-amber-50 hover:text-amber-800"
-                            >
-                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                                    <Icon path={Icons.wallet} className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <div className="font-semibold text-sm">Inventario</div>
-                                    <div className="text-xs text-slate-400">Control y valorización</div>
-                                </div>
-                            </button>
-                            <button
-                                onClick={() => handleDataEntryClick('Presupuesto')}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100"
-                            >
-                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                                    <Icon path={Icons.chart} className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <div className="font-semibold text-sm">Presupuesto</div>
-                                    <div className="text-xs text-slate-400">Planificacion mensual</div>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    };
+    if (!user) return null;
 
     return (
         <>
-            <style>{`
-                @keyframes fade-in {
-                    from { opacity: 0; transform: translateY(-10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in { animation: fade-in 0.2s ease-out; }
-            `}</style>
-
-            <nav
-                className={`fixed left-0 right-0 top-0 z-50 transition-all duration-300 ${
-                    isScrolled
-                        ? 'bg-gradient-to-r from-[#2b1113]/95 via-[#5e1318]/95 to-[#8a141b]/95 shadow-2xl shadow-[#2b1113]/30 backdrop-blur-xl'
-                        : 'bg-gradient-to-r from-[#2b1113] via-[#5e1318] to-[#8a141b]'
-                }`}
-            >
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="flex h-20 items-center justify-between">
-                        <Link to="/" className="group flex items-center gap-4">
-                            <div className="rounded-[1.4rem] border border-white/20 bg-[#fff7ef] p-1.5 shadow-lg shadow-black/10 transition group-hover:scale-[1.02]">
-                                <img
-                                    src={BRAND_LOGO}
-                                    alt="Carnes Amparito"
-                                    className="h-12 w-12 rounded-[1rem] object-cover"
-                                />
+            <aside className="fixed inset-y-0 left-0 z-40 hidden w-[280px] border-r border-[#9ec4d6] bg-white/96 backdrop-blur lg:flex lg:flex-col">
+                <div className="border-b border-[#9ec4d6] bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#52acc8] px-5 py-5 text-white">
+                    <div className="flex items-center gap-3">
+                        <img
+                            src={BRAND_LOGO}
+                            alt="Carnes Amparito"
+                            className="h-14 w-14 rounded-2xl border border-white/30 bg-white p-1.5 object-cover shadow-lg"
+                        />
+                        <div className="min-w-0">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d8f4ff]">
+                                Business cockpit
                             </div>
-                            <div className="hidden sm:block">
-                                <div className="text-lg font-black uppercase tracking-[0.28em] text-[#f2b635]">Carnes</div>
-                                <div className="-mt-1 text-2xl font-black text-white">Amparito</div>
-                                <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#f8d8c8]">
-                                    Centro contable
-                                </div>
-                            </div>
-                        </Link>
-
-                        {user && (
-                            <div className="hidden items-center gap-1 md:flex">
-                                <NavLink to="/" icon="home" active={location.pathname === '/'}>
-                                    Inicio
-                                </NavLink>
-
-                                <DataEntryButton />
-
-                                {hasDailyExpensesAccess && (
-                                    <NavLink to="/gastos-diarios" icon="cash" active={isActive('/gastos-diarios')}>
-                                        Gastos Diarios
-                                    </NavLink>
-                                )}
-
-                                <NavLink to="/cuentas-pagar" icon="creditCard" active={isActive('/cuentas-pagar')}>
-                                    Cuentas por Pagar
-                                </NavLink>
-
-                                {isAdmin && (
-                                    <>
-                                        <NavLink to="/conciliacion" icon="check" active={isActive('/conciliacion')}>
-                                            Conciliacion
-                                        </NavLink>
-                                        <NavLink to="/reportes" icon="chart" active={isActive('/reportes')}>
-                                            Reportes
-                                        </NavLink>
-                                        <NavLink to="/maestros/categorias" icon="tag" active={isActive('/maestros')}>
-                                            Categorias
-                                        </NavLink>
-                                    </>
-                                )}
-
-                                <div className="ml-4 flex items-center gap-3 border-l border-white/15 pl-4">
-                                    <div className="hidden lg:flex flex-col items-end">
-                                        <span className="text-sm font-bold text-white">{user.email.split('@')[0]}</span>
-                                        <span className="text-xs text-white/40">{user.email}</span>
-                                    </div>
-                                    <button
-                                        onClick={handleLogout}
-                                        className="flex items-center gap-2 rounded-lg border border-[#f2b635]/30 bg-[#f2b635]/10 px-3.5 py-2 text-sm font-semibold text-[#f2b635] transition-colors hover:bg-[#f2b635] hover:text-[#651317]"
-                                    >
-                                        <Icon path={Icons.logout} className="w-4 h-4" />
-                                        <span className="hidden sm:inline">Salir</span>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {user && (
-                            <div className="md:hidden">
-                                <button
-                                    onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-                                    className="rounded-xl border border-white/15 bg-white/5 p-2 text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
-                                >
-                                    <Icon path={isMobileMenuOpen ? Icons.x : Icons.menu} className="w-6 h-6" />
-                                </button>
-                            </div>
-                        )}
-
-                        {!user && (
-                            <Link
-                                to="/login"
-                                className="flex items-center gap-2 rounded-xl bg-[#f2b635] px-5 py-2.5 text-sm font-black uppercase tracking-[0.2em] text-[#651317] shadow-lg shadow-[#f2b635]/25 transition hover:bg-[#f6c24a]"
-                            >
-                                <Icon path={Icons.user} className="w-4 h-4" />
-                                Entrar
-                            </Link>
-                        )}
+                            <div className="truncate text-lg font-bold tracking-tight">Carnes Amparito</div>
+                            <div className="mt-1 text-[11px] text-white/75">ERP contable</div>
+                        </div>
                     </div>
                 </div>
 
-                {isMobileMenuOpen && user && (
-                    <div className="animate-fade-in border-t border-white/10 bg-gradient-to-b from-[#531418]/95 to-[#2b1113]/95 backdrop-blur-xl md:hidden">
-                        <div className="space-y-1 px-4 pb-4 pt-3">
-                            <div className="mb-2 rounded-2xl border border-white/10 bg-white/5 p-4">
-                                <div className="flex items-center gap-3">
-                                    <img
-                                        src={BRAND_LOGO}
-                                        alt="Carnes Amparito"
-                                        className="h-12 w-12 rounded-[1rem] border border-white/15 object-cover"
+                <div className="flex-1 overflow-y-auto px-4 py-4">
+                    {isAdmin && (
+                        <div className="mb-5">
+                            <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-[#678492]">
+                                Data entry
+                            </div>
+                            <div className="space-y-1.5">
+                                {dataEntryItems.map((item) => (
+                                    <SidebarLink
+                                        key={item.tab}
+                                        icon="plus"
+                                        label={item.label}
+                                        compact={true}
+                                        active={location.pathname === '/ingresar' && currentDataTab === item.tab}
+                                        onClick={() => handleDataEntry(item.tab)}
                                     />
-                                    <div>
-                                        <div className="text-sm font-black text-white">{user.email}</div>
-                                        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#f2b635]">
-                                            Carnes Amparito
-                                        </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-[#678492]">
+                        Operacion
+                    </div>
+                    <div className="space-y-1.5">
+                        {mainMenu.map((item) => (
+                            <SidebarLink
+                                key={item.id}
+                                icon={item.icon}
+                                label={item.label}
+                                active={
+                                    (item.id === 'home' && location.pathname === '/') ||
+                                    (item.id !== 'home' && (
+                                        (item.id === 'cash' && isActivePath('/gastos-diarios')) ||
+                                        (item.id === 'payables' && isActivePath('/cuentas-pagar')) ||
+                                        (item.id === 'reports' && isActivePath('/reportes')) ||
+                                        (item.id === 'masters' && isActivePath('/maestros'))
+                                    ))
+                                }
+                                onClick={item.action}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="border-t border-[#d5e8f1] bg-[#f4fafc] px-4 py-4">
+                    <div className="rounded-2xl border border-[#d5e8f1] bg-white px-3.5 py-3">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f7fc] text-[#0a628f]">
+                                <Icon path={Icons.user} className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-[#173545]">{user.email.split('@')[0]}</div>
+                                <div className="truncate text-xs text-[#6c8794]">{user.email}</div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="erp-pressable mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#c7dfea] bg-[#f8fbfd] px-3 py-2 text-sm font-semibold text-[#375664] hover:border-[#9ec4d6] hover:bg-white"
+                        >
+                            <Icon path={Icons.logout} className="h-4 w-4" />
+                            Cerrar sesion
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <header className="erp-topbar-glow fixed inset-x-0 top-0 z-30 border-b border-[#8ebbd0] bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white lg:left-[280px]">
+                <div className="flex h-[72px] items-center justify-between px-4 lg:px-6">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <button
+                            onClick={() => setMobileOpen((prev) => !prev)}
+                            className="erp-pressable rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/15 lg:hidden"
+                        >
+                            <Icon path={mobileOpen ? Icons.x : Icons.menu} className="h-5 w-5" />
+                        </button>
+
+                        <div className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 lg:flex">
+                            <Icon path={Icons.dot} className="h-5 w-5" />
+                        </div>
+
+                        <div className="min-w-0">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#d7f3ff]">
+                                SAP style workspace
+                            </div>
+                            <div className="truncate text-lg font-semibold tracking-tight">{pageTitle}</div>
+                        </div>
+                    </div>
+
+                    <div className="hidden items-center gap-3 lg:flex">
+                        <div className="flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white/90">
+                            <Icon path={Icons.search} className="h-4 w-4 text-white/70" />
+                            <span className="text-sm">Carnes Amparito</span>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-2">
+                            <Icon path={Icons.mail} className="h-4 w-4 text-white/75" />
+                            <span className="text-sm font-medium text-white/90">{user.email.split('@')[0]}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 lg:hidden">
+                        <img
+                            src={BRAND_LOGO}
+                            alt="Carnes Amparito"
+                            className="h-10 w-10 rounded-2xl border border-white/25 bg-white p-1 object-cover"
+                        />
+                    </div>
+                </div>
+            </header>
+
+            {mobileOpen && (
+                <div className="erp-pop-in fixed inset-0 z-40 bg-[#062d40]/40 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)}>
+                    <div
+                        className="h-full w-[88%] max-w-[320px] border-r border-[#9ec4d6] bg-white shadow-2xl erp-route-enter"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="border-b border-[#9ec4d6] bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#52acc8] px-5 py-5 text-white">
+                            <div className="flex items-center gap-3">
+                                <img
+                                    src={BRAND_LOGO}
+                                    alt="Carnes Amparito"
+                                    className="h-12 w-12 rounded-2xl border border-white/30 bg-white p-1.5 object-cover"
+                                />
+                                <div>
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d8f4ff]">
+                                        Cockpit
                                     </div>
+                                    <div className="text-base font-bold">Carnes Amparito</div>
                                 </div>
                             </div>
+                        </div>
 
-                            <NavLink to="/" icon="home" active={location.pathname === '/'} onClick={() => setIsMobileMenuOpen(false)}>
-                                Inicio
-                            </NavLink>
-
+                        <div className="max-h-[calc(100vh-180px)] overflow-y-auto px-4 py-4">
                             {isAdmin && (
                                 <>
-                                    <div className="px-4 pb-1 pt-3 text-[11px] font-bold uppercase tracking-[0.32em] text-[#f2b635]">
-                                        Ingresar datos
+                                    <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-[#678492]">
+                                        Data entry
                                     </div>
-                                    <button
-                                        onClick={() => handleDataEntryClick('Ingresos')}
-                                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
-                                    >
-                                        <Icon path={Icons.trendingUp} className="w-5 h-5 text-[#6bd18f]" />
-                                        Ingresos
-                                    </button>
-                                    <button
-                                        onClick={() => handleDataEntryClick('Gastos')}
-                                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
-                                    >
-                                        <Icon path={Icons.trendingDown} className="w-5 h-5 text-[#f2968f]" />
-                                        Gastos
-                                    </button>
-                                    <button
-                                        onClick={() => handleDataEntryClick('Inventario')}
-                                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
-                                    >
-                                        <Icon path={Icons.wallet} className="w-5 h-5 text-[#f2b635]" />
-                                        Inventario
-                                    </button>
-                                    <button
-                                        onClick={() => handleDataEntryClick('Presupuesto')}
-                                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#f8ece2] transition hover:bg-white/10 hover:text-white"
-                                    >
-                                        <Icon path={Icons.chart} className="w-5 h-5 text-[#ffdba2]" />
-                                        Presupuesto
-                                    </button>
+                                    <div className="mb-5 space-y-1.5">
+                                        {dataEntryItems.map((item) => (
+                                            <SidebarLink
+                                                key={item.tab}
+                                                icon="plus"
+                                                label={item.label}
+                                                compact={true}
+                                                active={location.pathname === '/ingresar' && currentDataTab === item.tab}
+                                                onClick={() => handleDataEntry(item.tab)}
+                                            />
+                                        ))}
+                                    </div>
                                 </>
                             )}
 
-                            {hasDailyExpensesAccess && (
-                                <NavLink
-                                    to="/gastos-diarios"
-                                    icon="cash"
-                                    active={isActive('/gastos-diarios')}
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                >
-                                    Gastos Diarios
-                                </NavLink>
-                            )}
+                            <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-[#678492]">
+                                Operacion
+                            </div>
+                            <div className="space-y-1.5">
+                                {mainMenu.map((item) => (
+                                    <SidebarLink
+                                        key={item.id}
+                                        icon={item.icon}
+                                        label={item.label}
+                                        active={
+                                            (item.id === 'home' && location.pathname === '/') ||
+                                            (item.id !== 'home' && (
+                                                (item.id === 'cash' && isActivePath('/gastos-diarios')) ||
+                                                (item.id === 'payables' && isActivePath('/cuentas-pagar')) ||
+                                                (item.id === 'reports' && isActivePath('/reportes')) ||
+                                                (item.id === 'masters' && isActivePath('/maestros'))
+                                            ))
+                                        }
+                                        onClick={() => {
+                                            item.action();
+                                            setMobileOpen(false);
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        </div>
 
-                            <NavLink
-                                to="/cuentas-pagar"
-                                icon="creditCard"
-                                active={isActive('/cuentas-pagar')}
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                Cuentas por Pagar
-                            </NavLink>
-
-                            {isAdmin && (
-                                <>
-                                    <NavLink
-                                        to="/conciliacion"
-                                        icon="check"
-                                        active={isActive('/conciliacion')}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        Conciliacion
-                                    </NavLink>
-                                    <NavLink
-                                        to="/reportes"
-                                        icon="chart"
-                                        active={isActive('/reportes')}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        Reportes
-                                    </NavLink>
-                                    <NavLink
-                                        to="/maestros/categorias"
-                                        icon="tag"
-                                        active={isActive('/maestros')}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        Categorias
-                                    </NavLink>
-                                </>
-                            )}
-
+                        <div className="border-t border-[#d5e8f1] bg-[#f4fafc] px-4 py-4">
                             <button
                                 onClick={handleLogout}
-                                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#f2b635]/35 bg-[#f2b635]/12 px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-[#ffe9b3] transition hover:bg-[#f2b635] hover:text-[#651317]"
+                                className="erp-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-[#c7dfea] bg-white px-3 py-2.5 text-sm font-semibold text-[#375664] hover:border-[#9ec4d6]"
                             >
-                                <Icon path={Icons.logout} className="w-4 h-4" />
+                                <Icon path={Icons.logout} className="h-4 w-4" />
                                 Cerrar sesion
                             </button>
                         </div>
                     </div>
-                )}
-            </nav>
-
-            <div className="h-20" />
+                </div>
+            )}
         </>
     );
 }

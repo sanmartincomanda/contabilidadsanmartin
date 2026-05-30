@@ -52,7 +52,7 @@ const DASHBOARD_STYLES = `
 .dash-fade{animation:dash-fade .22s ease both}
 .dash-check{animation:dash-check .22s ease both}
 .dash-pulse{animation:dash-pulse 2s ease-in-out infinite}
-.dash-mesh{background:linear-gradient(135deg,#1a0a0b 0%,#3b1114 25%,#5e1318 50%,#7f1218 75%,#2b1113 100%);background-size:300% 300%;animation:dash-gradient 14s ease infinite}
+.dash-mesh{background:linear-gradient(135deg,#084869 0%,#0c618f 25%,#1176a8 50%,#52acc8 75%,#0b5b83 100%);background-size:300% 300%;animation:dash-gradient 14s ease infinite}
 .dash-panel{animation:dash-slide-right .22s ease-out both}
 .dash-glass{background:rgba(255,255,255,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 .dash-kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px -6px rgba(15,23,42,.12)}
@@ -209,10 +209,10 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
                                 onChange={e => setNewDay(e.target.value)}
                                 className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-bold text-slate-700 text-center focus:border-[#a81d24] focus:ring-1 focus:ring-[#a81d24]/20 outline-none"
                             />
-                            <button
+                                <button
                                 onClick={addReminder}
                                 disabled={!newText.trim()}
-                                className="ml-auto flex items-center gap-2 rounded-lg bg-[#a81d24] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#7f1218] transition-colors"
+                                className="ml-auto flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40 transition-colors hover:opacity-95"
                             >
                                 <Icon d={ICON.plus} className="w-3.5 h-3.5" /> Agregar
                             </button>
@@ -228,7 +228,7 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="rounded-lg bg-[#a81d24] px-6 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#7f1218] disabled:opacity-50 transition-colors"
+                        className="rounded-lg bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] px-6 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50 transition-colors hover:opacity-95"
                     >
                         {saving ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
@@ -570,21 +570,24 @@ const Dashboard = ({ data = {} }) => {
 // --- LOADING / ERROR ---
 
 const AppLoadingState = () => (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-6 text-center">
-        <img src={BRAND_LOGO} alt="Carnes Amparito" className="h-24 w-24 rounded-xl border border-slate-200 bg-white p-2 shadow-lg shadow-slate-900/8" />
-        <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[#f2b635]">Carnes Amparito</p>
-            <p className="mt-2 text-xl font-black text-slate-800">Cargando informacion contable...</p>
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
+        <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
+            <img src={BRAND_LOGO} alt="Carnes Amparito" className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
+            <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#0c618f]">Business cockpit</div>
+            <div className="mt-2 text-2xl font-semibold text-[#173545]">Cargando modulo</div>
+            <div className="mt-2 text-sm text-[#6c8794]">Sincronizando informacion.</div>
         </div>
     </div>
 );
 
 const AppErrorState = () => (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
-        <img src={BRAND_LOGO} alt="Carnes Amparito" className="mb-5 h-24 w-24 rounded-xl border border-slate-200 bg-white p-2 shadow-lg shadow-slate-900/8" />
-        <h1 className="text-2xl font-black text-slate-900">Error de conexion</h1>
-        <p className="mt-2 max-w-sm text-sm text-slate-500">No logramos cargar la informacion de Carnes Amparito. Revisa la conexion e intenta nuevamente.</p>
-        <button onClick={() => window.location.reload()} className="mt-5 rounded-lg bg-[#a81d24] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#7f1218]">Reintentar</button>
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
+        <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
+            <img src={BRAND_LOGO} alt="Carnes Amparito" className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
+            <h1 className="mt-5 text-2xl font-semibold text-[#173545]">Sin conexion</h1>
+            <p className="mt-2 text-sm text-[#6c8794]">No logramos cargar la informacion.</p>
+            <button onClick={() => window.location.reload()} className="mt-5 rounded-2xl bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-[0_18px_28px_-20px_rgba(12,97,143,.9)] transition hover:opacity-95">Reintentar</button>
+        </div>
     </div>
 );
 
@@ -679,24 +682,35 @@ function AppContent() {
     const categoriesList = categoriesData.categorias || [];
 
     if (!user) {
-        return <main><Routes><Route path="/login" element={<Login />} /><Route path="*" element={<Navigate to="/login" replace />} /></Routes></main>;
+        return (
+            <main className="erp-shell-enter">
+                <div key={`${location.pathname}${location.search}`} className="erp-route-enter">
+                    <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="*" element={<Navigate to="/login" replace />} />
+                    </Routes>
+                </div>
+            </main>
+        );
     }
 
     return (
         <>
             <Header />
-            <main className="p-4 md:p-6">
-                <Routes>
-                    <Route path="/login" element={<Navigate to="/" replace />} />
-                    <Route path="/" element={<PrivateRoute element={isAdmin ? (dashboardLoading ? <AppLoadingState /> : <Dashboard data={dashboardData} />) : <Navigate to="/cuentas-pagar" />} />} />
-                    <Route path="/ingresar" element={<PrivateRoute element={isAdmin ? (dataEntryLoading ? <AppLoadingState /> : dataEntryError ? <AppErrorState /> : <DataEntry data={dataEntryData} categories={categoriesList} />) : <Navigate to="/cuentas-pagar" />} />} />
-                    <Route path="/gastos-diarios" element={<PrivateRoute element={<GastosDiarios categories={categoriesList} />} />} />
-                    <Route path="/conciliacion" element={<PrivateRoute element={isAdmin ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} />} />
-                    <Route path="/cuentas-pagar" element={<PrivateRoute element={accountsPayableLoading ? <AppLoadingState /> : accountsPayableError ? <AppErrorState /> : <AccountsPayable data={accountsPayableData} />} />} />
-                    <Route path="/reportes" element={<PrivateRoute element={isAdmin ? (reportsLoading ? <AppLoadingState /> : reportsError ? <AppErrorState /> : <Reports data={reportsData} />) : <Navigate to="/cuentas-pagar" />} />} />
-                    <Route path="/maestros/categorias" element={<PrivateRoute element={isAdmin ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} />} />
-                    <Route path="*" element={<Navigate to="/" />} />
-                </Routes>
+            <main className="erp-shell-enter min-h-screen px-3 pb-6 pt-[84px] lg:pl-[298px] lg:pr-6 lg:pt-[92px]">
+                <div key={`${location.pathname}${location.search}`} className="erp-route-enter mx-auto max-w-[1580px]">
+                    <Routes>
+                        <Route path="/login" element={<Navigate to="/" replace />} />
+                        <Route path="/" element={<PrivateRoute element={isAdmin ? (dashboardLoading ? <AppLoadingState /> : <Dashboard data={dashboardData} />) : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/ingresar" element={<PrivateRoute element={isAdmin ? (dataEntryLoading ? <AppLoadingState /> : dataEntryError ? <AppErrorState /> : <DataEntry data={dataEntryData} categories={categoriesList} />) : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/gastos-diarios" element={<PrivateRoute element={<GastosDiarios categories={categoriesList} />} />} />
+                        <Route path="/conciliacion" element={<PrivateRoute element={isAdmin ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/cuentas-pagar" element={<PrivateRoute element={accountsPayableLoading ? <AppLoadingState /> : accountsPayableError ? <AppErrorState /> : <AccountsPayable data={accountsPayableData} />} />} />
+                        <Route path="/reportes" element={<PrivateRoute element={isAdmin ? (reportsLoading ? <AppLoadingState /> : reportsError ? <AppErrorState /> : <Reports data={reportsData} />) : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/maestros/categorias" element={<PrivateRoute element={isAdmin ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                </div>
             </main>
         </>
     );
