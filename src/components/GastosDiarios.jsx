@@ -51,7 +51,7 @@ const Card = ({ title, children, className = "", right, icon }) => (
 const Button = ({ children, variant = 'primary', className = '', disabled, size = 'md', ...props }) => {
     const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5 text-sm' };
     const variants = {
-        primary: 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_16px_28px_-18px_rgba(12,97,143,.85)] hover:opacity-95',
+        primary: 'bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,.78)] hover:brightness-[1.04]',
         success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
         danger: 'bg-red-600 hover:bg-red-700 text-white',
         warning: 'bg-[#a81d24] hover:bg-[#7f1218] text-white',
@@ -72,7 +72,7 @@ const Button = ({ children, variant = 'primary', className = '', disabled, size 
 
 const Input = ({ label, icon, type = "text", className = '', ...props }) => (
     <div className="space-y-1.5">
-        {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
+        {label && <label className="text-xs font-semibold uppercase tracking-widest text-[#61727f]">{label}</label>}
         <div className="relative group">
             {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] group-focus-within:text-[#0a628f] transition-colors" />}
             <input
@@ -86,7 +86,7 @@ const Input = ({ label, icon, type = "text", className = '', ...props }) => (
 
 const Select = ({ label, icon, options, ...props }) => (
     <div className="space-y-1.5">
-        {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
+        {label && <label className="text-xs font-semibold uppercase tracking-widest text-[#61727f]">{label}</label>}
         <div className="relative">
             {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] pointer-events-none" />}
             <select
@@ -313,8 +313,8 @@ export default function GastosDiarios({ categories = [] }) {
             <div className="erp-panel overflow-hidden rounded-[24px] no-print">
                 <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
                     <div>
-                        <div className="erp-page-title">Caja diaria</div>
-                        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#173545]">Gastos y compras</h1>
+                        <div className="erp-page-title">Cash desk</div>
+                        <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Caja diaria</h1>
                     </div>
                     <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
                         {CAJA}
@@ -323,14 +323,14 @@ export default function GastosDiarios({ categories = [] }) {
             </div>
 
             {/* Tabs */}
-            <div className="erp-panel rounded-[24px] p-1.5 no-print">
+            <div className="erp-command-strip rounded-[24px] p-1.5 no-print">
                 <div className="flex gap-1">
                     <button
                         onClick={() => setActiveTab('registro')}
                         className={`erp-pressable flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                             activeTab === 'registro'
-                                ? 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_14px_28px_-18px_rgba(12,97,143,.8)]'
-                                : 'text-[#55717f] hover:bg-[#eef7fb] hover:text-[#173545]'
+                                ? 'bg-[#152533] text-white shadow-[0_16px_26px_-18px_rgba(15,23,42,.8)]'
+                                : 'text-[#5b6e7b] hover:bg-white hover:text-[#16222d]'
                         }`}
                     >
                         <Icon path={Icons.receipt} className="w-3.5 h-3.5" />
@@ -340,8 +340,8 @@ export default function GastosDiarios({ categories = [] }) {
                         onClick={() => setActiveTab('historial')}
                         className={`erp-pressable flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                             activeTab === 'historial'
-                                ? 'bg-[#173545] text-white'
-                                : 'text-[#55717f] hover:bg-[#eef7fb] hover:text-[#173545]'
+                                ? 'bg-[#152533] text-white'
+                                : 'text-[#5b6e7b] hover:bg-white hover:text-[#16222d]'
                         }`}
                     >
                         <Icon path={Icons.calendar} className="w-3.5 h-3.5" />
@@ -352,7 +352,7 @@ export default function GastosDiarios({ categories = [] }) {
 
             {activeTab === 'registro' ? (
                 <div className="animate-fade-in max-w-lg">
-                    <Card title="Nuevo Registro de Caja" icon="receipt" gradient={true}>
+                    <Card title="Captura de caja" icon="receipt" gradient={true}>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {/* Fecha + Tipo en la misma fila */}
                             <div className="grid grid-cols-2 gap-3">
@@ -445,7 +445,7 @@ export default function GastosDiarios({ categories = [] }) {
                     >
                         <div className="space-y-5">
                             {/* Filtros */}
-                            <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <div className="erp-filter-panel flex flex-wrap items-end gap-3 p-4">
                                 <Input
                                     label="Fecha"
                                     type="date"
@@ -465,21 +465,21 @@ export default function GastosDiarios({ categories = [] }) {
 
                             {/* Totales */}
                             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                                <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                                <div className="erp-metric-card overflow-hidden">
                                     <div className="h-0.5 bg-[#a81d24]" />
                                     <div className="p-3.5 text-center">
                                         <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Gastos</div>
                                         <div className="text-lg font-black text-[#a81d24] mt-1 font-mono">{fmt(totalGastos)}</div>
                                     </div>
                                 </div>
-                                <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                                <div className="erp-metric-card overflow-hidden">
                                     <div className="h-0.5 bg-amber-500" />
                                     <div className="p-3.5 text-center">
                                         <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Compras</div>
                                         <div className="text-lg font-black text-amber-700 mt-1 font-mono">{fmt(totalCompras)}</div>
                                     </div>
                                 </div>
-                                <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                                <div className="erp-metric-card overflow-hidden">
                                     <div className="h-0.5 bg-[#f2b635]" />
                                     <div className="p-3.5 text-center">
                                         <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Abonos</div>
@@ -496,9 +496,9 @@ export default function GastosDiarios({ categories = [] }) {
                             </div>
 
                             {/* Tabla */}
-                            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                            <div className="erp-table-shell overflow-x-auto">
                                 <table className="w-full text-sm">
-                                    <thead className="bg-slate-50 border-b border-slate-200">
+                                    <thead className="border-b border-slate-200">
                                         <tr>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Hora</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Descripción</th>

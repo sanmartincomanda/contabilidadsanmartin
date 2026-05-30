@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
@@ -15,7 +15,6 @@ const Icons = {
     user: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
     menu: 'M4 6h16M4 12h16M4 18h16',
     x: 'M6 18L18 6M6 6l12 12',
-    chevron: 'M9 5l7 7-7 7',
     dot: 'M12 12h.01M12 12h.01M12 12h.01',
     mail: 'M3 8l7.89 4.26a2 2 0 002.22 0L21 8m-2 10H5a2 2 0 01-2-2V8a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2z',
     search: 'M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z',
@@ -32,13 +31,13 @@ const SidebarLink = ({ icon, label, active, onClick, compact = false }) => (
         onClick={onClick}
         className={`erp-pressable erp-soft-glow flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left ${
             active
-                ? 'border-[#8bc4da] bg-[#e9f7fc] text-[#0a628f] shadow-sm'
-                : 'border-transparent text-[#3c5a68] hover:border-[#d5e8f1] hover:bg-[#f5fafc]'
+                ? 'border-[#2f5f7a] bg-[#173042] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.05)]'
+                : 'border-transparent text-[#9ba9b7] hover:border-[#22374a] hover:bg-[#121f2c] hover:text-[#eaf2f6]'
         } ${compact ? 'text-[13px] font-medium' : 'text-sm font-semibold'}`}
     >
         <span
             className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                active ? 'bg-[#0c618f] text-white' : 'bg-[#eff7fb] text-[#0c618f]'
+                active ? 'bg-[#1d89b3] text-white' : 'bg-[#0f1a25] text-[#7bb9d3]'
             }`}
         >
             <Icon path={Icons[icon]} className="h-4 w-4" />
@@ -61,13 +60,13 @@ export default function Header() {
     );
 
     const pageTitle = useMemo(() => {
-        if (location.pathname === '/ingresar') return `Data Entry · ${currentDataTab}`;
+        if (location.pathname === '/ingresar') return `Captura · ${currentDataTab}`;
         if (location.pathname === '/gastos-diarios') return 'Caja diaria';
         if (location.pathname === '/cuentas-pagar') return 'Cuentas por pagar';
         if (location.pathname === '/conciliacion') return 'Conciliacion';
         if (location.pathname === '/reportes') return 'Reportes';
         if (location.pathname.startsWith('/maestros')) return 'Maestros';
-        return 'Cockpit financiero';
+        return 'Centro de control';
     }, [currentDataTab, location.pathname]);
 
     const mainMenu = [
@@ -91,11 +90,6 @@ export default function Header() {
     const isActivePath = (path) =>
         location.pathname === path || location.pathname.startsWith(`${path}/`);
 
-    const handleNavigate = (path) => {
-        navigate(path);
-        setMobileOpen(false);
-    };
-
     const handleDataEntry = (tab) => {
         navigate(`/ingresar?tab=${encodeURIComponent(tab)}`);
         setMobileOpen(false);
@@ -114,20 +108,20 @@ export default function Header() {
 
     return (
         <>
-            <aside className="fixed inset-y-0 left-0 z-40 hidden w-[280px] border-r border-[#9ec4d6] bg-white/96 backdrop-blur lg:flex lg:flex-col">
-                <div className="border-b border-[#9ec4d6] bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#52acc8] px-5 py-5 text-white">
+            <aside className="erp-shell-card fixed inset-y-0 left-0 z-40 hidden w-[288px] border-r border-[#1d2b38] text-white lg:flex lg:flex-col">
+                <div className="border-b border-[#243443] px-5 py-5">
                     <div className="flex items-center gap-3">
                         <img
                             src={BRAND_LOGO}
                             alt="Carnes Amparito"
-                            className="h-14 w-14 rounded-2xl border border-white/30 bg-white p-1.5 object-cover shadow-lg"
+                            className="h-14 w-14 rounded-2xl border border-white/12 bg-white p-1.5 object-cover shadow-[0_16px_30px_-20px_rgba(0,0,0,.7)]"
                         />
                         <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d8f4ff]">
-                                Business cockpit
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#6ea8bf]">
+                                Executive ERP
                             </div>
-                            <div className="truncate text-lg font-bold tracking-tight">Carnes Amparito</div>
-                            <div className="mt-1 text-[11px] text-white/75">ERP contable</div>
+                            <div className="truncate text-lg font-bold tracking-tight text-[#f7fbfd]">Carnes Amparito</div>
+                            <div className="mt-1 text-[11px] text-[#7f92a3]">Operacion financiera diaria</div>
                         </div>
                     </div>
                 </div>
@@ -135,8 +129,8 @@ export default function Header() {
                 <div className="flex-1 overflow-y-auto px-4 py-4">
                     {isAdmin && (
                         <div className="mb-5">
-                            <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-[#678492]">
-                                Data entry
+                            <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#6f8393]">
+                                Captura
                             </div>
                             <div className="space-y-1.5">
                                 {dataEntryItems.map((item) => (
@@ -153,8 +147,8 @@ export default function Header() {
                         </div>
                     )}
 
-                    <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-[#678492]">
-                        Operacion
+                    <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#6f8393]">
+                        Modulos
                     </div>
                     <div className="space-y-1.5">
                         {mainMenu.map((item) => (
@@ -177,20 +171,20 @@ export default function Header() {
                     </div>
                 </div>
 
-                <div className="border-t border-[#d5e8f1] bg-[#f4fafc] px-4 py-4">
-                    <div className="rounded-2xl border border-[#d5e8f1] bg-white px-3.5 py-3">
+                <div className="border-t border-[#243443] px-4 py-4">
+                    <div className="rounded-2xl border border-[#22313f] bg-[#101c28] px-3.5 py-3">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f7fc] text-[#0a628f]">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#173042] text-[#83bdd5]">
                                 <Icon path={Icons.user} className="h-5 w-5" />
                             </div>
                             <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-[#173545]">{user.email.split('@')[0]}</div>
-                                <div className="truncate text-xs text-[#6c8794]">{user.email}</div>
+                                <div className="truncate text-sm font-semibold text-[#eef5f8]">{user.email.split('@')[0]}</div>
+                                <div className="truncate text-xs text-[#7f92a3]">{user.email}</div>
                             </div>
                         </div>
                         <button
                             onClick={handleLogout}
-                            className="erp-pressable mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#c7dfea] bg-[#f8fbfd] px-3 py-2 text-sm font-semibold text-[#375664] hover:border-[#9ec4d6] hover:bg-white"
+                            className="erp-pressable mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#294154] bg-[#162330] px-3 py-2 text-sm font-semibold text-[#dbe8ee] hover:border-[#365a71] hover:bg-[#1a2b3a]"
                         >
                             <Icon path={Icons.logout} className="h-4 w-4" />
                             Cerrar sesion
@@ -199,36 +193,36 @@ export default function Header() {
                 </div>
             </aside>
 
-            <header className="erp-topbar-glow fixed inset-x-0 top-0 z-30 border-b border-[#8ebbd0] bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white lg:left-[280px]">
-                <div className="flex h-[72px] items-center justify-between px-4 lg:px-6">
+            <header className="erp-topbar-glow fixed inset-x-0 top-0 z-30 border-b border-[#d1dae2] bg-[rgba(248,251,253,0.92)] text-[#15222d] backdrop-blur lg:left-[288px]">
+                <div className="flex h-[74px] items-center justify-between px-4 lg:px-6">
                     <div className="flex min-w-0 items-center gap-3">
                         <button
                             onClick={() => setMobileOpen((prev) => !prev)}
-                            className="erp-pressable rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/15 lg:hidden"
+                            className="erp-pressable rounded-xl border border-[#d1dae2] bg-white p-2 text-[#1b3546] hover:border-[#b9c5d1] hover:bg-[#f5f8fb] lg:hidden"
                         >
                             <Icon path={mobileOpen ? Icons.x : Icons.menu} className="h-5 w-5" />
                         </button>
 
-                        <div className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 lg:flex">
-                            <Icon path={Icons.dot} className="h-5 w-5" />
+                        <div className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-[#d7dfe6] bg-white lg:flex">
+                            <Icon path={Icons.dot} className="h-5 w-5 text-[#4d6372]" />
                         </div>
 
                         <div className="min-w-0">
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#d7f3ff]">
-                                SAP style workspace
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#6d7f8d]">
+                                Operacion
                             </div>
-                            <div className="truncate text-lg font-semibold tracking-tight">{pageTitle}</div>
+                            <div className="truncate text-lg font-semibold tracking-tight text-[#16222d]">{pageTitle}</div>
                         </div>
                     </div>
 
                     <div className="hidden items-center gap-3 lg:flex">
-                        <div className="flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white/90">
-                            <Icon path={Icons.search} className="h-4 w-4 text-white/70" />
-                            <span className="text-sm">Carnes Amparito</span>
+                        <div className="erp-command-strip flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm text-[#4f6270]">
+                            <Icon path={Icons.search} className="h-4 w-4 text-[#6c8190]" />
+                            <span className="text-sm font-medium">Carnes Amparito</span>
                         </div>
-                        <div className="flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-2">
-                            <Icon path={Icons.mail} className="h-4 w-4 text-white/75" />
-                            <span className="text-sm font-medium text-white/90">{user.email.split('@')[0]}</span>
+                        <div className="flex items-center gap-2 rounded-2xl border border-[#d7dfe6] bg-white px-3.5 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,.5)]">
+                            <Icon path={Icons.mail} className="h-4 w-4 text-[#6c8190]" />
+                            <span className="text-sm font-semibold text-[#304553]">{user.email.split('@')[0]}</span>
                         </div>
                     </div>
 
@@ -236,30 +230,30 @@ export default function Header() {
                         <img
                             src={BRAND_LOGO}
                             alt="Carnes Amparito"
-                            className="h-10 w-10 rounded-2xl border border-white/25 bg-white p-1 object-cover"
+                            className="h-10 w-10 rounded-2xl border border-[#d7dfe6] bg-white p-1 object-cover"
                         />
                     </div>
                 </div>
             </header>
 
             {mobileOpen && (
-                <div className="erp-pop-in fixed inset-0 z-40 bg-[#062d40]/40 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)}>
+                <div className="erp-pop-in fixed inset-0 z-40 bg-[#07111b]/56 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)}>
                     <div
-                        className="h-full w-[88%] max-w-[320px] border-r border-[#9ec4d6] bg-white shadow-2xl erp-route-enter"
+                        className="erp-shell-card h-full w-[88%] max-w-[320px] border-r border-[#1d2b38] shadow-2xl erp-route-enter"
                         onClick={(event) => event.stopPropagation()}
                     >
-                        <div className="border-b border-[#9ec4d6] bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#52acc8] px-5 py-5 text-white">
+                        <div className="border-b border-[#243443] px-5 py-5 text-white">
                             <div className="flex items-center gap-3">
                                 <img
                                     src={BRAND_LOGO}
                                     alt="Carnes Amparito"
-                                    className="h-12 w-12 rounded-2xl border border-white/30 bg-white p-1.5 object-cover"
+                                    className="h-12 w-12 rounded-2xl border border-white/12 bg-white p-1.5 object-cover"
                                 />
                                 <div>
-                                    <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d8f4ff]">
-                                        Cockpit
+                                    <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#6ea8bf]">
+                                        Executive ERP
                                     </div>
-                                    <div className="text-base font-bold">Carnes Amparito</div>
+                                    <div className="text-base font-bold text-[#f7fbfd]">Carnes Amparito</div>
                                 </div>
                             </div>
                         </div>
@@ -267,8 +261,8 @@ export default function Header() {
                         <div className="max-h-[calc(100vh-180px)] overflow-y-auto px-4 py-4">
                             {isAdmin && (
                                 <>
-                                    <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-[#678492]">
-                                        Data entry
+                                    <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#6f8393]">
+                                        Captura
                                     </div>
                                     <div className="mb-5 space-y-1.5">
                                         {dataEntryItems.map((item) => (
@@ -285,8 +279,8 @@ export default function Header() {
                                 </>
                             )}
 
-                            <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-[#678492]">
-                                Operacion
+                            <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#6f8393]">
+                                Modulos
                             </div>
                             <div className="space-y-1.5">
                                 {mainMenu.map((item) => (
@@ -312,10 +306,10 @@ export default function Header() {
                             </div>
                         </div>
 
-                        <div className="border-t border-[#d5e8f1] bg-[#f4fafc] px-4 py-4">
+                        <div className="border-t border-[#243443] px-4 py-4">
                             <button
                                 onClick={handleLogout}
-                                className="erp-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-[#c7dfea] bg-white px-3 py-2.5 text-sm font-semibold text-[#375664] hover:border-[#9ec4d6]"
+                                className="erp-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-[#294154] bg-[#162330] px-3 py-2.5 text-sm font-semibold text-[#dbe8ee] hover:border-[#365a71]"
                             >
                                 <Icon path={Icons.logout} className="h-4 w-4" />
                                 Cerrar sesion

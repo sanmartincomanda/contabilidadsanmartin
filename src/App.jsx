@@ -40,23 +40,23 @@ const DEFAULT_REMINDERS = [
 const CONFIG_DOC_PATH = 'configuracion/dashboard';
 
 const DASHBOARD_STYLES = `
-@keyframes dash-slide-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dash-slide-up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes dash-fade{from{opacity:0}to{opacity:1}}
-@keyframes dash-check{0%{transform:scale(0)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
-@keyframes dash-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes dash-check{0%{transform:scale(0)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+@keyframes dash-pulse{0%,100%{opacity:1}50%{opacity:.48}}
 @keyframes dash-gradient{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @keyframes dash-slide-right{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-.dash-up{animation:dash-slide-up .28s ease-out both}
-.dash-up-1{animation-delay:30ms}.dash-up-2{animation-delay:60ms}.dash-up-3{animation-delay:90ms}.dash-up-4{animation-delay:120ms}
-.dash-up-5{animation-delay:150ms}.dash-up-6{animation-delay:180ms}
-.dash-fade{animation:dash-fade .22s ease both}
-.dash-check{animation:dash-check .22s ease both}
+.dash-up{animation:dash-slide-up .26s ease-out both}
+.dash-up-1{animation-delay:24ms}.dash-up-2{animation-delay:48ms}.dash-up-3{animation-delay:72ms}.dash-up-4{animation-delay:96ms}
+.dash-up-5{animation-delay:120ms}.dash-up-6{animation-delay:144ms}
+.dash-fade{animation:dash-fade .2s ease both}
+.dash-check{animation:dash-check .2s ease both}
 .dash-pulse{animation:dash-pulse 2s ease-in-out infinite}
-.dash-mesh{background:linear-gradient(135deg,#084869 0%,#0c618f 25%,#1176a8 50%,#52acc8 75%,#0b5b83 100%);background-size:300% 300%;animation:dash-gradient 14s ease infinite}
+.dash-mesh{background:linear-gradient(135deg,#0d1622 0%,#13212d 42%,#173042 74%,#1a6f93 100%);background-size:240% 240%;animation:dash-gradient 18s ease infinite}
 .dash-panel{animation:dash-slide-right .22s ease-out both}
-.dash-glass{background:rgba(255,255,255,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-.dash-kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px -6px rgba(15,23,42,.12)}
-.dash-kpi{transition:transform .18s ease-out,box-shadow .18s ease-out}
+.dash-glass{background:rgba(255,255,255,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.dash-kpi:hover{transform:translateY(-1px);box-shadow:0 16px 26px -18px rgba(15,23,42,.24)}
+.dash-kpi{transition:transform .18s ease-out,box-shadow .18s ease-out,border-color .18s ease-out}
 @media print{.no-print{display:none!important}}
 `;
 
@@ -131,18 +131,18 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
-            <div className="absolute inset-0 bg-[#1a0a0b]/50 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-[#08121b]/58 backdrop-blur-sm" />
             <div
-                className="dash-panel relative w-full max-w-md bg-white shadow-2xl shadow-[#7f1218]/20 overflow-hidden flex flex-col"
+                className="erp-panel relative flex w-full max-w-md flex-col overflow-hidden rounded-[28px] shadow-2xl shadow-[rgba(12,20,29,.26)]"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="dash-mesh px-6 py-5 flex items-center justify-between flex-shrink-0">
+                <div className="bg-[linear-gradient(135deg,#101c27_0%,#173042_64%,#1a6f93_100%)] px-6 py-5 flex items-center justify-between flex-shrink-0">
                     <div>
-                        <div className="text-[10px] font-bold uppercase tracking-[0.4em] text-[#f2b635] mb-1">Carnes Amparito</div>
+                        <div className="text-[10px] font-bold uppercase tracking-[0.36em] text-[#8db2c4] mb-1">Workspace setup</div>
                         <h2 className="text-lg font-black text-white">Configuración de Inicio</h2>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-xl bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition">
+                    <button onClick={onClose} className="erp-pressable p-2 rounded-xl bg-white/10 text-white/80 hover:bg-white/18 hover:text-white transition">
                         <Icon d={ICON.x} className="w-5 h-5" />
                     </button>
                 </div>
@@ -344,25 +344,25 @@ const Dashboard = ({ data = {} }) => {
             {showSettings && <SettingsPanel config={config} onClose={() => setShowSettings(false)} onSave={saveSettings} />}
 
             {/* ========= HERO HEADER ========= */}
-            <div className="dash-up overflow-hidden rounded-xl shadow-lg shadow-[#1a0a0b]/20">
-                <div className="dash-mesh relative px-6 py-6 md:px-8 md:py-7 overflow-hidden">
+            <div className="dash-up overflow-hidden rounded-[24px] border border-[#1e2e3d] shadow-[0_24px_48px_-34px_rgba(9,18,27,.45)]">
+                <div className="dash-mesh relative overflow-hidden px-6 py-6 md:px-8 md:py-7">
                     <div className="relative flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 flex-1">
-                            <img src={BRAND_LOGO} alt="Logo" className="hidden sm:block h-11 w-11 rounded-lg border border-white/15 object-cover flex-shrink-0" />
+                            <img src={BRAND_LOGO} alt="Logo" className="hidden sm:block h-11 w-11 rounded-xl border border-white/10 bg-white object-cover flex-shrink-0" />
                             <div>
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#f2b635] mb-0.5">Carnes Amparito</div>
-                                <div className="text-base font-black text-white">{greeting}</div>
-                                <div className="text-xs text-white/40 capitalize mt-0.5">{mesLabel}</div>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.34em] text-[#79a7bc] mb-0.5">Executive cockpit</div>
+                                <div className="text-lg font-extrabold tracking-tight text-white">{greeting}</div>
+                                <div className="mt-0.5 text-xs text-white/44 capitalize">{mesLabel}</div>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="hidden md:block border-l border-white/10 pl-4">
-                                <p className="text-xs text-white/50 max-w-[200px] leading-relaxed">{insight}</p>
+                                <p className="max-w-[220px] text-xs leading-relaxed text-white/54">{insight}</p>
                             </div>
                             <button
                                 onClick={() => setShowSettings(true)}
-                                className="p-2 rounded-lg bg-white/8 border border-white/10 text-white/50 hover:bg-white/15 hover:text-[#f2b635] transition-colors group"
+                                className="erp-pressable rounded-xl border border-white/10 bg-white/6 p-2 text-white/60 hover:bg-white/12 hover:text-white group"
                                 title="Configuración"
                             >
                                 <svg className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -378,7 +378,7 @@ const Dashboard = ({ data = {} }) => {
             {/* ========= KPI GRID ========= */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 {kpis.map((kpi, i) => (
-                    <div key={kpi.label} className={`dash-up dash-up-${i + 1} dash-kpi relative bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden`}>
+                    <div key={kpi.label} className={`dash-up dash-up-${i + 1} dash-kpi erp-panel relative overflow-hidden rounded-[22px]`}>
                         {kpi.alert && (
                             <div className="absolute top-3 right-3">
                                 <span className="relative flex h-2.5 w-2.5">
@@ -387,7 +387,7 @@ const Dashboard = ({ data = {} }) => {
                                 </span>
                             </div>
                         )}
-                        <div className={`h-0.5 ${kpi.stripe}`} />
+                        <div className={`h-[3px] ${kpi.stripe}`} />
                         <div className="p-4 md:p-5">
                             <div className={`p-2 rounded-lg ${kpi.iconBg} w-fit mb-3`}>
                                 <Icon d={kpi.icon} className={`w-4 h-4 ${kpi.iconColor}`} />
@@ -403,12 +403,12 @@ const Dashboard = ({ data = {} }) => {
             </div>
 
             {/* ========= UTILIDAD ========= */}
-            <div className="dash-up dash-up-5 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="dash-up dash-up-5 erp-panel overflow-hidden rounded-[24px]">
                 <div className={`h-0.5 ${utilidad >= 0 ? 'bg-emerald-500' : 'bg-[#a81d24]'}`} />
                 <div className="p-5 md:p-6 flex items-center justify-between flex-wrap gap-4">
                     <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Resultado del Mes</div>
-                        <div className="text-xs text-slate-400 mb-3">Ingresos − Gastos − Compras</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Resultado del mes</div>
+                        <div className="text-xs text-slate-400 mb-3">Ingresos - Gastos - Compras</div>
                         <div className={`text-3xl md:text-4xl font-black font-mono tracking-tighter ${utilidad >= 0 ? 'text-emerald-700' : 'text-[#a81d24]'}`}>
                             {fmt(utilidad)}
                         </div>
@@ -426,8 +426,8 @@ const Dashboard = ({ data = {} }) => {
             {/* ========= BOTTOM GRID: Reminders + Alerts ========= */}
             <div className="dash-up dash-up-6 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
                 {/* --- REMINDERS --- */}
-                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+                <div className="erp-panel overflow-hidden rounded-[24px]">
+                    <div className="erp-panel-header flex items-center justify-between px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
                             <div className="p-1.5 rounded-lg bg-[#fff0f0]">
                                 <Icon d={ICON.bell} className="w-4 h-4 text-[#a81d24]" />
@@ -509,8 +509,8 @@ const Dashboard = ({ data = {} }) => {
                 </div>
 
                 {/* --- FACTURAS VENCIDAS / PENDIENTES --- */}
-                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-                    <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+                <div className="erp-panel overflow-hidden rounded-[24px]">
+                    <div className="erp-panel-header flex items-center gap-2.5 px-5 py-3.5">
                         <div className={`p-1.5 rounded-lg ${vencidas.length > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-100'}`}>
                             <Icon d={ICON.alert} className={`w-4 h-4 ${vencidas.length > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
                         </div>
@@ -573,8 +573,8 @@ const AppLoadingState = () => (
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
         <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
             <img src={BRAND_LOGO} alt="Carnes Amparito" className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
-            <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#0c618f]">Business cockpit</div>
-            <div className="mt-2 text-2xl font-semibold text-[#173545]">Cargando modulo</div>
+            <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#60717e]">Executive ERP</div>
+            <div className="mt-2 text-2xl font-extrabold text-[#16222d]">Cargando modulo</div>
             <div className="mt-2 text-sm text-[#6c8794]">Sincronizando informacion.</div>
         </div>
     </div>

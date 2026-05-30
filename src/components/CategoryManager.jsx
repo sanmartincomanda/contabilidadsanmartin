@@ -1,126 +1,184 @@
-// src/components/CategoryManager.jsx
-
-import React, { useState } from 'react'; // Eliminamos useEffect
+import React, { useState } from 'react';
+import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-// Solo necesitamos addDoc, updateDoc, deleteDoc, doc para manipular, 
-// no necesitamos collection, onSnapshot, query, orderBy
-import { addDoc, updateDoc, deleteDoc, doc, collection } from 'firebase/firestore'; 
 
-const Card = ({ title, children, className = '' }) => (
-    <div className={`rounded-2xl shadow-sm border border-neutral-200 bg-white p-4 ${className}`}>
-        <div className="text-lg font-semibold text-neutral-700 mb-3">{title}</div>
-        {children}
+const Card = ({ title, eyebrow, children, className = '' }) => (
+    <div className={`erp-panel erp-panel-hover overflow-hidden rounded-[24px] ${className}`}>
+        <div className="erp-panel-header px-5 py-4">
+            {eyebrow && <div className="erp-page-title">{eyebrow}</div>}
+            <h3 className="mt-1 text-xl font-extrabold tracking-tight text-[#16222d]">{title}</h3>
+        </div>
+        <div className="p-5">{children}</div>
     </div>
 );
 
-// CORRECCIÓN: Quitamos setCategories y onDataChange de props. Categories ya viene cargada de App.jsx
-export default function CategoryManager({ categories }) { 
+export default function CategoryManager({ categories }) {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [editingName, setEditingName] = useState('');
 
-    // ELIMINADO: Todo el bloque useEffect con onSnapshot
-    // App.jsx ya está escuchando la colección 'categorias'
-
-const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    setLoading(true);
-    try {
-        // *** ESTA LÍNEA ES CRÍTICA Y DEPENDE DE LOS PERMISOS DE ESCRITURA ***
-        await addDoc(collection(db, 'categorias'), {
-            name: newCategoryName.trim(),
-        });
-        setNewCategoryName('');
-        // Al tener éxito, el listener en App.jsx DEBE actualizar la prop 'categories'.
-    } catch (error) {
-        console.error("Error al agregar categoría:", error);
-    } finally {
-        setLoading(false);
-    }
-};
+    const handleAddCategory = async () => {
+        if (!newCategoryName.trim()) return;
+        setLoading(true);
+        try {
+            await addDoc(collection(db, 'categorias'), {
+                name: newCategoryName.trim(),
+            });
+            setNewCategoryName('');
+        } catch (error) {
+            console.error('Error al agregar categoria:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleUpdateCategory = async (id) => {
         if (!editingName.trim()) return;
         setLoading(true);
         try {
-            const catRef = doc(db, 'categorias', id);
-            await updateDoc(catRef, { name: editingName.trim() });
+            await updateDoc(doc(db, 'categorias', id), { name: editingName.trim() });
             setEditingId(null);
+            setEditingName('');
         } catch (error) {
-            console.error("Error al actualizar categoría:", error);
+            console.error('Error al actualizar categoria:', error);
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteCategory = async (id) => {
-        if (!window.confirm('¿Estás seguro de que quieres eliminar esta categoría?')) return;
+        if (!window.confirm('Eliminar esta categoria?')) return;
         setLoading(true);
         try {
             await deleteDoc(doc(db, 'categorias', id));
         } catch (error) {
-            console.error("Error al eliminar categoría:", error);
+            console.error('Error al eliminar categoria:', error);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Card title="Gestión de Categorías" className="max-w-xl mx-auto">
-            
-            {/* Formulario de Adición */}
-            <div className="mb-6 p-4 border rounded-lg bg-neutral-50">
-                <h3 className="text-md font-semibold mb-2">Agregar Nueva Categoría</h3>
-                <div className="flex space-x-2">
-                    <input
-                        type="text"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        placeholder="Nombre de la categoría (ej. Sueldos, Alquiler)"
-                        className="flex-grow rounded-lg border border-neutral-300 px-3 py-1.5 text-sm"
-                        disabled={loading}
-                    />
-                    <button
-                        onClick={handleAddCategory}
-                        disabled={loading || !newCategoryName.trim()}
-                        className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
-                    >
-                        {loading ? 'Agregando...' : 'Agregar'}
-                    </button>
+        <div className="space-y-5">
+            <div className="erp-panel overflow-hidden rounded-[24px]">
+                <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
+                    <div>
+                        <div className="erp-page-title">Master data</div>
+                        <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Categorias</h1>
+                    </div>
+                    <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
+                        {categories.length} activas
+                    </span>
                 </div>
             </div>
 
-            {/* Lista de Categorías */}
-            <h3 className="text-md font-semibold mt-6 mb-2">Lista de Categorías ({categories.length})</h3>
-            <div className="border rounded-lg overflow-hidden divide-y divide-neutral-100">
-                {categories.length === 0 ? (
-                    <div className="p-4 text-center text-neutral-500 text-sm">No hay categorías. Agrega la primera.</div>
-                ) : (
-                    categories.map(cat => (
-                        <div key={cat.id} className="p-3 flex justify-between items-center text-sm">
-                            {editingId === cat.id ? (
-                                <input
-                                    type="text"
-                                    value={editingName}
-                                    onChange={(e) => setEditingName(e.target.value)}
-                                    className="rounded border border-blue-300 px-1 text-sm w-full mr-2"
-                                />
-                            ) : (
-                                <span className="text-neutral-700 font-medium">{cat.name}</span>
-                            )}
-                            <div className="flex space-x-2 flex-shrink-0">
-                                {editingId === cat.id ? (
-                                    <button onClick={() => handleUpdateCategory(cat.id)} disabled={loading} className="text-blue-500 hover:text-blue-700 disabled:opacity-50">Guardar</button>
-                                ) : (
-                                    <button onClick={() => { setEditingId(cat.id); setEditingName(cat.name); }} disabled={loading} className="text-yellow-600 hover:text-yellow-700 disabled:opacity-50">Editar</button>
-                                )}
-                                <button onClick={() => handleDeleteCategory(cat.id)} disabled={loading} className="text-red-600 hover:text-red-700 disabled:opacity-50">Eliminar</button>
-                            </div>
+            <div className="grid gap-5 xl:grid-cols-[420px_minmax(0,1fr)]">
+                <Card title="Nueva categoria" eyebrow="Captura">
+                    <div className="space-y-4">
+                        <div className="erp-filter-panel p-4">
+                            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#5f7280]">
+                                Nombre
+                            </label>
+                            <input
+                                type="text"
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                placeholder="Ej. Sueldos, alquiler, transporte"
+                                className="erp-focus block h-12 w-full rounded-2xl border border-[#ccd7df] bg-white px-4 text-sm font-semibold text-[#16222d] shadow-[inset_0_1px_2px_rgba(15,23,42,.04)] disabled:opacity-60"
+                                disabled={loading}
+                            />
                         </div>
-                    ))
-                )}
+
+                        <button
+                            onClick={handleAddCategory}
+                            disabled={loading || !newCategoryName.trim()}
+                            className="erp-pressable flex h-12 w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] px-4 text-sm font-extrabold uppercase tracking-[0.18em] text-white shadow-[0_18px_32px_-18px_rgba(14,23,34,.72)] disabled:cursor-not-allowed disabled:opacity-55"
+                        >
+                            {loading ? 'Guardando' : 'Agregar'}
+                        </button>
+                    </div>
+                </Card>
+
+                <Card title="Base de categorias" eyebrow="Listado">
+                    {categories.length === 0 ? (
+                        <div className="erp-empty-state px-6 py-12 text-center">
+                            <div className="text-sm font-semibold text-[#5f7280]">No hay categorias registradas.</div>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {[...categories]
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .map((cat) => (
+                                    <div
+                                        key={cat.id}
+                                        className="erp-metric-card flex items-center justify-between gap-3 px-4 py-3"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#173042] text-sm font-bold text-white">
+                                                {cat.name?.charAt(0)?.toUpperCase() || 'C'}
+                                            </div>
+                                            {editingId === cat.id ? (
+                                                <input
+                                                    type="text"
+                                                    value={editingName}
+                                                    onChange={(e) => setEditingName(e.target.value)}
+                                                    className="erp-focus h-11 w-full rounded-2xl border border-[#ccd7df] bg-white px-4 text-sm font-semibold text-[#16222d]"
+                                                />
+                                            ) : (
+                                                <div className="truncate text-sm font-semibold text-[#22313f]">{cat.name}</div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            {editingId === cat.id ? (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleUpdateCategory(cat.id)}
+                                                        disabled={loading}
+                                                        className="erp-pressable rounded-xl bg-[#173042] px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white disabled:opacity-50"
+                                                    >
+                                                        Guardar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingId(null);
+                                                            setEditingName('');
+                                                        }}
+                                                        disabled={loading}
+                                                        className="erp-pressable rounded-xl border border-[#ccd7df] bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#556774] disabled:opacity-50"
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingId(cat.id);
+                                                            setEditingName(cat.name);
+                                                        }}
+                                                        disabled={loading}
+                                                        className="erp-pressable rounded-xl border border-[#ccd7df] bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#556774] disabled:opacity-50"
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteCategory(cat.id)}
+                                                        disabled={loading}
+                                                        className="erp-pressable rounded-xl border border-[#f0c9cc] bg-[#fff7f7] px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#a81d24] disabled:opacity-50"
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                    )}
+                </Card>
             </div>
-        </Card>
+        </div>
     );
 }

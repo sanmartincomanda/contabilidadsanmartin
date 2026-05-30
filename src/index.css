@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,15 +8,15 @@
   --brand-wine: #a81d24;
   --brand-wine-dark: #7f1218;
   --brand-gold: #f2b635;
-  --erp-shell: #0c618f;
-  --erp-shell-deep: #084869;
-  --erp-shell-soft: #dff4fb;
-  --erp-surface: #f6fbfd;
-  --erp-panel: #ffffff;
-  --erp-line: #bfd7e4;
-  --erp-line-strong: #8fb7cb;
-  --erp-text: #193545;
-  --erp-muted: #68808c;
+  --erp-shell: #1a6f93;
+  --erp-shell-deep: #0d1622;
+  --erp-shell-soft: #edf4f8;
+  --erp-surface: #e8eef3;
+  --erp-panel: #fbfdfe;
+  --erp-line: #d3dbe3;
+  --erp-line-strong: #97a8b7;
+  --erp-text: #16222d;
+  --erp-muted: #64727f;
   --erp-success: #1f8e58;
   --erp-warning: #d48b24;
   --erp-danger: #b1393e;
@@ -29,7 +29,7 @@
 }
 
 html {
-  background: #e3f0f5;
+  background: #dfe7ed;
   scroll-behavior: smooth;
 }
 
@@ -37,12 +37,14 @@ body {
   min-height: 100vh;
   @apply text-slate-900 antialiased;
   background:
-    linear-gradient(180deg, #d6edf5 0, #edf6fa 160px, #f7fbfd 100%),
-    linear-gradient(90deg, rgba(12, 97, 143, 0.04) 1px, transparent 1px),
-    linear-gradient(rgba(12, 97, 143, 0.04) 1px, transparent 1px);
-  background-size: auto, 28px 28px, 28px 28px;
+    radial-gradient(circle at top left, rgba(24, 126, 168, 0.12), transparent 22%),
+    radial-gradient(circle at top right, rgba(13, 22, 34, 0.08), transparent 20%),
+    linear-gradient(180deg, #dce6ed 0, #e9eff4 96px, #eff4f7 100%),
+    linear-gradient(90deg, rgba(17, 34, 50, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(17, 34, 50, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, auto, 32px 32px, 32px 32px;
   color: var(--erp-text);
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-family: "Manrope", "Segoe UI", sans-serif;
 }
 
 #root {
@@ -62,7 +64,7 @@ textarea {
 
 input::placeholder,
 textarea::placeholder {
-  color: #8aa0ab;
+  color: #92a0ac;
 }
 
 table {
@@ -76,24 +78,24 @@ table {
 }
 
 ::-webkit-scrollbar-track {
-  background: #d8e9f1;
+  background: #dce5eb;
 }
 
 ::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  border: 2px solid #d8e9f1;
-  background: #8eb7ca;
+  border: 2px solid #dce5eb;
+  background: #9ba9b5;
 }
 
 ::selection {
-  background: rgba(17, 115, 168, 0.18);
+  background: rgba(26, 111, 147, 0.18);
   color: var(--erp-text);
 }
 
 .erp-panel {
   border: 1px solid var(--erp-line);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 32px -28px rgba(7, 80, 119, 0.6);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 251, 253, 0.96) 100%);
+  box-shadow: 0 18px 32px -28px rgba(18, 29, 41, 0.45);
   transition:
     transform var(--erp-speed-base) var(--erp-ease-standard),
     box-shadow var(--erp-speed-base) var(--erp-ease-standard),
@@ -102,22 +104,22 @@ table {
 }
 
 .erp-panel-header {
-  background: linear-gradient(180deg, #f8fcfd 0%, #edf6fa 100%);
+  background: linear-gradient(180deg, #fafcfd 0%, #eef3f7 100%);
   border-bottom: 1px solid var(--erp-line);
 }
 
 .erp-chip {
-  border: 1px solid rgba(12, 97, 143, 0.16);
-  background: rgba(12, 97, 143, 0.08);
-  color: var(--erp-shell);
+  border: 1px solid rgba(13, 22, 34, 0.12);
+  background: rgba(13, 22, 34, 0.04);
+  color: #355062;
 }
 
 .erp-page-title {
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  color: var(--erp-shell);
+  color: #5a6c79;
 }
 
 .erp-mono {
@@ -126,18 +128,18 @@ table {
 
 .erp-focus:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(17, 115, 168, 0.14);
+  box-shadow: 0 0 0 3px rgba(26, 111, 147, 0.14);
   border-color: var(--erp-shell);
 }
 
 .erp-topbar-glow {
-  box-shadow: 0 12px 28px -22px rgba(6, 72, 105, 0.75);
+  box-shadow: 0 14px 30px -24px rgba(8, 16, 25, 0.28);
 }
 
 .erp-panel-hover:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   border-color: var(--erp-line-strong);
-  box-shadow: 0 26px 42px -32px rgba(7, 80, 119, 0.7);
+  box-shadow: 0 28px 42px -34px rgba(16, 26, 38, 0.42);
 }
 
 .erp-hover-lift {
@@ -198,7 +200,74 @@ table {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--erp-speed-fast) ease;
-  box-shadow: 0 0 0 1px rgba(12, 97, 143, 0.12), 0 12px 24px -20px rgba(12, 97, 143, 0.55);
+  box-shadow: 0 0 0 1px rgba(26, 111, 147, 0.12), 0 12px 24px -20px rgba(16, 26, 38, 0.22);
+}
+
+.erp-shell-card {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(21, 31, 44, 0.97) 0%, rgba(12, 19, 29, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.erp-command-strip {
+  border: 1px solid var(--erp-line);
+  background: linear-gradient(180deg, #f8fafc 0%, #edf2f6 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.erp-table-shell {
+  overflow: hidden;
+  border: 1px solid #dbe2e8;
+  border-radius: 18px;
+  background: #fcfdff;
+}
+
+.erp-table-shell thead {
+  background: linear-gradient(180deg, #f5f8fb 0%, #eef3f7 100%);
+}
+
+.erp-table-shell th {
+  color: #60717e;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.erp-table-shell td {
+  color: #22313f;
+}
+
+.erp-table-shell tbody tr {
+  transition: background-color var(--erp-speed-fast) ease;
+}
+
+.erp-table-shell tbody tr:hover {
+  background: rgba(17, 35, 51, 0.032);
+}
+
+.erp-table-shell tfoot {
+  background: linear-gradient(180deg, #f6f9fb 0%, #eef3f7 100%);
+}
+
+.erp-empty-state {
+  border: 1px dashed #c8d3dc;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #f7fafc 0%, #eef3f7 100%);
+  color: #667582;
+}
+
+.erp-filter-panel {
+  border: 1px solid #d6dee6;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #f7fafc 0%, #eef3f7 100%);
+}
+
+.erp-metric-card {
+  border: 1px solid #d8e0e7;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 16px 28px -26px rgba(15, 23, 42, 0.4);
 }
 
 .erp-soft-glow:hover::after,

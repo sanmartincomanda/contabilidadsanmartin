@@ -69,7 +69,7 @@ const Card = ({ title, children, className = "", right, icon }) => (
 
 const Button = ({ children, variant = 'primary', className = '', disabled, ...props }) => {
     const variants = {
-        primary:   'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_16px_28px_-18px_rgba(12,97,143,.85)] hover:opacity-95',
+        primary:   'bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,.78)] hover:brightness-[1.04]',
         danger:    'bg-red-600 hover:bg-red-700 text-white',
         success:   'bg-emerald-600 hover:bg-emerald-700 text-white',
         ghost:     'bg-white hover:bg-[#f3f9fc] text-[#45606d] border border-[#c5dce7]',
@@ -89,7 +89,7 @@ const Button = ({ children, variant = 'primary', className = '', disabled, ...pr
 
 const Input = ({ label, icon, className = '', ...props }) => (
     <div className="space-y-1.5">
-        {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
+        {label && <label className="text-xs font-semibold uppercase tracking-widest text-[#61727f]">{label}</label>}
         <div className="relative group">
             {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] group-focus-within:text-[#0a628f] transition-colors" />}
             <input
@@ -102,7 +102,7 @@ const Input = ({ label, icon, className = '', ...props }) => (
 
 const Select = ({ label, options, ...props }) => (
     <div className="space-y-1.5">
-        {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
+        {label && <label className="text-xs font-semibold uppercase tracking-widest text-[#61727f]">{label}</label>}
         <div className="relative">
             <select
                 className="w-full rounded-2xl border border-[#bdd5e1] bg-[#f7fbfd] px-3.5 py-2.5 text-sm font-medium text-[#173545] outline-none transition-all focus:border-[#0a628f] focus:ring-2 focus:ring-[#0a628f]/12 appearance-none cursor-pointer pr-8"
@@ -510,8 +510,8 @@ export function AccountsPayable({ data }) {
                     <div className="erp-panel overflow-hidden rounded-[24px]">
                         <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-6 py-4">
                             <div>
-                                <div className="erp-page-title">Payables</div>
-                                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#173545]">Cuentas por pagar</h1>
+                                <div className="erp-page-title">Payables desk</div>
+                                <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Cuentas por pagar</h1>
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="text-right">
@@ -528,15 +528,15 @@ export function AccountsPayable({ data }) {
 
                 {/* ── TARJETAS DE RESUMEN ── */}
                 <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
-                    <FadeIn delay={60} className="rounded-[24px] bg-gradient-to-br from-[#0a628f] via-[#1176a8] to-[#4ca9c5] p-5 text-white shadow-[0_20px_34px_-20px_rgba(12,97,143,.75)]">
+                    <FadeIn delay={60} className="rounded-[24px] bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] p-5 text-white shadow-[0_22px_36px_-24px_rgba(15,23,42,.78)]">
                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-red-200 text-[10px] font-bold uppercase tracking-widest">Saldo Total</span>
+                            <span className="text-[#9ec9da] text-[10px] font-bold uppercase tracking-widest">Saldo total</span>
                             <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center">
                                 <Icon path={Icons.trendingDown} className="w-4 h-4 text-white" />
                             </div>
                         </div>
                         <div className="text-2xl font-bold">{fmt(saldoTotalGeneral)}</div>
-                        <div className="text-red-200 text-xs mt-1.5">
+                        <div className="text-[#b3cfdb] text-xs mt-1.5">
                             {stats.count} {stats.count === 1 ? 'factura pendiente' : 'facturas pendientes'}
                         </div>
                     </FadeIn>
@@ -565,7 +565,7 @@ export function AccountsPayable({ data }) {
                 </div>
 
                 {/* ── NAVEGACIÓN TABS ── */}
-                <div className="erp-panel rounded-[24px] p-1.5 mb-6">
+                <div className="erp-command-strip rounded-[24px] p-1.5 mb-6">
                     <div className="flex flex-wrap gap-1.5">
                         {tabs.map(tab => (
                             <button
@@ -573,8 +573,8 @@ export function AccountsPayable({ data }) {
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`erp-pressable flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                                     activeTab === tab.id
-                                        ? 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_14px_28px_-18px_rgba(12,97,143,.8)]'
-                                        : 'text-[#55717f] hover:bg-[#eef7fb] hover:text-[#173545]'
+                                        ? 'bg-[#152533] text-white shadow-[0_16px_26px_-18px_rgba(15,23,42,.8)]'
+                                        : 'text-[#5b6e7b] hover:bg-white hover:text-[#16222d]'
                                 }`}
                             >
                                 <Icon path={Icons[tab.icon]} className="w-3.5 h-3.5" />
@@ -689,9 +689,9 @@ export function AccountsPayable({ data }) {
                                             </div>
                                         }
                                     >
-                                        <div className="overflow-x-auto rounded-lg border border-stone-200">
+                                        <div className="erp-table-shell overflow-x-auto">
                                             <table className="w-full text-sm">
-                                                <thead className="bg-stone-50 border-b border-stone-200">
+                                                <thead>
                                                     <tr>
                                                         {['N° Factura', 'Emisión', 'Vencimiento', 'Monto', 'Abonado', 'Saldo', 'Estado', ''].map(h => (
                                                             <th key={h} className={`px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === '' || h === 'Monto' || h === 'Abonado' || h === 'Saldo' ? 'text-right' : h === 'Estado' ? 'text-center' : 'text-left'}`}>
@@ -700,11 +700,11 @@ export function AccountsPayable({ data }) {
                                                         ))}
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-stone-100">
+                                                <tbody className="divide-y divide-slate-100">
                                                     {provData.items.map(f => {
                                                         const vencInfo = getVencimientoInfo(f.vencimiento);
                                                         return (
-                                                            <tr key={f.id} className="hover:bg-stone-50/70 transition-colors group">
+                                                            <tr key={f.id} className="group transition-colors">
                                                                 <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">{f.numero}</td>
                                                                 <td className="px-4 py-3 text-xs text-slate-500">{f.fecha}</td>
                                                                 <td className="px-4 py-3">
@@ -724,7 +724,7 @@ export function AccountsPayable({ data }) {
                                                                     <button
                                                                         onClick={() => handleDeleteFactura(f)}
                                                                         disabled={loading}
-                                                                        className="p-1.5 text-stone-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 disabled:opacity-20"
+                                                                        className="erp-pressable p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 disabled:opacity-20"
                                                                     >
                                                                         <Icon path={Icons.trash} className="w-3.5 h-3.5" />
                                                                     </button>
@@ -740,7 +740,7 @@ export function AccountsPayable({ data }) {
                             ))}
 
                             {Object.keys(facturasPorProveedor).length === 0 && (
-                                <div className="text-center py-16 bg-white rounded-xl border border-dashed border-stone-300">
+                                <div className="erp-empty-state px-6 py-16 text-center">
                                     <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
                                         <Icon path={Icons.checkCircle} className="w-7 h-7 text-emerald-500" />
                                     </div>
@@ -761,9 +761,9 @@ export function AccountsPayable({ data }) {
                                         <p className="text-sm font-medium text-slate-400">No hay abonos registrados</p>
                                     </div>
                                 ) : (
-                                    <div className="overflow-x-auto rounded-lg border border-stone-200">
+                                    <div className="erp-table-shell overflow-x-auto">
                                         <table className="w-full text-sm">
-                                            <thead className="bg-stone-50 border-b border-stone-200">
+                                            <thead>
                                                 <tr>
                                                     {['Recibo #', 'Fecha', 'Proveedor', 'Método', 'Monto', 'Acción'].map(h => (
                                                         <th key={h} className={`px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === 'Monto' ? 'text-right' : h === 'Acción' ? 'text-center' : 'text-left'}`}>
@@ -772,7 +772,7 @@ export function AccountsPayable({ data }) {
                                                     ))}
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-stone-100">
+                                            <tbody className="divide-y divide-slate-100">
                                                 {abonos.sort((a, b) => b.secuencia - a.secuencia).map(a => (
                                                     <tr key={a.id} className="hover:bg-stone-50 transition-colors">
                                                         <td className="px-4 py-3 font-mono font-bold text-[#a81d24]">#{a.secuencia}</td>
@@ -788,7 +788,7 @@ export function AccountsPayable({ data }) {
                                                             <button
                                                                 onClick={() => handleDeleteAbono(a)}
                                                                 disabled={loading}
-                                                                className="text-red-500 hover:text-red-700 font-semibold text-xs uppercase px-3 py-1 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                                className="erp-pressable text-red-500 hover:text-red-700 font-semibold text-xs uppercase px-3 py-1 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                                             >
                                                                 Anular
                                                             </button>
@@ -835,7 +835,7 @@ export function AccountsPayable({ data }) {
                                                     </div>
                                                     <button
                                                         onClick={() => deleteDoc(doc(db, 'proveedores', p.id))}
-                                                        className="p-1.5 text-stone-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                        className="erp-pressable p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                                     >
                                                         <Icon path={Icons.trash} className="w-3.5 h-3.5" />
                                                     </button>

@@ -53,7 +53,7 @@ const Icon = ({ path, className = "w-5 h-5" }) => (
 
 const Card = ({ title, children, className = "", right, icon, gradient = false }) => (
     <div className={`erp-panel erp-panel-hover rounded-[24px] overflow-hidden ${className}`}>
-        <div className={`flex justify-between items-center px-5 py-3.5 border-b ${gradient ? 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] border-[#8ec0d4]' : 'erp-panel-header border-[#c5dce7]'}`}>
+        <div className={`flex justify-between items-center px-5 py-3.5 border-b ${gradient ? 'bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] border-[#203446]' : 'erp-panel-header border-[#c5dce7]'}`}>
             <div className="flex items-center gap-3">
                 {icon && (
                     <div className={`p-2 rounded-xl ${gradient ? 'bg-white/12' : 'bg-[#eaf7fc]'}`}>
@@ -71,7 +71,7 @@ const Card = ({ title, children, className = "", right, icon, gradient = false }
 const Button = ({ children, variant = 'primary', className = '', disabled, size = 'md', ...props }) => {
     const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5 text-sm' };
     const variants = {
-        primary: 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_16px_28px_-18px_rgba(12,97,143,.85)] hover:opacity-95',
+        primary: 'bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,.78)] hover:brightness-[1.04]',
         success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
         danger: 'bg-red-600 hover:bg-red-700 text-white',
         warning: 'bg-[#a81d24] hover:bg-[#7f1218] text-white',
@@ -94,7 +94,7 @@ const Button = ({ children, variant = 'primary', className = '', disabled, size 
 
 const Input = ({ label, icon, type = "text", className = '', ...props }) => (
     <div className="space-y-1">
-        {label && <label className="text-xs font-bold uppercase tracking-wider text-stone-500">{label}</label>}
+        {label && <label className="text-xs font-bold uppercase tracking-wider text-[#61727f]">{label}</label>}
         <div className="relative group">
             {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] group-focus-within:text-[#0a628f] transition-colors" />}
             <input
@@ -108,7 +108,7 @@ const Input = ({ label, icon, type = "text", className = '', ...props }) => (
 
 const Select = ({ label, icon, options, ...props }) => (
     <div className="space-y-1.5">
-        {label && <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>}
+        {label && <label className="text-xs font-semibold uppercase tracking-widest text-[#61727f]">{label}</label>}
         <div className="relative">
             {icon && <Icon path={Icons[icon]} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72909d] pointer-events-none" />}
             <select
@@ -260,7 +260,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
     };
 
     return (
-        <tr className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
+        <tr className="border-b border-slate-100 transition-colors">
             {Object.keys(fields).map(key => (
                 <td key={key} className="py-2.5 px-3 text-sm">
                     {isEditing ? renderInput(key, editData[key]) : renderValue(key, item[key])}
@@ -378,14 +378,14 @@ const EditableList = ({
     return (
         <div className="mt-4">
             {onFilterChange && (
-                <div className="mb-4 space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <div className="erp-filter-panel mb-4 space-y-3 p-4">
                     <div className="flex flex-wrap items-center gap-3">
-                        <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">{filterLabel}:</label>
+                        <label className="text-xs font-bold text-[#61727f] uppercase tracking-wider">{filterLabel}:</label>
                         <input
                             type={filterType}
                             value={filterValue}
                             onChange={(e) => onFilterChange(e.target.value)}
-                            className="bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-stone-700 focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 outline-none"
+                            className="erp-focus rounded-xl border border-[#ccd7df] bg-white px-3 py-1.5 text-sm font-semibold text-[#30414f] outline-none"
                         />
                         {filterValue && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => onFilterChange('')}>
@@ -398,7 +398,7 @@ const EditableList = ({
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                             {advancedFilterConfig.map((filterField) => (
                                 <div key={filterField.key} className="space-y-1">
-                                    <label className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-[#61727f]">
                                         {filterField.label}
                                     </label>
                                     <input
@@ -406,7 +406,7 @@ const EditableList = ({
                                         value={advancedFilters[filterField.key] || ''}
                                         placeholder={filterField.placeholder || ''}
                                         onChange={(e) => onAdvancedFiltersChange(filterField.key, e.target.value)}
-                                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-stone-700 focus:border-[#a81d24] focus:ring-2 focus:ring-[#a81d24]/15 outline-none"
+                                        className="erp-focus w-full rounded-xl border border-[#ccd7df] bg-white px-3 py-1.5 text-sm font-semibold text-[#30414f] outline-none"
                                     />
                                 </div>
                             ))}
@@ -416,21 +416,21 @@ const EditableList = ({
             )}
 
             {!hasData ? (
-                <div className="p-8 border-2 border-dashed border-stone-200 rounded-xl bg-stone-50 text-stone-400 text-center">
-                    <Icon path={Icons.alertCircle} className="w-10 h-10 mx-auto mb-3 text-stone-300" />
+                <div className="erp-empty-state p-8 text-center">
+                    <Icon path={Icons.alertCircle} className="w-10 h-10 mx-auto mb-3 text-slate-300" />
                     <p className="font-medium text-sm">
                         {filterValue ? `No hay registros para ${filterValue}` : "No hay registros recientes"}
                     </p>
                 </div>
             ) : (
-                <div className="overflow-x-auto border border-stone-200 rounded-xl shadow-sm">
+                <div className="erp-table-shell overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="text-left bg-stone-100 border-b border-stone-200">
+                            <tr className="text-left border-b border-[#dbe2e8]">
                                 {Object.values(fields).map(field => (
-                                    <th key={field.label} className="py-2.5 px-3 font-bold text-stone-600 text-xs uppercase tracking-wider">{field.label}</th>
+                                    <th key={field.label} className="px-3 py-2.5">{field.label}</th>
                                 ))}
-                                <th className="py-2.5 px-3 font-bold text-stone-600 text-xs uppercase tracking-wider">Acciones</th>
+                                <th className="px-3 py-2.5">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -514,8 +514,8 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
 
     return (
         <div className="space-y-4">
-            <div className="rounded-lg border border-[#f2c5c5] bg-[#fff8f8] px-4 py-2.5 text-xs font-semibold text-[#7f1218]">
-                Todo se registra en {DEFAULT_BRANCH_NAME}.
+            <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
+                Base: {DEFAULT_BRANCH_NAME}
             </div>
 
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -611,8 +611,8 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
     return (
         <div className="space-y-4">
             <form onSubmit={handleSubmit} className="space-y-3">
-                <div className="rounded-lg border border-[#f2c5c5] bg-[#fff8f8] px-4 py-2.5 text-xs font-semibold text-[#7f1218]">
-                    Todo se registra en {DEFAULT_BRANCH_NAME}.
+                <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
+                    Base: {DEFAULT_BRANCH_NAME}
                 </div>
                 <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
                 <Input label="Descripción" icon="fileText" placeholder="Ej: Pago de servicios..." value={description} onChange={e => setDescription(e.target.value)} required />
@@ -664,8 +664,8 @@ const InventoryForm = ({ loading, setLoading, onSuccess }) => {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="rounded-lg border border-[#f2c5c5] bg-[#fff8f8] px-4 py-2.5 text-xs font-semibold text-[#7f1218]">
-                Todo se registra en {DEFAULT_BRANCH_NAME}.
+            <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
+                Base: {DEFAULT_BRANCH_NAME}
             </div>
             <Input label="Mes" type="month" icon="calendar" value={month} onChange={e => setMonth(e.target.value)} required />
             <Select label="Tipo" icon="box" value={type} onChange={e => setType(e.target.value)} options={<><option value="inicial">Inicial</option><option value="final">Final</option></>} />
@@ -715,11 +715,11 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-700">
-                Las compras registradas aqui se contabilizan como costo de contado.
+            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-[11px] font-semibold text-emerald-700">
+                Compra de contado
             </div>
-            <div className="rounded-lg border border-[#f2c5c5] bg-[#fff8f8] px-4 py-2.5 text-xs font-semibold text-[#7f1218]">
-                Todo se registra en {DEFAULT_BRANCH_NAME}.
+            <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
+                Base: {DEFAULT_BRANCH_NAME}
             </div>
             <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
             <Input label="Proveedor" icon="users" placeholder="Nombre del proveedor" value={supplier} onChange={e => setSupplier(e.target.value)} required />
@@ -1007,14 +1007,14 @@ export function DataEntry({ categories, data }) {
             <div className="erp-panel overflow-hidden rounded-[24px] no-print">
                 <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
                     <div>
-                        <div className="erp-page-title">Data entry</div>
-                        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#173545]">Registro manual</h1>
+                        <div className="erp-page-title">Manual capture</div>
+                        <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Data entry</h1>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
                             {tabsConfig[activeTab].label}
                         </span>
-                        <span className="rounded-full border border-[#d3e6ef] bg-white px-3 py-1 text-xs font-medium text-[#5d7784]">
+                        <span className="rounded-full border border-[#d7dfe6] bg-white px-3 py-1 text-xs font-semibold text-[#5d7784]">
                             {DEFAULT_BRANCH_NAME}
                         </span>
                     </div>
@@ -1022,7 +1022,7 @@ export function DataEntry({ categories, data }) {
             </div>
 
             {/* Tabs */}
-            <div className="erp-panel rounded-[24px] p-2 no-print">
+            <div className="erp-command-strip rounded-[24px] p-2 no-print">
                 <div className="flex flex-wrap gap-1.5">
                     {Object.entries(tabsConfig).map(([tab, config]) => (
                         <button
@@ -1030,8 +1030,8 @@ export function DataEntry({ categories, data }) {
                             onClick={() => setActiveTab(tab)}
                             className={`erp-pressable flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${
                                 activeTab === tab
-                                    ? 'bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] text-white shadow-[0_14px_28px_-18px_rgba(12,97,143,.8)]'
-                                    : 'text-[#55717f] hover:bg-[#eef7fb]'
+                                    ? 'bg-[#152533] text-white shadow-[0_16px_26px_-18px_rgba(15,23,42,.8)]'
+                                    : 'text-[#5b6e7b] hover:bg-white'
                             }`}
                         >
                             <Icon path={Icons[config.icon]} className="w-3.5 h-3.5" />
@@ -1042,9 +1042,9 @@ export function DataEntry({ categories, data }) {
             </div>
 
             {/* Main content */}
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[390px_minmax(0,1fr)]">
                 <div className="no-print animate-fade-in">
-                    <Card title={`Captura · ${tabsConfig[activeTab].label}`} icon={tabsConfig[activeTab].icon} gradient={true}>
+                    <Card title={`Captura activa · ${tabsConfig[activeTab].label}`} icon={tabsConfig[activeTab].icon} gradient={true}>
                         {activeTab === 'Ingresos' && <IncomeForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Gastos' && <ExpenseForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Inventario' && <InventoryForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
@@ -1056,7 +1056,7 @@ export function DataEntry({ categories, data }) {
                 </div>
 
                 <div className="animate-fade-in">
-                    <Card title={`Historial · ${tabsConfig[activeTab].label}`} icon="receipt">
+                    <Card title={`Historial operativo · ${tabsConfig[activeTab].label}`} icon="receipt">
                         <EditableList
                             data={getListData()}
                             collectionName={getCollectionName()}
