@@ -86,6 +86,52 @@ const findGastoRefsForPurchase = async (purchaseId, purchaseData) => {
     return uniqueRefs(gastoRefs);
 };
 
+const toNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getMonthFromDate = (dateValue, fallback = '') => {
+    if (!dateValue || typeof dateValue !== 'string') return fallback;
+    return dateValue.substring(0, 7);
+};
+
+const buildPayableMirrorUpdate = (purchaseData, payableData) => {
+    const nextAmount = toNumber(purchaseData.amount, toNumber(payableData?.monto));
+    const currentAmount = toNumber(payableData?.monto);
+    const currentSaldo = toNumber(payableData?.saldo);
+    const appliedAmount = Math.max(currentAmount - currentSaldo, 0);
+    const nextSaldo = Math.max(nextAmount - appliedAmount, 0);
+
+    let nextEstado = 'pendiente';
+    if (nextSaldo <= 0) {
+        nextEstado = 'pagado';
+    } else if (appliedAmount > 0) {
+        nextEstado = 'parcial';
+    }
+
+    return {
+        fecha: purchaseData.date || payableData?.fecha || '',
+        month: purchaseData.month || getMonthFromDate(purchaseData.date, payableData?.month || ''),
+        proveedor: purchaseData.supplier || payableData?.proveedor || '',
+        numero: purchaseData.invoiceNumber ?? payableData?.numero ?? '',
+        monto: nextAmount,
+        saldo: nextSaldo,
+        estado: nextEstado,
+        branch: purchaseData.branch || payableData?.branch || '',
+        branchName: purchaseData.branchName || payableData?.branchName || '',
+        sucursal: purchaseData.branchName || payableData?.sucursal || payableData?.branchName || '',
+    };
+};
+
+const buildGastoMirrorUpdate = (purchaseData, gastoData) => ({
+    fecha: purchaseData.date || gastoData?.fecha || '',
+    monto: toNumber(purchaseData.amount, toNumber(gastoData?.monto)),
+    branch: purchaseData.branch || gastoData?.branch || '',
+    branchName: purchaseData.branchName || gastoData?.branchName || '',
+    sucursal: purchaseData.branch || gastoData?.sucursal || '',
+});
+
 export async function deletePayableTransaction(payableId) {
     const payableRef = doc(db, 'cuentas_por_pagar', payableId);
     const payableSnap = await getDoc(payableRef);
@@ -151,6 +197,52 @@ export async function deletePurchaseTransaction(purchaseId) {
 
     return {
         deleted: true,
+        linkedPayableIds: payableRefs.map((payableRef) => payableRef.id),
+        linkedGastoDiarioIds: gastoRefs.map((gastoRef) => gastoRef.id),
+    };
+}
+
+export async function updatePurchaseTransaction(purchaseId, purchaseUpdates) {
+    const purchaseRef = doc(db, 'compras', purchaseId);
+    const purchaseSnap = await getDoc(purchaseRef);
+
+    if (!purchaseSnap.exists()) {
+        return { updated: false, missing: true };
+    }
+
+    const currentPurchase = purchaseSnap.data();
+    const nextPurchase = {
+        ...currentPurchase,
+        ...purchaseUpdates,
+    };
+
+    if (nextPurchase.date) {
+        nextPurchase.month = getMonthFromDate(nextPurchase.date, nextPurchase.month || '');
+    }
+
+    const payableRefs = await findPayableRefsForPurchase(purchaseId, nextPurchase);
+    const gastoRefs = await findGastoRefsForPurchase(purchaseId, nextPurchase);
+
+    const batch = writeBatch(db);
+    batch.update(purchaseRef, nextPurchase);
+
+    for (const payableRef of payableRefs) {
+        const payableSnap = await getDoc(payableRef);
+        if (!payableSnap.exists()) continue;
+        batch.update(payableRef, buildPayableMirrorUpdate(nextPurchase, payableSnap.data()));
+    }
+
+    for (const gastoRef of gastoRefs) {
+        const gastoSnap = await getDoc(gastoRef);
+        if (!gastoSnap.exists()) continue;
+        batch.update(gastoRef, buildGastoMirrorUpdate(nextPurchase, gastoSnap.data()));
+    }
+
+    await batch.commit();
+
+    return {
+        updated: true,
+        purchase: nextPurchase,
         linkedPayableIds: payableRefs.map((payableRef) => payableRef.id),
         linkedGastoDiarioIds: gastoRefs.map((gastoRef) => gastoRef.id),
     };
