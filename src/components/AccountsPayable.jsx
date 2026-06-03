@@ -50,9 +50,12 @@ const SlideIn = ({ children, className = "" }) => (
 );
 
 // --- COMPONENTES UI ---
-const Card = ({ title, children, className = "", right, icon }) => (
+const Card = ({ title, children, className = "", right, icon, onHeaderDoubleClick, headerClassName = "" }) => (
     <div className={`erp-panel erp-panel-hover rounded-[24px] overflow-hidden ${className}`}>
-        <div className="erp-panel-header flex justify-between items-center px-5 py-3.5 border-b border-[#c5dce7]">
+        <div
+            className={`erp-panel-header flex justify-between items-center px-5 py-3.5 border-b border-[#c5dce7] ${headerClassName}`}
+            onDoubleClick={onHeaderDoubleClick}
+        >
             <div className="flex items-center gap-3">
                 {icon && (
                     <div className="rounded-xl bg-[#eaf7fc] p-2">
@@ -170,6 +173,7 @@ export function AccountsPayable({ data }) {
     const [activeTab, setActiveTab] = useState('Estado de Cuenta');
     const [loading, setLoading] = useState(false);
     const [nuevoProveedor, setNuevoProveedor] = useState('');
+    const [expandedProvider, setExpandedProvider] = useState(null);
 
     // Ref para bloquear doble-submit en cualquier operación crítica
     const isProcessingRef = useRef(false);
@@ -479,6 +483,10 @@ export function AccountsPayable({ data }) {
         }
     }, []);
 
+    const toggleProviderExpanded = useCallback((providerName) => {
+        setExpandedProvider((prev) => prev === providerName ? null : providerName);
+    }, []);
+
     const handleAddProveedor = useCallback(async (e) => {
         e.preventDefault();
         if (!nuevoProveedor.trim()) return;
@@ -691,9 +699,17 @@ export function AccountsPayable({ data }) {
                         <div className="space-y-5">
                             {Object.entries(facturasPorProveedor).map(([prov, provData], idx) => (
                                 <FadeIn key={prov} delay={idx * 70}>
+                                    {(() => {
+                                        const isExpanded = expandedProvider === prov;
+                                        const partialCount = provData.items.filter((item) => item.estado === 'parcial').length;
+                                        const pendingCount = provData.items.length - partialCount;
+
+                                        return (
                                     <Card
                                         title={prov}
                                         icon="building"
+                                        onHeaderDoubleClick={() => toggleProviderExpanded(prov)}
+                                        headerClassName="select-none"
                                         right={!isCompactViewport ? (
                                             <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
                                                 <div className="rounded-lg border border-[#f3d8ca] bg-[#fff8f4] px-3 py-2 text-right">
@@ -714,6 +730,14 @@ export function AccountsPayable({ data }) {
                                                     <Icon path={Icons.creditCard} className="w-3.5 h-3.5" />
                                                     Abonar
                                                 </Button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleProviderExpanded(prov)}
+                                                    className="erp-pressable flex items-center justify-center gap-2 rounded-lg border border-[#c5dce7] bg-white px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[#355161]"
+                                                >
+                                                    <Icon path={Icons.chevronRight} className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                                    {isExpanded ? 'Ocultar' : 'Ver'}
+                                                </button>
                                             </div>
                                         ) : null}
                                     >
@@ -740,11 +764,42 @@ export function AccountsPayable({ data }) {
                                                         <Icon path={Icons.creditCard} className="w-3.5 h-3.5" />
                                                         Abonar proveedor
                                                     </Button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleProviderExpanded(prov)}
+                                                        className="erp-pressable flex items-center justify-center gap-2 rounded-lg border border-[#c5dce7] bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-[#355161]"
+                                                    >
+                                                        <Icon path={Icons.chevronRight} className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                                        {isExpanded ? 'Ocultar facturas' : 'Ver facturas'}
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}
 
-                                        {isCompactViewport ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleProviderExpanded(prov)}
+                                            onDoubleClick={() => toggleProviderExpanded(prov)}
+                                            className="erp-pressable mb-4 flex w-full items-center justify-between rounded-[20px] border border-[#d7e2e9] bg-[linear-gradient(180deg,#f9fbfd_0%,#f2f7fa_100%)] px-4 py-3 text-left"
+                                        >
+                                            <div>
+                                                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                    Resumen proveedor
+                                                </div>
+                                                <div className="mt-1 text-sm font-bold text-[#16222d]">
+                                                    {provData.items.length} {provData.items.length === 1 ? 'factura activa' : 'facturas activas'}
+                                                </div>
+                                                <div className="mt-1 text-xs text-slate-500">
+                                                    {pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}{partialCount > 0 ? ` · ${partialCount} parcial` : ''}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#355161]">
+                                                <span>{isExpanded ? 'Ocultar' : 'Abrir'}</span>
+                                                <Icon path={Icons.chevronRight} className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                            </div>
+                                        </button>
+
+                                        {isExpanded && (isCompactViewport ? (
                                         <div className="space-y-3">
                                             {provData.items.map((f) => {
                                                 const vencInfo = getVencimientoInfo(f.vencimiento);
@@ -846,8 +901,10 @@ export function AccountsPayable({ data }) {
                                                 </tbody>
                                             </table>
                                         </div>
-                                        )}
+                                        ))}
                                     </Card>
+                                        );
+                                    })()}
                                 </FadeIn>
                             ))}
 
