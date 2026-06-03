@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { fmt, peso, branchName, resolveBranchId } from '../constants';
 import { calculateDepreciationExpenseForMonth, getDepreciationActiveMonths } from '../services/depreciation';
+import { calculateGeneralRegimeTaxes } from '../services/tax';
 import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
 import { resolveReportIncomeEntries } from '../services/incomeAggregation';
@@ -130,6 +131,8 @@ const FinancialFlowChart = ({
     totalNetProfit,
     totalTax,
     totalDepreciation,
+    totalIMI,
+    totalIR,
     selectedMonth,
 }) => {
     const income = clampFlow(totalIncome);
@@ -159,10 +162,12 @@ const FinancialFlowChart = ({
         return Math.max(value * scale, minVisible);
     };
 
-    const xIncome = 140;
-    const xGross = 400;
-    const xOperating = 740;
-    const xFinal = 1080;
+    const chartWidth = 1480;
+    const chartHeight = 540;
+    const xIncome = 180;
+    const xGross = 500;
+    const xOperating = 920;
+    const xFinal = 1300;
 
     const sourceCenter = 255;
     const grossCenter = 165;
@@ -193,10 +198,15 @@ const FinancialFlowChart = ({
     };
 
     const formatValue = (value) => fmt(value);
+    const formatShare = (value) => {
+        if (!totalIncome) return '0.0%';
+        return `${((Math.abs(value) / totalIncome) * 100).toFixed(1)}%`;
+    };
 
     return (
         <div className="overflow-x-auto">
-            <div className="min-w-[1120px] rounded-[26px] border border-[#d7e2e9] bg-[linear-gradient(180deg,#fbfdff_0%,#f2f8fb_100%)] p-5">
+            <div className="flex min-w-[1360px] justify-center rounded-[26px] border border-[#d7e2e9] bg-[linear-gradient(180deg,#fbfdff_0%,#f2f8fb_100%)] p-5">
+                <div className="w-full max-w-[1380px]">
                 <div className="mb-3 flex items-center justify-between">
                     <div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Flujo del resultado</div>
@@ -207,7 +217,7 @@ const FinancialFlowChart = ({
                     </div>
                 </div>
 
-                <svg viewBox="0 0 1220 540" className="h-auto w-full">
+                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-auto w-full">
                     <defs>
                         <linearGradient id="incomeFlow" x1="0%" x2="100%">
                             <stop offset="0%" stopColor="rgba(40, 182, 246, 0.55)" />
@@ -224,7 +234,7 @@ const FinancialFlowChart = ({
                     </defs>
 
                     <path d={buildRibbonPath({ x0: xIncome, x1: xGross, y0: sourceCenter, h0: hIncome, y1: grossCenter, h1: hGross })} fill="url(#incomeFlow)" />
-                    <path d={buildRibbonPath({ x0: xIncome, x1: xGross, y0: sourceCenter, h0: hIncome, y1: cogsCenter, h1: hCOGS })} fill="url(#incomeFlow)" opacity="0.9" />
+                    <path d={buildRibbonPath({ x0: xIncome, x1: xGross, y0: sourceCenter, h0: hIncome, y1: cogsCenter, h1: hCOGS })} fill="url(#redFlow)" opacity="0.96" />
 
                     <path d={buildRibbonPath({ x0: xGross, x1: xOperating, y0: grossCenter, h0: hGross, y1: operatingCenter, h1: hOperating })} fill="url(#greenFlow)" />
                     <path d={buildRibbonPath({ x0: xGross, x1: xOperating, y0: grossCenter, h0: hGross, y1: expensesCenter, h1: hExpenses })} fill="url(#redFlow)" />
@@ -242,27 +252,42 @@ const FinancialFlowChart = ({
                     <rect x={xFinal - 7} y={depreciationCenter - ((hDepreciation || minVisible) / 2)} width="14" height={hDepreciation || minVisible} rx="5" fill={palette.redBar} />
                     <rect x={xFinal - 7} y={taxCenter - (hTax / 2)} width="14" height={hTax} rx="5" fill={palette.redBar} opacity="0.86" />
 
-                    <text x="28" y="145" fontSize="13" fontWeight="800" fill="#2a7fa3">INGRESOS</text>
-                    <text x="28" y="170" fontSize="22" fontWeight="900" fill="#0f3d56">{formatValue(totalIncome)}</text>
-                    <text x="452" y="145" fontSize="14" fontWeight="800" fill="#1c7a31">INGRESO BRUTO</text>
-                    <text x="452" y="170" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalGrossProfit)}</text>
-                    <text x="450" y="385" fontSize="14" fontWeight="800" fill="#cc3127">COSTO DE VENTA</text>
-                    <text x="450" y="410" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalCOGS)}</text>
+                    <text x="40" y="145" fontSize="13" fontWeight="800" fill="#2a7fa3">INGRESOS</text>
+                    <text x="40" y="170" fontSize="22" fontWeight="900" fill="#0f3d56">{formatValue(totalIncome)}</text>
+                    <text x="40" y="193" fontSize="12" fontWeight="700" fill="#5b95b4">{formatShare(totalIncome)}</text>
 
-                    <text x="790" y="148" fontSize="14" fontWeight="800" fill="#1c7a31">BENEFICIO OPERATIVO</text>
-                    <text x="790" y="173" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalOperatingGrossProfit)}</text>
-                    <text x="790" y="325" fontSize="14" fontWeight="800" fill="#cc3127">GASTOS OPERATIVOS</text>
-                    <text x="790" y="350" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalExpenses)}</text>
+                    <text x="565" y="145" fontSize="14" fontWeight="800" fill="#1c7a31">INGRESO BRUTO</text>
+                    <text x="565" y="170" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalGrossProfit)}</text>
+                    <text x="565" y="193" fontSize="12" fontWeight="700" fill="#4f8d57">{formatShare(totalGrossProfit)}</text>
 
-                    <text x="1110" y="125" fontSize="14" fontWeight="800" fill="#1c7a31">RESULTADO NETO</text>
-                    <text x="1110" y="150" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalNetProfit)}</text>
-                    <text x="1110" y="305" fontSize="14" fontWeight="800" fill="#cc3127">DEPRECIACIONES</text>
-                    <text x="1110" y="330" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalDepreciation)}</text>
-                    <text x="1110" y="415" fontSize="14" fontWeight="800" fill="#cc3127">IMPUESTO</text>
-                    <text x="1110" y="440" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalTax)}</text>
+                    <text x="565" y="385" fontSize="14" fontWeight="800" fill="#cc3127">COSTO DE VENTA</text>
+                    <text x="565" y="410" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalCOGS)}</text>
+                    <text x="565" y="433" fontSize="12" fontWeight="700" fill="#d66d65">{formatShare(totalCOGS)}</text>
 
-                    <text x="600" y="40" textAnchor="middle" fontSize="12" fontWeight="800" fill="#6b7f8c">DE DONDE VIENEN Y PARA QUE SE UTILIZAN LOS INGRESOS</text>
+                    <text x="985" y="148" fontSize="14" fontWeight="800" fill="#1c7a31">BENEFICIO OPERATIVO</text>
+                    <text x="985" y="173" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalOperatingGrossProfit)}</text>
+                    <text x="985" y="196" fontSize="12" fontWeight="700" fill="#4f8d57">{formatShare(totalOperatingGrossProfit)}</text>
+
+                    <text x="985" y="325" fontSize="14" fontWeight="800" fill="#cc3127">GASTOS OPERATIVOS</text>
+                    <text x="985" y="350" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalExpenses)}</text>
+                    <text x="985" y="373" fontSize="12" fontWeight="700" fill="#d66d65">{formatShare(totalExpenses)}</text>
+
+                    <text x="1340" y="125" fontSize="14" fontWeight="800" fill="#1c7a31">RESULTADO NETO</text>
+                    <text x="1340" y="150" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalNetProfit)}</text>
+                    <text x="1340" y="173" fontSize="12" fontWeight="700" fill="#4f8d57">{formatShare(totalNetProfit)}</text>
+
+                    <text x="1340" y="305" fontSize="14" fontWeight="800" fill="#cc3127">DEPRECIACIONES</text>
+                    <text x="1340" y="330" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalDepreciation)}</text>
+                    <text x="1340" y="353" fontSize="12" fontWeight="700" fill="#d66d65">{formatShare(totalDepreciation)}</text>
+
+                    <text x="1340" y="415" fontSize="14" fontWeight="800" fill="#cc3127">IMPUESTO</text>
+                    <text x="1340" y="440" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalTax)}</text>
+                    <text x="1340" y="463" fontSize="12" fontWeight="700" fill="#d66d65">{formatShare(totalTax)}</text>
+                    <text x="1340" y="484" fontSize="11" fontWeight="700" fill="#cc6e66">IMI {formatValue(totalIMI)} | IR {formatValue(totalIR)}</text>
+
+                    <text x={chartWidth / 2} y="40" textAnchor="middle" fontSize="12" fontWeight="800" fill="#6b7f8c">DE DONDE VIENEN Y PARA QUE SE UTILIZAN LOS INGRESOS</text>
                 </svg>
+                </div>
             </div>
         </div>
     );
@@ -520,6 +545,8 @@ export default function Reports({ data }) {
     let totalGrossProfit = 0;
     let totalOperatingGrossProfit = 0;
     let totalDepreciation = 0;
+    let totalIMI = 0;
+    let totalIR = 0;
     let totalTax = 0;
     let totalNetProfit = 0;
     let currentBudgets = {};
@@ -558,8 +585,11 @@ export default function Reports({ data }) {
     totalGrossProfit = totalIncome - totalCOGS;
     totalOperatingGrossProfit = totalGrossProfit - totalExpenses;
     totalDepreciation = calculateDepreciationExpenseForMonth(data.depreciaciones || [], selectedMonth);
-    totalTax = 0;
-    totalNetProfit = totalOperatingGrossProfit - totalDepreciation - totalTax;
+    const taxBreakdown = calculateGeneralRegimeTaxes(totalIncome, totalOperatingGrossProfit, totalDepreciation);
+    totalIMI = taxBreakdown.imi;
+    totalIR = taxBreakdown.ir;
+    totalTax = taxBreakdown.totalTax;
+    totalNetProfit = taxBreakdown.netProfit;
 
     const totalBudgetLimit = useMemo(() => {
         return Object.values(currentBudgets).reduce((acc, val) => acc + val, 0);
@@ -683,7 +713,7 @@ export default function Reports({ data }) {
                         <StatCard
                             title="Utilidad Operativa Bruta"
                             value={fmt(totalOperatingGrossProfit)}
-                            subtitle="Antes de depreciacion"
+                            subtitle="Antes de depreciacion e impuesto"
                             icon="wallet"
                             variant={totalOperatingGrossProfit >= 0 ? 'default' : 'danger'}
                             trend={totalIncome > 0 ? ((totalOperatingGrossProfit / totalIncome) * 100).toFixed(1) : 0}
@@ -717,6 +747,8 @@ export default function Reports({ data }) {
                             totalNetProfit={totalNetProfit}
                             totalTax={totalTax}
                             totalDepreciation={totalDepreciation}
+                            totalIMI={totalIMI}
+                            totalIR={totalIR}
                             selectedMonth={selectedMonth}
                         />
                     </Card>
@@ -839,7 +871,7 @@ export default function Reports({ data }) {
                                             </div>
                                             <div>
                                                 <div className="text-xs font-bold uppercase tracking-wide text-stone-500">Impuesto</div>
-                                                <div className="text-xs font-medium text-stone-500">Cuota fija actual</div>
+                                                <div className="text-xs font-medium text-stone-500">IMI {fmt(totalIMI)} + IR {fmt(totalIR)}</div>
                                             </div>
                                         </div>
                                         <div className="text-base font-black text-stone-700">{fmt(totalTax)}</div>

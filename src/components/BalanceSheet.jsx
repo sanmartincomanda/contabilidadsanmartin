@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { fmt, peso } from '../constants';
 import { calculateDepreciationExpenseForMonth } from '../services/depreciation';
 import { sumIncomeForMonth } from '../services/incomeAggregation';
+import { calculateGeneralRegimeTaxes } from '../services/tax';
 import { getLocalMonthString } from '../utils/localDate';
 
 const StatCard = ({ title, total, children, accentColor }) => (
@@ -83,8 +84,9 @@ export default function BalanceSheet({ data }) {
         const utilidadBruta = ingresosMes - costoDeVenta;
         const utilidadOperativaBruta = utilidadBruta - gastosMes;
         const depreciacionesMes = calculateDepreciationExpenseForMonth(depreciaciones, mesPasadoStr);
-        const impuestoMes = 0;
-        const utilidadNeta = utilidadOperativaBruta - depreciacionesMes - impuestoMes;
+        const taxBreakdown = calculateGeneralRegimeTaxes(ingresosMes, utilidadOperativaBruta, depreciacionesMes);
+        const impuestoMes = taxBreakdown.totalTax;
+        const utilidadNeta = taxBreakdown.netProfit;
 
         // --- CÁLCULOS DEL BALANCE (Lado Activo y Pasivo) ---
         
