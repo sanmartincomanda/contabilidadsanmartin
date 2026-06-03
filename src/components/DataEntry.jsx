@@ -7,10 +7,11 @@ import {
 } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../constants';
+import { getDepreciationEndMonth, getMonthlyDepreciationAmount } from '../services/depreciation';
 import { resolveIncomeEntries } from '../services/incomeAggregation';
 import { syncSicarDailyIncome } from '../services/sicarIncomeSync';
 import { deletePurchaseTransaction, updatePurchaseTransaction } from '../services/linkedTransactions';
-import { getLocalDateString } from '../utils/localDate';
+import { getLocalDateString, getLocalMonthString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -38,6 +39,7 @@ const Icons = {
     target: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
     handCoin: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
     scale: "M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3",
+    calculator: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z",
     dollar: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
     tag: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
     refresh: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
@@ -316,13 +318,13 @@ const EditableList = ({
     };
 
     const getItemDate = (item) => {
-        const dateStr = item.date || item.fecha || item.month || item.mes;
+        const dateStr = item.date || item.fecha || item.depreciateFrom || item.purchaseDate || item.month || item.mes;
         if (!dateStr) return new Date(0);
         return new Date(dateStr);
     };
 
     const getItemDateString = (item) => {
-        const dateStr = item.date || item.fecha || item.month || item.mes || '';
+        const dateStr = item.date || item.fecha || item.depreciateFrom || item.purchaseDate || item.month || item.mes || '';
         return String(dateStr);
     };
 
@@ -636,8 +638,7 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
 // --- OTROS FORMULARIOS ---
 
 const getCurrentMonth = () => {
-    const date = new Date();
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    return getLocalMonthString();
 };
 
 const InventoryForm = ({ loading, setLoading, onSuccess }) => {
@@ -732,6 +733,97 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
+const DepreciationForm = ({ loading, setLoading, onSuccess }) => {
+    const [depreciationType, setDepreciationType] = useState('');
+    const [amount, setAmount] = useState('');
+    const [purchaseDate, setPurchaseDate] = useState(getLocalDateString());
+    const [depreciateFrom, setDepreciateFrom] = useState(getLocalDateString());
+    const [usefulLifeYears, setUsefulLifeYears] = useState('');
+
+    const monthlyPreview = useMemo(() => {
+        const previewAmount = Number(amount);
+        const previewYears = Number(usefulLifeYears);
+        if (!previewAmount || !previewYears) return 0;
+        return getMonthlyDepreciationAmount({ amount: previewAmount, usefulLifeYears: previewYears });
+    }, [amount, usefulLifeYears]);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const numAmount = Number(amount);
+        const numYears = Number(usefulLifeYears);
+
+        if (!depreciationType.trim() || !purchaseDate || !depreciateFrom) {
+            return alert('Complete tipo, fecha de compra e inicio de depreciacion.');
+        }
+        if (!Number.isFinite(numAmount) || numAmount <= 0) {
+            return alert('Monto invalido.');
+        }
+        if (!Number.isFinite(numYears) || numYears <= 0) {
+            return alert('Ingrese anos de depreciacion validos.');
+        }
+
+        setLoading(true);
+        try {
+            await addDoc(collection(db, 'depreciaciones'), {
+                depreciationType: depreciationType.trim().toUpperCase(),
+                amount: numAmount,
+                purchaseDate,
+                depreciateFrom,
+                usefulLifeYears: numYears,
+                month: depreciateFrom.substring(0, 7),
+                branch: DEFAULT_BRANCH_ID,
+                branchName: DEFAULT_BRANCH_NAME,
+                timestamp: Timestamp.now(),
+            });
+            setDepreciationType('');
+            setAmount('');
+            setPurchaseDate(getLocalDateString());
+            setDepreciateFrom(getLocalDateString());
+            setUsefulLifeYears('');
+            onSuccess?.();
+        } catch (error) {
+            console.error('Error guardando depreciacion:', error);
+            alert('Error al guardar depreciacion');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="rounded-full border border-[#cfd9df] bg-[#f4f8fb] px-4 py-2 text-[11px] font-semibold text-[#355161]">
+                Depreciacion lineal mensual
+            </div>
+            <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
+                Base: {DEFAULT_BRANCH_NAME}
+            </div>
+            <Input
+                label="Tipo de depreciacion"
+                icon="calculator"
+                placeholder="Ej: Equipo frio, vehiculo, mobiliario..."
+                value={depreciationType}
+                onChange={(e) => setDepreciationType(e.target.value)}
+                required
+            />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                <Input label="Anos de depreciacion" type="number" step="0.01" icon="calendar" placeholder="0" value={usefulLifeYears} onChange={(e) => setUsefulLifeYears(e.target.value)} required />
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Input label="Fecha de compra" type="date" icon="calendar" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} required />
+                <Input label="Depreciar a partir de" type="date" icon="calendar" value={depreciateFrom} onChange={(e) => setDepreciateFrom(e.target.value)} required />
+            </div>
+            <div className="rounded-2xl border border-[#d7e2e9] bg-[#f8fbfd] px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Depreciacion mensual estimada</div>
+                <div className="mt-1 text-lg font-black text-[#16222d]">{fmt(monthlyPreview)}</div>
+            </div>
+            <Button type="submit" variant="primary" disabled={loading} className="w-full">
+                {loading ? 'Guardando...' : 'Registrar Depreciacion'}
+            </Button>
+        </form>
+    );
+};
+
 const BudgetForm = ({ categories, loading, setLoading, onSuccess }) => {
     const [month, setMonth] = useState(getCurrentMonth());
     const [amount, setAmount] = useState('');
@@ -810,7 +902,7 @@ const EquityForm = ({ loading, setLoading, onSuccess }) => {
 
 // --- COMPONENTE PRINCIPAL ---
 
-const VALID_TABS = ['Ingresos', 'Gastos', 'Inventario', 'Compras', 'Presupuesto', 'Cuentas por Cobrar', 'Patrimonio'];
+const VALID_TABS = ['Ingresos', 'Gastos', 'Inventario', 'Compras', 'Depreciaciones', 'Presupuesto', 'Cuentas por Cobrar', 'Patrimonio'];
 
 export function DataEntry({ categories, data }) {
     const [searchParams] = useSearchParams();
@@ -833,6 +925,7 @@ export function DataEntry({ categories, data }) {
         Gastos: getCurrentMonth(),
         Inventario: getCurrentMonth(),
         Compras: getCurrentMonth(),
+        Depreciaciones: getCurrentMonth(),
         Presupuesto: getCurrentMonth(),
         'Cuentas por Cobrar': getCurrentMonth(),
         Patrimonio: getCurrentMonth(),
@@ -843,6 +936,7 @@ export function DataEntry({ categories, data }) {
         Gastos: { dateFrom: '', dateTo: '', search: '' },
         Inventario: {},
         Compras: { dateFrom: '', dateTo: '', supplier: '', invoiceNumber: '' },
+        Depreciaciones: { dateFrom: '', dateTo: '', depreciationType: '' },
         Presupuesto: {},
         'Cuentas por Cobrar': {},
         Patrimonio: {},
@@ -853,6 +947,7 @@ export function DataEntry({ categories, data }) {
         'Gastos': { icon: 'trendingDown', label: 'Gastos' },
         'Inventario': { icon: 'box', label: 'Inventario' },
         'Compras': { icon: 'shoppingCart', label: 'Compras' },
+        'Depreciaciones': { icon: 'calculator', label: 'Depreciaciones' },
         'Presupuesto': { icon: 'target', label: 'Presupuesto' },
         'Cuentas por Cobrar': { icon: 'handCoin', label: 'C. Cobrar' },
         'Patrimonio': { icon: 'scale', label: 'Patrimonio' }
@@ -863,6 +958,7 @@ export function DataEntry({ categories, data }) {
         Gastos: { type: 'month', label: 'Filtrar por Mes' },
         Inventario: { type: 'month', label: 'Filtrar por Mes' },
         Compras: { type: 'month', label: 'Filtrar por Mes' },
+        Depreciaciones: { type: 'month', label: 'Filtrar por Inicio Dep.' },
         Presupuesto: { type: 'month', label: 'Filtrar por Mes' },
         'Cuentas por Cobrar': { type: 'month', label: 'Filtrar por Mes' },
         Patrimonio: { type: 'month', label: 'Filtrar por Mes' },
@@ -908,6 +1004,15 @@ export function DataEntry({ categories, data }) {
             paymentType: { label: 'Tipo', type: 'text' },
             amount: { label: 'Monto', type: 'currency' }
         },
+        Depreciaciones: {
+            depreciationType: { label: 'Tipo', type: 'text' },
+            purchaseDate: { label: 'Fecha compra', type: 'date' },
+            depreciateFrom: { label: 'Inicia dep.', type: 'date' },
+            usefulLifeYears: { label: 'Anos', type: 'number' },
+            monthlyDepreciation: { label: 'Mensual', type: 'currency', readonly: true },
+            endMonth: { label: 'Fin', type: 'month', readonly: true },
+            amount: { label: 'Monto', type: 'currency' }
+        },
         Presupuesto: {
             month: { label: 'Mes', type: 'month' },
             category: { label: 'Categoría', type: 'text' },
@@ -942,6 +1047,11 @@ export function DataEntry({ categories, data }) {
             { key: 'supplier', label: 'Proveedor', type: 'text', placeholder: 'Buscar proveedor...', keys: ['supplier'] },
             { key: 'invoiceNumber', label: 'No. Factura', type: 'text', placeholder: 'Buscar factura...', keys: ['invoiceNumber'] },
         ],
+        Depreciaciones: [
+            { key: 'dateFrom', label: 'Desde', type: 'date' },
+            { key: 'dateTo', label: 'Hasta', type: 'date' },
+            { key: 'depreciationType', label: 'Tipo', type: 'text', placeholder: 'Buscar tipo...', keys: ['depreciationType'] },
+        ],
     };
 
     const getListData = () => {
@@ -950,6 +1060,7 @@ export function DataEntry({ categories, data }) {
             'Gastos': 'gastos',
             'Inventario': 'inventarios',
             'Compras': 'compras',
+            'Depreciaciones': 'depreciaciones',
             'Presupuesto': 'presupuestos',
             'Cuentas por Cobrar': 'cuentasPorCobrar',
             'Patrimonio': 'patrimonio'
@@ -979,6 +1090,20 @@ export function DataEntry({ categories, data }) {
             }));
         }
 
+        if (activeTab === 'Depreciaciones') {
+            return (data.depreciaciones || []).map((item) => ({
+                ...item,
+                depreciationType: item.depreciationType || item.type || '',
+                purchaseDate: item.purchaseDate || item.date || '',
+                depreciateFrom: item.depreciateFrom || item.startDate || '',
+                month: item.month || ((item.depreciateFrom || item.startDate) ? (item.depreciateFrom || item.startDate).substring(0, 7) : ''),
+                usefulLifeYears: Number(item.usefulLifeYears ?? item.years ?? 0) || 0,
+                monthlyDepreciation: getMonthlyDepreciationAmount(item),
+                endMonth: getDepreciationEndMonth(item),
+                amount: Number(item.amount ?? item.monto ?? 0) || 0,
+            }));
+        }
+
         return data[collectionMap[activeTab]] || [];
     };
 
@@ -988,6 +1113,7 @@ export function DataEntry({ categories, data }) {
             'Gastos': 'gastos',
             'Inventario': 'inventarios',
             'Compras': 'compras',
+            'Depreciaciones': 'depreciaciones',
             'Presupuesto': 'presupuestos',
             'Cuentas por Cobrar': 'cuentasPorCobrar',
             'Patrimonio': 'patrimonio'
@@ -1049,6 +1175,7 @@ export function DataEntry({ categories, data }) {
                         {activeTab === 'Gastos' && <ExpenseForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Inventario' && <InventoryForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Compras' && <PurchasesForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Depreciaciones' && <DepreciationForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Presupuesto' && <BudgetForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Cuentas por Cobrar' && <ReceivableForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Patrimonio' && <EquityForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}

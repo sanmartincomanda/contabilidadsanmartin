@@ -1,9 +1,11 @@
 // src/components/Reports.jsx
 import React, { useMemo, useState, useCallback } from 'react';
 import { fmt, peso, branchName, resolveBranchId } from '../constants';
+import { calculateDepreciationExpenseForMonth, getDepreciationActiveMonths } from '../services/depreciation';
 import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
 import { resolveReportIncomeEntries } from '../services/incomeAggregation';
+import { getLocalMonthString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -97,6 +99,171 @@ const StatCard = ({ title, value, subtitle, icon, variant = 'default', trend }) 
             <div className={`text-2xl font-black mb-0.5 ${isColored ? 'text-white' : 'text-[#16222d]'}`}>{value}</div>
             <div className={`text-xs font-bold uppercase tracking-wider ${isColored ? 'text-white/70' : 'text-[#5f7280]'}`}>{title}</div>
             {subtitle && <div className={`text-xs mt-1 ${isColored ? 'text-white/50' : 'text-[#81929d]'}`}>{subtitle}</div>}
+        </div>
+    );
+};
+
+const clampFlow = (value) => Math.max(Number(value) || 0, 0);
+
+const buildRibbonPath = ({ x0, x1, y0, h0, y1, h1 }) => {
+    const startTop = y0 - (h0 / 2);
+    const startBottom = y0 + (h0 / 2);
+    const endTop = y1 - (h1 / 2);
+    const endBottom = y1 + (h1 / 2);
+    const curve = (x1 - x0) * 0.42;
+
+    return [
+        `M ${x0} ${startTop}`,
+        `C ${x0 + curve} ${startTop}, ${x1 - curve} ${endTop}, ${x1} ${endTop}`,
+        `L ${x1} ${endBottom}`,
+        `C ${x1 - curve} ${endBottom}, ${x0 + curve} ${startBottom}, ${x0} ${startBottom}`,
+        'Z',
+    ].join(' ');
+};
+
+const FinancialFlowChart = ({
+    totalIncome,
+    totalGrossProfit,
+    totalCOGS,
+    totalOperatingGrossProfit,
+    totalExpenses,
+    totalNetProfit,
+    totalTax,
+    totalDepreciation,
+    selectedMonth,
+}) => {
+    const income = clampFlow(totalIncome);
+    const gross = clampFlow(totalGrossProfit);
+    const cogs = clampFlow(totalCOGS);
+    const operating = clampFlow(totalOperatingGrossProfit);
+    const expenses = clampFlow(totalExpenses);
+    const net = clampFlow(totalNetProfit);
+    const depreciation = clampFlow(totalDepreciation);
+    const tax = clampFlow(totalTax);
+
+    if (!income) {
+        return (
+            <div className="erp-empty-state p-8 text-center">
+                <div className="text-sm font-semibold text-slate-500">Sin datos suficientes para generar el flujo de resultados.</div>
+                <div className="mt-1 text-xs text-slate-400">Selecciona un periodo con ingresos registrados.</div>
+            </div>
+        );
+    }
+
+    const totalDeductions = depreciation + tax;
+    const availableHeight = 230;
+    const minVisible = 8;
+    const scale = availableHeight / Math.max(income, 1);
+    const toHeight = (value) => {
+        if (value <= 0) return 0;
+        return Math.max(value * scale, minVisible);
+    };
+
+    const xIncome = 140;
+    const xGross = 400;
+    const xOperating = 740;
+    const xFinal = 1080;
+
+    const sourceCenter = 255;
+    const grossCenter = 165;
+    const cogsCenter = 390;
+    const operatingCenter = 165;
+    const expensesCenter = 330;
+    const netCenter = 140;
+    const depreciationCenter = 320;
+    const taxCenter = 430;
+
+    const hIncome = toHeight(income);
+    const hGross = toHeight(gross);
+    const hCOGS = toHeight(cogs);
+    const hOperating = toHeight(operating);
+    const hExpenses = toHeight(expenses);
+    const hNet = toHeight(net);
+    const hDepreciation = toHeight(depreciation);
+    const hTax = tax > 0 ? toHeight(tax) : 4;
+
+    const palette = {
+        incomeBar: '#28b6f6',
+        incomeFill: 'rgba(40, 182, 246, 0.34)',
+        greenBar: '#138a3d',
+        greenFill: 'rgba(93, 193, 108, 0.33)',
+        redBar: '#ff3b30',
+        redFill: 'rgba(255, 107, 107, 0.64)',
+        stageBar: '#5b6470',
+    };
+
+    const formatValue = (value) => fmt(value);
+
+    return (
+        <div className="overflow-x-auto">
+            <div className="min-w-[1120px] rounded-[26px] border border-[#d7e2e9] bg-[linear-gradient(180deg,#fbfdff_0%,#f2f8fb_100%)] p-5">
+                <div className="mb-3 flex items-center justify-between">
+                    <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Flujo del resultado</div>
+                        <div className="text-sm font-bold text-[#16222d]">Mapa financiero del periodo</div>
+                    </div>
+                    <div className="rounded-full border border-[#d7e2e9] bg-white px-3 py-1 text-xs font-semibold text-[#5d7784]">
+                        {selectedMonth}
+                    </div>
+                </div>
+
+                <svg viewBox="0 0 1220 540" className="h-auto w-full">
+                    <defs>
+                        <linearGradient id="incomeFlow" x1="0%" x2="100%">
+                            <stop offset="0%" stopColor="rgba(40, 182, 246, 0.55)" />
+                            <stop offset="100%" stopColor="rgba(40, 182, 246, 0.26)" />
+                        </linearGradient>
+                        <linearGradient id="greenFlow" x1="0%" x2="100%">
+                            <stop offset="0%" stopColor="rgba(103, 199, 118, 0.42)" />
+                            <stop offset="100%" stopColor="rgba(147, 214, 143, 0.26)" />
+                        </linearGradient>
+                        <linearGradient id="redFlow" x1="0%" x2="100%">
+                            <stop offset="0%" stopColor="rgba(255, 117, 117, 0.58)" />
+                            <stop offset="100%" stopColor="rgba(255, 117, 117, 0.33)" />
+                        </linearGradient>
+                    </defs>
+
+                    <path d={buildRibbonPath({ x0: xIncome, x1: xGross, y0: sourceCenter, h0: hIncome, y1: grossCenter, h1: hGross })} fill="url(#incomeFlow)" />
+                    <path d={buildRibbonPath({ x0: xIncome, x1: xGross, y0: sourceCenter, h0: hIncome, y1: cogsCenter, h1: hCOGS })} fill="url(#incomeFlow)" opacity="0.9" />
+
+                    <path d={buildRibbonPath({ x0: xGross, x1: xOperating, y0: grossCenter, h0: hGross, y1: operatingCenter, h1: hOperating })} fill="url(#greenFlow)" />
+                    <path d={buildRibbonPath({ x0: xGross, x1: xOperating, y0: grossCenter, h0: hGross, y1: expensesCenter, h1: hExpenses })} fill="url(#redFlow)" />
+
+                    <path d={buildRibbonPath({ x0: xOperating, x1: xFinal, y0: operatingCenter, h0: hOperating, y1: netCenter, h1: hNet })} fill="url(#greenFlow)" />
+                    <path d={buildRibbonPath({ x0: xOperating, x1: xFinal, y0: operatingCenter, h0: hOperating, y1: depreciationCenter, h1: hDepreciation || minVisible })} fill="url(#redFlow)" />
+                    <path d={buildRibbonPath({ x0: xOperating, x1: xFinal, y0: operatingCenter, h0: hOperating, y1: taxCenter, h1: hTax })} fill="url(#redFlow)" opacity="0.78" />
+
+                    <rect x={xIncome - 7} y={sourceCenter - (hIncome / 2)} width="14" height={hIncome} rx="5" fill={palette.incomeBar} />
+                    <rect x={xGross - 7} y={grossCenter - (hGross / 2)} width="14" height={hGross} rx="5" fill={palette.greenBar} />
+                    <rect x={xGross - 7} y={cogsCenter - (hCOGS / 2)} width="14" height={hCOGS} rx="5" fill={palette.redBar} />
+                    <rect x={xOperating - 7} y={operatingCenter - (hOperating / 2)} width="14" height={hOperating} rx="5" fill={palette.greenBar} />
+                    <rect x={xOperating - 7} y={expensesCenter - (hExpenses / 2)} width="14" height={hExpenses} rx="5" fill={palette.redBar} />
+                    <rect x={xFinal - 7} y={netCenter - (hNet / 2)} width="14" height={hNet} rx="5" fill={palette.greenBar} />
+                    <rect x={xFinal - 7} y={depreciationCenter - ((hDepreciation || minVisible) / 2)} width="14" height={hDepreciation || minVisible} rx="5" fill={palette.redBar} />
+                    <rect x={xFinal - 7} y={taxCenter - (hTax / 2)} width="14" height={hTax} rx="5" fill={palette.redBar} opacity="0.86" />
+
+                    <text x="28" y="145" fontSize="13" fontWeight="800" fill="#2a7fa3">INGRESOS</text>
+                    <text x="28" y="170" fontSize="22" fontWeight="900" fill="#0f3d56">{formatValue(totalIncome)}</text>
+                    <text x="452" y="145" fontSize="14" fontWeight="800" fill="#1c7a31">INGRESO BRUTO</text>
+                    <text x="452" y="170" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalGrossProfit)}</text>
+                    <text x="450" y="385" fontSize="14" fontWeight="800" fill="#cc3127">COSTO DE VENTA</text>
+                    <text x="450" y="410" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalCOGS)}</text>
+
+                    <text x="790" y="148" fontSize="14" fontWeight="800" fill="#1c7a31">BENEFICIO OPERATIVO</text>
+                    <text x="790" y="173" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalOperatingGrossProfit)}</text>
+                    <text x="790" y="325" fontSize="14" fontWeight="800" fill="#cc3127">GASTOS OPERATIVOS</text>
+                    <text x="790" y="350" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalExpenses)}</text>
+
+                    <text x="1110" y="125" fontSize="14" fontWeight="800" fill="#1c7a31">RESULTADO NETO</text>
+                    <text x="1110" y="150" fontSize="20" fontWeight="900" fill="#185f2a">{formatValue(totalNetProfit)}</text>
+                    <text x="1110" y="305" fontSize="14" fontWeight="800" fill="#cc3127">DEPRECIACIONES</text>
+                    <text x="1110" y="330" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalDepreciation)}</text>
+                    <text x="1110" y="415" fontSize="14" fontWeight="800" fill="#cc3127">IMPUESTO</text>
+                    <text x="1110" y="440" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalTax)}</text>
+
+                    <text x="600" y="40" textAnchor="middle" fontSize="12" fontWeight="800" fill="#6b7f8c">DE DONDE VIENEN Y PARA QUE SE UTILIZAN LOS INGRESOS</text>
+                </svg>
+            </div>
         </div>
     );
 };
@@ -330,15 +497,16 @@ const aggregateData = (data) => {
 
 export default function Reports({ data }) {
     const [activeTab, setActiveTab] = useState('Resultados');
-    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7));
+    const [selectedMonth, setSelectedMonth] = useState(getLocalMonthString());
     const [modalCategory, setModalCategory] = useState(null);
 
     const aggregatedData = useMemo(() => aggregateData(data), [data]);
 
     const availableMonths = useMemo(() => {
-        const months = [...new Set(aggregatedData.map(d => d.month))];
+        const depreciationMonths = (data.depreciaciones || []).flatMap((item) => getDepreciationActiveMonths(item));
+        const months = [...new Set([...aggregatedData.map(d => d.month), ...depreciationMonths].filter(Boolean))];
         return months.sort((a, b) => b.localeCompare(a));
-    }, [aggregatedData]);
+    }, [aggregatedData, data.depreciaciones]);
 
     const filteredReport = useMemo(() => {
         return aggregatedData.filter(d => selectedMonth ? d.month === selectedMonth : true);
@@ -350,6 +518,9 @@ export default function Reports({ data }) {
     let totalPurchasesOnly = 0;
     let inventoryAdjustment = 0;
     let totalGrossProfit = 0;
+    let totalOperatingGrossProfit = 0;
+    let totalDepreciation = 0;
+    let totalTax = 0;
     let totalNetProfit = 0;
     let currentBudgets = {};
     let filteredRawExpenses = [];
@@ -382,9 +553,13 @@ export default function Reports({ data }) {
 
             finalExpenseRows = Object.entries(expenseMap).sort((a, b) => b[1] - a[1]);
         }
-        totalGrossProfit = totalIncome - totalCOGS;
-        totalNetProfit = totalGrossProfit - totalExpenses;
     }
+
+    totalGrossProfit = totalIncome - totalCOGS;
+    totalOperatingGrossProfit = totalGrossProfit - totalExpenses;
+    totalDepreciation = calculateDepreciationExpenseForMonth(data.depreciaciones || [], selectedMonth);
+    totalTax = 0;
+    totalNetProfit = totalOperatingGrossProfit - totalDepreciation - totalTax;
 
     const totalBudgetLimit = useMemo(() => {
         return Object.values(currentBudgets).reduce((acc, val) => acc + val, 0);
@@ -484,7 +659,7 @@ export default function Reports({ data }) {
                     </div>
 
                     {/* KPI cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
                         <StatCard
                             title="Ingresos Totales"
                             value={fmt(totalIncome)}
@@ -506,6 +681,20 @@ export default function Reports({ data }) {
                             trend={totalIncome > 0 ? ((totalGrossProfit / totalIncome) * 100).toFixed(1) : 0}
                         />
                         <StatCard
+                            title="Utilidad Operativa Bruta"
+                            value={fmt(totalOperatingGrossProfit)}
+                            subtitle="Antes de depreciacion"
+                            icon="wallet"
+                            variant={totalOperatingGrossProfit >= 0 ? 'default' : 'danger'}
+                            trend={totalIncome > 0 ? ((totalOperatingGrossProfit / totalIncome) * 100).toFixed(1) : 0}
+                        />
+                        <StatCard
+                            title="Depreciaciones"
+                            value={fmt(totalDepreciation)}
+                            icon="receipt"
+                            variant="warning"
+                        />
+                        <StatCard
                             title="Utilidad Neta"
                             value={fmt(totalNetProfit)}
                             icon="wallet"
@@ -513,6 +702,24 @@ export default function Reports({ data }) {
                             trend={totalIncome > 0 ? ((totalNetProfit / totalIncome) * 100).toFixed(1) : 0}
                         />
                     </div>
+
+                    <Card
+                        title="Mapa Financiero"
+                        subtitle="Vista visual del flujo de resultados del periodo"
+                        icon="dashboard"
+                    >
+                        <FinancialFlowChart
+                            totalIncome={totalIncome}
+                            totalGrossProfit={totalGrossProfit}
+                            totalCOGS={totalCOGS}
+                            totalOperatingGrossProfit={totalOperatingGrossProfit}
+                            totalExpenses={totalExpenses}
+                            totalNetProfit={totalNetProfit}
+                            totalTax={totalTax}
+                            totalDepreciation={totalDepreciation}
+                            selectedMonth={selectedMonth}
+                        />
+                    </Card>
 
                     {/* Main grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -596,6 +803,46 @@ export default function Reports({ data }) {
                                                 <div className="text-base font-black text-stone-700">{fmt(totalExpenses)}</div>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* Utilidad operativa bruta */}
+                                    <div className="flex items-center justify-between rounded-xl border border-[#c7d7e2] bg-[#f6fbfe] p-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ddecf6]">
+                                                <Icon path={Icons.wallet} className="w-4 h-4 text-[#1a6f93]" />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold uppercase tracking-wide text-[#4b6979]">Utilidad Operativa Bruta</div>
+                                                <div className="text-base font-black text-[#173042]">{fmt(totalOperatingGrossProfit)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Depreciaciones */}
+                                    <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+                                                <Icon path={Icons.receipt} className="w-4 h-4 text-slate-700" />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold uppercase tracking-wide text-stone-500">Depreciaciones</div>
+                                                <div className="text-base font-black text-stone-700">{fmt(totalDepreciation)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Impuesto */}
+                                    <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100">
+                                                <Icon path={Icons.alert} className="w-4 h-4 text-stone-600" />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold uppercase tracking-wide text-stone-500">Impuesto</div>
+                                                <div className="text-xs font-medium text-stone-500">Cuota fija actual</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-base font-black text-stone-700">{fmt(totalTax)}</div>
                                     </div>
 
                                     {/* Utilidad Neta */}

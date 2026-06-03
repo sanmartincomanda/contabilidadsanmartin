@@ -95,6 +95,7 @@ export default function Header() {
         { tab: 'Gastos', label: 'Gastos' },
         { tab: 'Inventario', label: 'Inventario' },
         { tab: 'Compras', label: 'Compras' },
+        { tab: 'Depreciaciones', label: 'Depreciacion' },
         { tab: 'Presupuesto', label: 'Presupuesto' },
         { tab: 'Cuentas por Cobrar', label: 'C. cobrar' },
         { tab: 'Patrimonio', label: 'Patrimonio' },

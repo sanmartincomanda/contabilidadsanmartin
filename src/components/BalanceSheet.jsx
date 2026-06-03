@@ -1,7 +1,9 @@
 // src/components/BalanceSheet.jsx
 import React, { useMemo } from 'react';
 import { fmt, peso } from '../constants';
+import { calculateDepreciationExpenseForMonth } from '../services/depreciation';
 import { sumIncomeForMonth } from '../services/incomeAggregation';
+import { getLocalMonthString } from '../utils/localDate';
 
 const StatCard = ({ title, total, children, accentColor }) => (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:shadow-md">
@@ -30,7 +32,7 @@ export default function BalanceSheet({ data }) {
         // 1. Definir Mes Pasado (Sincronizado con Estado de Resultados)
         const ahora = new Date();
         const mesPasado = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
-        const mesPasadoStr = mesPasado.toISOString().substring(0, 7); 
+        const mesPasadoStr = getLocalMonthString(mesPasado);
 
         // 2. Extraer Colecciones
         const facturasPagar = data?.cuentas_por_pagar || [];
@@ -40,6 +42,7 @@ export default function BalanceSheet({ data }) {
         const ingresos = data?.ingresos || [];
         const compras = data?.compras || [];
         const gastos = data?.gastos || [];
+        const depreciaciones = data?.depreciaciones || [];
         const mirroredFacturaIds = new Set(
             compras
                 .map((compra) => compra.sourceFacturaId || compra.linkedPayableId || (compra.id?.startsWith('credito_') ? compra.id.replace('credito_', '') : ''))
@@ -76,9 +79,12 @@ export default function BalanceSheet({ data }) {
             .filter(g => g.date && g.date.startsWith(mesPasadoStr))
             .reduce((acc, g) => acc + (peso(g.amount) || 0), 0);
 
-        // D. Utilidad Neta (El dato que cuadra el balance)
+        // D. Depreciaciones e impuesto del periodo
         const utilidadBruta = ingresosMes - costoDeVenta;
-        const utilidadNeta = utilidadBruta - gastosMes;
+        const utilidadOperativaBruta = utilidadBruta - gastosMes;
+        const depreciacionesMes = calculateDepreciationExpenseForMonth(depreciaciones, mesPasadoStr);
+        const impuestoMes = 0;
+        const utilidadNeta = utilidadOperativaBruta - depreciacionesMes - impuestoMes;
 
         // --- CÁLCULOS DEL BALANCE (Lado Activo y Pasivo) ---
         

@@ -19,10 +19,10 @@ import { getLocalDateString, getLocalMonthString } from './utils/localDate';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
-const DATA_ENTRY_COLLECTIONS = ['ingresos', 'gastos', 'categorias', 'inventarios', 'compras', 'presupuestos', 'cuentasPorCobrar', 'patrimonio'];
+const DATA_ENTRY_COLLECTIONS = ['ingresos', 'gastos', 'categorias', 'inventarios', 'compras', 'presupuestos', 'cuentasPorCobrar', 'patrimonio', 'depreciaciones'];
 const ACCOUNTS_PAYABLE_COLLECTIONS = ['cuentas_por_pagar', 'abonos_pagar', 'proveedores'];
 const CATEGORY_COLLECTIONS = ['categorias'];
-const REPORT_COLLECTIONS = ['ingresos', 'gastos', 'inventarios', 'compras', 'presupuestos', 'cuentas_por_pagar'];
+const REPORT_COLLECTIONS = ['ingresos', 'gastos', 'inventarios', 'compras', 'presupuestos', 'cuentas_por_pagar', 'depreciaciones'];
 const DASHBOARD_COLLECTIONS = ['ingresos', 'gastos', 'compras', 'cuentas_por_pagar'];
 
 const DEFAULT_REMINDERS = [
