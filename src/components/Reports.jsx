@@ -643,6 +643,15 @@ const FiscalReport = ({
     onExportPdf,
 }) => {
     const margin = (value) => report.totalIncome > 0 ? `${((value / report.totalIncome) * 100).toFixed(1)}%` : '0.0%';
+    const expenseSubcategoryRows = report.groupedExpenses.flatMap((group) => (
+        group.subcategories.map((item) => ({
+            key: item.key,
+            label: item.subcategory,
+            parent: group.category,
+            value: item.amount,
+            margin: margin(item.amount),
+        }))
+    ));
     const fiscalRows = [
         { label: 'Ingresos netos', value: report.totalIncome, tone: 'income', margin: margin(report.totalIncome) },
         {
@@ -651,21 +660,37 @@ const FiscalReport = ({
             tone: 'cost',
             margin: margin(report.totalCOGS),
             children: [
-                { label: 'Compras de contado', value: report.cashPurchases },
-                { label: 'Compras de credito', value: report.creditPurchases },
+                ...report.purchaseBreakdown.map((item) => ({
+                    label: item.subcategory,
+                    value: item.amount,
+                    margin: margin(item.amount),
+                })),
                 ...(report.usesInventoryAdjustment ? [
-                    { label: 'Inventario inicial', value: report.initialInventory },
-                    { label: 'Inventario final', value: -report.finalInventory },
-                    { label: 'Ajuste inventario', value: report.inventoryAdjustment },
+                    { label: 'Inventario inicial', value: report.initialInventory, margin: margin(report.initialInventory) },
+                    { label: 'Inventario final', value: -report.finalInventory, margin: margin(-report.finalInventory) },
+                    { label: 'Ajuste inventario', value: report.inventoryAdjustment, margin: margin(report.inventoryAdjustment) },
                 ] : []),
             ],
         },
         { label: 'Utilidad bruta', value: report.grossProfit, tone: 'subtotal', margin: margin(report.grossProfit) },
-        { label: 'Gastos operativos', value: report.totalExpenses, tone: 'cost', margin: margin(report.totalExpenses) },
-        { label: 'Utilidad operativa bruta', value: report.operatingGrossProfit, tone: 'subtotal', margin: margin(report.operatingGrossProfit) },
-        { label: 'Depreciaciones', value: report.depreciation, tone: 'cost', margin: margin(report.depreciation) },
-        { label: 'IMI 1% sobre ingresos', value: report.imi, tone: 'cost', margin: margin(report.imi) },
-        { label: 'IR 30% sobre base imponible', value: report.ir, tone: 'cost', margin: margin(report.ir) },
+        {
+            label: 'Gastos operativos',
+            value: report.totalExpenses,
+            tone: 'cost',
+            margin: margin(report.totalExpenses),
+            children: expenseSubcategoryRows,
+        },
+        ...(report.depreciation > 0 ? [{ label: 'Depreciaciones', value: report.depreciation, tone: 'cost', margin: margin(report.depreciation) }] : []),
+        {
+            label: 'Impuesto',
+            value: report.totalTax,
+            tone: 'cost',
+            margin: margin(report.totalTax),
+            children: [
+                { label: 'IMI 1% sobre ingresos', value: report.imi, margin: margin(report.imi) },
+                { label: 'IR 30% sobre base imponible', value: report.ir, margin: margin(report.ir) },
+            ],
+        },
         { label: 'Utilidad neta fiscal', value: report.netProfit, tone: 'net', margin: margin(report.netProfit) },
     ];
 
@@ -744,55 +769,55 @@ const FiscalReport = ({
                 </div>
             </Card>
 
-            <section className="fiscal-report-print overflow-hidden rounded-[28px] border border-[#d7e2e9] bg-white shadow-[0_22px_50px_-36px_rgba(15,23,42,.45)]">
-                <div className="border-b-[6px] border-[#a81d24] bg-[linear-gradient(135deg,#101c27_0%,#173042_58%,#1a6f93_100%)] px-6 py-6 text-white">
-                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <section className="fiscal-report-print overflow-hidden rounded-[20px] border border-[#d7e2e9] bg-white shadow-[0_22px_50px_-36px_rgba(15,23,42,.45)]">
+                <div className="border-b-[5px] border-[#a81d24] bg-white px-5 py-4 text-[#173042]">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-4">
-                            <img src="/amparito-logo.jpeg" alt="Carnes Amparito" className="h-20 w-20 rounded-2xl border-4 border-white/20 bg-white object-contain p-1 shadow-lg" />
+                            <img src="/amparito-logo.jpeg" alt="Carnes Amparito" className="h-14 w-14 rounded-xl border border-[#d7e2e9] bg-white object-contain p-1 shadow-sm" />
                             <div>
-                                <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#adc8d7]">Reporte Fiscal</div>
-                                <h2 className="mt-1 text-3xl font-black tracking-tight">Carnes Amparito</h2>
-                                <p className="mt-1 text-sm font-semibold text-white/72">Estado de Resultado Fiscal y Gerencial</p>
+                                <div className="text-[9px] font-black uppercase tracking-[0.34em] text-[#7a919d]">Reporte Fiscal</div>
+                                <h2 className="mt-0.5 text-2xl font-black tracking-tight">Carnes Amparito</h2>
+                                <p className="text-xs font-semibold text-[#6d8390]">Estado de Resultado Fiscal y Gerencial</p>
                             </div>
                         </div>
-                        <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-right backdrop-blur">
-                            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-white/60">Periodo</div>
-                            <div className="mt-1 text-lg font-black">{report.periodLabel}</div>
-                            <div className="mt-1 text-xs font-semibold text-white/60">Generado: {report.generatedAt}</div>
+                        <div className="rounded-2xl border border-[#d7e2e9] bg-[#f7fbfd] px-4 py-2.5 text-right">
+                            <div className="text-[9px] font-black uppercase tracking-[0.24em] text-[#7a919d]">Periodo</div>
+                            <div className="mt-0.5 text-sm font-black">{report.periodLabel}</div>
+                            <div className="mt-0.5 text-[10px] font-semibold text-[#7a919d]">Generado: {report.generatedAt}</div>
                         </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 border-b border-[#d7e2e9] bg-[#f7fbfd] px-6 py-4 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 border-b border-[#d7e2e9] bg-[#f7fbfd] px-5 py-3 md:grid-cols-4">
                     <div>
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Ingresos</div>
-                        <div className="mt-1 text-xl font-black text-[#173042]">{fmt(report.totalIncome)}</div>
+                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Ingresos</div>
+                        <div className="mt-0.5 text-base font-black text-[#173042]">{fmt(report.totalIncome)}</div>
                     </div>
                     <div>
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Costo venta</div>
-                        <div className="mt-1 text-xl font-black text-[#a81d24]">{fmt(report.totalCOGS)}</div>
+                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Costo venta</div>
+                        <div className="mt-0.5 text-base font-black text-[#a81d24]">{fmt(report.totalCOGS)}</div>
                     </div>
                     <div>
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Gastos operativos</div>
-                        <div className="mt-1 text-xl font-black text-[#a81d24]">{fmt(report.totalExpenses)}</div>
+                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Gastos operativos</div>
+                        <div className="mt-0.5 text-base font-black text-[#a81d24]">{fmt(report.totalExpenses)}</div>
                     </div>
                     <div>
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Utilidad neta</div>
-                        <div className={`mt-1 text-xl font-black ${report.netProfit >= 0 ? 'text-[#1e7a4f]' : 'text-[#a81d24]'}`}>{fmt(report.netProfit)}</div>
+                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Utilidad neta</div>
+                        <div className={`mt-0.5 text-base font-black ${report.netProfit >= 0 ? 'text-[#1e7a4f]' : 'text-[#a81d24]'}`}>{fmt(report.netProfit)}</div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6 px-6 py-6 xl:grid-cols-[1.15fr_.85fr]">
-                    <div className="rounded-2xl border border-[#d7e2e9]">
-                        <div className="border-b border-[#d7e2e9] bg-[#f7fbfd] px-4 py-3">
-                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Estado de Resultado</div>
+                <div className="px-5 py-5">
+                    <div className="overflow-hidden rounded-2xl border border-[#d7e2e9]">
+                        <div className="border-b border-[#d7e2e9] bg-[#f7fbfd] px-4 py-2.5">
+                            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Estado de resultado fiscal</div>
                         </div>
-                        <table className="w-full text-sm">
+                        <table className="w-full text-[12px]">
                             <thead>
-                                <tr className="border-b border-[#d7e2e9] text-left text-[10px] font-black uppercase tracking-[0.16em] text-[#6d8390]">
-                                    <th className="px-4 py-3">Concepto</th>
-                                    <th className="px-4 py-3 text-right">Monto</th>
-                                    <th className="px-4 py-3 text-right">% Ingreso</th>
+                                <tr className="border-b border-[#d7e2e9] text-left text-[9px] font-black uppercase tracking-[0.16em] text-[#6d8390]">
+                                    <th className="px-4 py-2.5">Concepto</th>
+                                    <th className="px-4 py-2.5 text-right">Monto</th>
+                                    <th className="px-4 py-2.5 text-right">% ingreso</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -805,15 +830,18 @@ const FiscalReport = ({
                                                     ? 'bg-[#eef8f0] text-[#173042]'
                                                     : ''
                                         }`}>
-                                            <td className="px-4 py-3 font-black uppercase">{row.label}</td>
-                                            <td className={`px-4 py-3 text-right font-black ${amountTone(row.tone)}`}>{fmt(row.value)}</td>
-                                            <td className="px-4 py-3 text-right font-bold">{row.margin}</td>
+                                            <td className="px-4 py-2.5 font-black uppercase">{row.label}</td>
+                                            <td className={`px-4 py-2.5 text-right font-black ${amountTone(row.tone)}`}>{fmt(row.value)}</td>
+                                            <td className="px-4 py-2.5 text-right font-bold">{row.margin}</td>
                                         </tr>
                                         {row.children?.map((child) => (
-                                            <tr key={`${row.label}-${child.label}`} className="border-b border-[#f2f5f7] bg-[#fbfdfe] text-xs text-[#5d7784]">
-                                                <td className="px-8 py-2 font-semibold">{child.label}</td>
-                                                <td className="px-4 py-2 text-right font-bold">{fmt(child.value)}</td>
-                                                <td className="px-4 py-2 text-right">-</td>
+                                            <tr key={`${row.label}-${child.label}-${child.value}`} className="border-b border-[#f2f5f7] bg-[#fbfdfe] text-[11px] text-[#5d7784]">
+                                                <td className="px-8 py-1.5">
+                                                    <div className="font-bold uppercase">{child.label}</div>
+                                                    {child.parent && <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#91a3ad]">{child.parent}</div>}
+                                                </td>
+                                                <td className="px-4 py-1.5 text-right font-bold">{fmt(child.value)}</td>
+                                                <td className="px-4 py-1.5 text-right font-semibold">{child.margin || '-'}</td>
                                             </tr>
                                         ))}
                                     </React.Fragment>
@@ -822,70 +850,30 @@ const FiscalReport = ({
                         </table>
                     </div>
 
-                    <div className="space-y-4">
-                        <div className="rounded-2xl border border-[#d7e2e9] bg-[#fbfdfe] p-4">
-                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Base fiscal</div>
-                            <div className="mt-4 space-y-3 text-sm">
+                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.2fr]">
+                        <div className="rounded-2xl border border-[#d7e2e9] bg-[#fbfdfe] p-3">
+                            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Base fiscal</div>
+                            <div className="mt-3 grid gap-2 text-[12px]">
                                 <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">Base IR</span><span className="font-black text-[#173042]">{fmt(report.irBase)}</span></div>
                                 <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">IMI 1%</span><span className="font-black text-[#a81d24]">{fmt(report.imi)}</span></div>
                                 <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">IR 30%</span><span className="font-black text-[#a81d24]">{fmt(report.ir)}</span></div>
-                                <div className="border-t border-[#d7e2e9] pt-3">
+                                <div className="border-t border-[#d7e2e9] pt-2">
                                     <div className="flex justify-between gap-4"><span className="font-black uppercase text-[#173042]">Total impuesto</span><span className="font-black text-[#a81d24]">{fmt(report.totalTax)}</span></div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-[#d7e2e9] bg-white p-4">
-                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Notas del reporte</div>
-                            <div className="mt-3 space-y-2 text-xs font-semibold leading-relaxed text-[#667b87]">
+                        <div className="rounded-2xl border border-[#d7e2e9] bg-white p-3">
+                            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Notas del reporte</div>
+                            <div className="mt-2 space-y-1 text-[10px] font-semibold leading-snug text-[#667b87]">
                                 <p>Moneda expresada en cordobas nicaraguenses (C$).</p>
-                                <p>IMI calculado automaticamente al 1% de ingresos.</p>
-                                <p>IR calculado al 30% sobre utilidad operativa menos IMI y depreciacion.</p>
+                                <p>IMI calculado automaticamente al 1% de ingresos. IR calculado al 30% sobre utilidad operativa menos IMI y depreciacion.</p>
                                 {!report.usesInventoryAdjustment && (
-                                    <p>Para intervalos de fechas, el costo de venta se basa en compras del periodo; el ajuste de inventario se aplica en reporte mensual completo.</p>
+                                    <p>Para intervalos, el costo de venta se basa en compras del periodo; el ajuste de inventario aplica en reporte mensual completo.</p>
                                 )}
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div className="border-t border-[#d7e2e9] px-6 py-5">
-                    <div className="mb-4 text-[11px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Gastos por categoria y subcategoria</div>
-                    {report.groupedExpenses.length ? (
-                        <div className="overflow-hidden rounded-2xl border border-[#d7e2e9]">
-                            <table className="w-full text-sm">
-                                <thead className="bg-[#f7fbfd] text-left text-[10px] font-black uppercase tracking-[0.16em] text-[#6d8390]">
-                                    <tr>
-                                        <th className="px-4 py-3">Categoria / Subcategoria</th>
-                                        <th className="px-4 py-3 text-right">Monto</th>
-                                        <th className="px-4 py-3 text-right">% Gastos</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {report.groupedExpenses.map((group) => (
-                                        <React.Fragment key={group.category}>
-                                            <tr className="border-t border-[#d7e2e9] bg-[#fbfdfe]">
-                                                <td className="px-4 py-3 font-black uppercase text-[#173042]">{group.category}</td>
-                                                <td className="px-4 py-3 text-right font-black text-[#173042]">{fmt(group.amount)}</td>
-                                                <td className="px-4 py-3 text-right font-bold text-[#5d7784]">{group.percentage.toFixed(1)}%</td>
-                                            </tr>
-                                            {group.subcategories.map((item) => (
-                                                <tr key={item.key} className="border-t border-[#eef3f6]">
-                                                    <td className="px-8 py-2 text-xs font-semibold uppercase text-[#5d7784]">{item.subcategory}</td>
-                                                    <td className="px-4 py-2 text-right text-xs font-bold text-[#173042]">{fmt(item.amount)}</td>
-                                                    <td className="px-4 py-2 text-right text-xs font-semibold text-[#6d8390]">{item.percentage.toFixed(1)}%</td>
-                                                </tr>
-                                            ))}
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <div className="rounded-2xl border border-dashed border-[#d7e2e9] bg-[#fbfdfe] p-5 text-center text-sm font-semibold text-[#6d8390]">
-                            Sin gastos operativos registrados en este periodo.
-                        </div>
-                    )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 border-t border-[#d7e2e9] px-6 py-6 text-xs text-[#5d7784] md:grid-cols-2">
@@ -1131,6 +1119,19 @@ const buildFiscalReportData = (data = {}, period = {}) => {
         .reduce((sum, income) => sum + peso(income.amount), 0);
 
     const expenseDetails = {};
+    const costDetails = {};
+    const addCostDetail = (item, amount, fallbackSubcategory = 'Otros costos de producto') => {
+        const classification = normalizeExpenseClassification({
+            category: 'Costos de venta / compras',
+            subcategory: item.subcategory || item.subcategoria || fallbackSubcategory,
+            description: item.description || item.descripcion || item.detalle,
+            supplier: item.supplier || item.proveedor,
+            type: 'Compra',
+        });
+        const key = classification.subcategory || fallbackSubcategory;
+        costDetails[key] = (costDetails[key] || 0) + amount;
+    };
+
     const totalExpenses = gastos.reduce((sum, item) => {
         const dateString = getDateString(item.date || item.fecha || item.timestamp);
         if (!isDateInRange(dateString, safeStartDate, safeEndDate)) return sum;
@@ -1145,14 +1146,18 @@ const buildFiscalReportData = (data = {}, period = {}) => {
     const cashPurchases = compras.reduce((sum, item) => {
         const dateString = getDateString(item.date || item.fecha || item.timestamp);
         if (!isDateInRange(dateString, safeStartDate, safeEndDate)) return sum;
-        return sum + peso(item.amount ?? item.monto);
+        const amount = peso(item.amount ?? item.monto);
+        addCostDetail(item, amount);
+        return sum + amount;
     }, 0);
 
     const creditPurchases = facturasCredito.reduce((sum, item) => {
         if (item.id && mirroredFacturaIds.has(item.id)) return sum;
         const dateString = getDateString(item.fecha || item.date || item.timestamp);
         if (!isDateInRange(dateString, safeStartDate, safeEndDate)) return sum;
-        return sum + peso(item.monto ?? item.amount);
+        const amount = peso(item.monto ?? item.amount);
+        addCostDetail(item, amount);
+        return sum + amount;
     }, 0);
 
     const initialInventory = isMonthlyInventoryPeriod
@@ -1174,6 +1179,16 @@ const buildFiscalReportData = (data = {}, period = {}) => {
     const operatingGrossProfit = grossProfit - totalExpenses;
     const depreciation = calculateDepreciationExpenseForRange(depreciaciones, safeStartDate, safeEndDate);
     const taxBreakdown = calculateGeneralRegimeTaxes(totalIncome, operatingGrossProfit, depreciation);
+    const purchaseBreakdown = Object.entries(costDetails)
+        .map(([subcategory, amount]) => ({
+            key: subcategory,
+            subcategory,
+            amount,
+            percentage: totalCOGS > 0 ? (amount / totalCOGS) * 100 : 0,
+        }))
+        .filter((item) => item.amount > 0)
+        .sort((a, b) => b.amount - a.amount);
+
     const groupedExpenses = Array.from(buildGroupedExpenseBreakdown(expenseDetails).values())
         .map((group) => ({
             ...group,
@@ -1198,6 +1213,7 @@ const buildFiscalReportData = (data = {}, period = {}) => {
         cashPurchases,
         creditPurchases,
         totalPurchases,
+        purchaseBreakdown,
         initialInventory,
         finalInventory,
         inventoryAdjustment,
@@ -1475,18 +1491,21 @@ export default function Reports({ data }) {
                 .custom-scrollbar::-webkit-scrollbar-track { background: #f5f0ec; border-radius: 3px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #c8a898; border-radius: 3px; }
                 @media print {
-                    @page { size: letter portrait; margin: 10mm; }
-                    body { background: #fff !important; }
+                    @page { size: letter portrait; margin: 7mm; }
+                    html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     body * { visibility: hidden !important; }
                     .fiscal-report-print, .fiscal-report-print * { visibility: visible !important; }
                     .fiscal-report-print {
                         position: absolute !important;
                         inset: 0 auto auto 0 !important;
                         width: 100% !important;
+                        font-size: 10.5px !important;
                         border: 0 !important;
                         border-radius: 0 !important;
                         box-shadow: none !important;
                     }
+                    .fiscal-report-print table { font-size: 10.5px !important; }
+                    .fiscal-report-print td, .fiscal-report-print th { padding-top: 4px !important; padding-bottom: 4px !important; }
                     .fiscal-no-print, .fiscal-no-print * { display: none !important; visibility: hidden !important; }
                     .fiscal-report-print table { page-break-inside: auto; }
                     .fiscal-report-print tr { page-break-inside: avoid; page-break-after: auto; }
