@@ -142,6 +142,78 @@ const Spinner = () => (
     </svg>
 );
 
+const AbonoDetalle = ({ detalle, fmt, compact = false }) => {
+    if (!detalle.length) {
+        return (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+                Este abono no tiene detalle de facturas guardado.
+            </div>
+        );
+    }
+
+    if (compact) {
+        return (
+            <div className="mt-3 space-y-2 rounded-2xl border border-[#d7e2e9] bg-[#f7fbfd] p-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#607888]">
+                    Facturas pagadas
+                </div>
+                {detalle.map((item) => (
+                    <div key={item.id} className="rounded-xl border border-[#d7e2e9] bg-white p-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="break-all font-mono text-xs font-black text-[#16222d]">#{item.numero}</div>
+                                {item.fecha && <div className="mt-1 text-[10px] font-semibold text-slate-400">Emision: {item.fecha}</div>}
+                            </div>
+                            <div className="erp-mono text-sm font-black text-emerald-600">{fmt(item.montoAbonado)}</div>
+                        </div>
+                        {item.montoFactura !== undefined && (
+                            <div className="mt-2 flex items-center justify-between text-[11px] font-semibold text-[#607888]">
+                                <span>Monto factura</span>
+                                <span className="erp-mono">{fmt(item.montoFactura)}</span>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="rounded-2xl border border-[#d7e2e9] bg-[#f7fbfd] p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#607888]">
+                    Facturas pagadas
+                </div>
+                <div className="text-xs font-semibold text-slate-400">{detalle.length} factura{detalle.length === 1 ? '' : 's'}</div>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                    <thead>
+                        <tr>
+                            {['Factura', 'Emision', 'Monto factura', 'Abono aplicado', 'Saldo actual'].map((heading) => (
+                                <th key={heading} className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 ${heading.includes('Monto') || heading.includes('Abono') || heading.includes('Saldo') ? 'text-right' : 'text-left'}`}>
+                                    {heading}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {detalle.map((item) => (
+                            <tr key={item.id}>
+                                <td className="px-3 py-2 font-mono font-bold text-[#16222d]">#{item.numero}</td>
+                                <td className="px-3 py-2 text-slate-500">{item.fecha || '-'}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-slate-600">{item.montoFactura !== undefined ? fmt(item.montoFactura) : '-'}</td>
+                                <td className="px-3 py-2 text-right font-black text-emerald-600">{fmt(item.montoAbonado)}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-[#a81d24]">{item.saldoActual !== undefined ? fmt(item.saldoActual) : '-'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 const useCompactViewport = (breakpoint = 1023) => {
     const getMatches = () => (
         typeof window !== 'undefined' ? window.innerWidth <= breakpoint : false
@@ -259,6 +331,7 @@ export function AccountsPayable({ data }) {
         estado: 'todos',
         factura: '',
     });
+    const [expandedAbonoId, setExpandedAbonoId] = useState(null);
 
     // Ref para bloquear doble-submit en cualquier operación crítica
     const isProcessingRef = useRef(false);
@@ -374,6 +447,30 @@ export function AccountsPayable({ data }) {
     const totalAbonosFiltrados = useMemo(() => (
         abonosFiltrados.reduce((sum, abono) => sum + Number(abono.montoTotal || 0), 0)
     ), [abonosFiltrados]);
+
+    const facturasById = useMemo(() => (
+        facturas.reduce((acc, factura) => {
+            acc[factura.id] = toInvoiceView(factura);
+            return acc;
+        }, {})
+    ), [facturas]);
+
+    const getAbonoDetalleFacturas = useCallback((abono) => (
+        (abono.detalleAfectado || []).map((detalle, index) => {
+            const factura = facturasById[detalle.id] || {};
+            return {
+                id: detalle.id || `detalle-${index}`,
+                numero: factura.numero || detalle.numero || detalle.invoiceNumber || detalle.id || 'S/N',
+                proveedor: factura.proveedor || abono.proveedor,
+                fecha: factura.fecha || '',
+                vencimiento: factura.vencimiento || '',
+                montoFactura: factura.monto,
+                saldoActual: factura.saldo,
+                estadoActual: factura.statusInfo,
+                montoAbonado: Number(detalle.montoAbonado || 0),
+            };
+        })
+    ), [facturasById]);
 
     // --- HANDLERS ---
     const handleSaveFactura = useCallback(async (e) => {
@@ -1167,17 +1264,31 @@ export function AccountsPayable({ data }) {
                                 ) : (
                                     isCompactViewport ? (
                                         <div className="space-y-3">
-                                            {abonosFiltrados.map(a => (
+                                            {abonosFiltrados.map(a => {
+                                                const isExpanded = expandedAbonoId === a.id;
+                                                const detalleFacturas = getAbonoDetalleFacturas(a);
+
+                                                return (
                                                 <div key={a.id} className="erp-mobile-record p-4">
-                                                    <div className="mb-3 flex items-start justify-between gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setExpandedAbonoId(prev => prev === a.id ? null : a.id)}
+                                                        className="mb-3 flex w-full items-start justify-between gap-3 text-left"
+                                                    >
                                                         <div>
                                                             <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Recibo</div>
                                                             <div className="mt-1 text-sm font-black text-[#a81d24]">#{a.secuencia}</div>
+                                                            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#607888]">
+                                                                {isExpanded ? 'Ocultar detalle' : 'Ver facturas pagadas'}
+                                                            </div>
                                                         </div>
-                                                        <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
-                                                            {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
-                                                        </Badge>
-                                                    </div>
+                                                        <div className="flex flex-col items-end gap-2">
+                                                            <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
+                                                                {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                                                            </Badge>
+                                                            <Icon path={Icons.chevronRight} className={`h-4 w-4 text-[#607888] transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                                        </div>
+                                                    </button>
                                                     <div className="erp-mobile-keyvalue">
                                                         <div className="erp-mobile-keyvalue-row">
                                                             <span>Fecha</span>
@@ -1192,6 +1303,9 @@ export function AccountsPayable({ data }) {
                                                             <span className="erp-mono font-extrabold text-emerald-600">{fmt(a.montoTotal)}</span>
                                                         </div>
                                                     </div>
+                                                    {isExpanded && (
+                                                        <AbonoDetalle detalle={detalleFacturas} fmt={fmt} compact />
+                                                    )}
                                                     <button
                                                         onClick={() => handleDeleteAbono(a)}
                                                         disabled={loading}
@@ -1201,7 +1315,8 @@ export function AccountsPayable({ data }) {
                                                         Anular abono
                                                     </button>
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     ) : (
                                         <div className="erp-table-shell overflow-x-auto">
@@ -1216,28 +1331,53 @@ export function AccountsPayable({ data }) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {abonosFiltrados.map(a => (
-                                                    <tr key={a.id} className="hover:bg-stone-50 transition-colors">
-                                                        <td className="px-4 py-3 font-mono font-bold text-[#a81d24]">#{a.secuencia}</td>
-                                                        <td className="px-4 py-3 text-xs text-slate-500">{a.fecha}</td>
-                                                        <td className="px-4 py-3 font-semibold text-slate-800 text-xs">{a.proveedor}</td>
-                                                        <td className="px-4 py-3">
-                                                            <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
-                                                                {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right font-bold text-emerald-600">{fmt(a.montoTotal)}</td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <button
-                                                                onClick={() => handleDeleteAbono(a)}
-                                                                disabled={loading}
-                                                                className="erp-pressable text-red-500 hover:text-red-700 font-semibold text-xs uppercase px-3 py-1 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                {abonosFiltrados.map(a => {
+                                                    const isExpanded = expandedAbonoId === a.id;
+                                                    const detalleFacturas = getAbonoDetalleFacturas(a);
+
+                                                    return (
+                                                        <React.Fragment key={a.id}>
+                                                            <tr
+                                                                className="cursor-pointer hover:bg-stone-50 transition-colors"
+                                                                onClick={() => setExpandedAbonoId(prev => prev === a.id ? null : a.id)}
                                                             >
-                                                                Anular
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                                <td className="px-4 py-3 font-mono font-bold text-[#a81d24]">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Icon path={Icons.chevronRight} className={`h-3.5 w-3.5 text-[#607888] transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                                                        #{a.secuencia}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-xs text-slate-500">{a.fecha}</td>
+                                                                <td className="px-4 py-3 font-semibold text-slate-800 text-xs">{a.proveedor}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
+                                                                        {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-right font-bold text-emerald-600">{fmt(a.montoTotal)}</td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <button
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            handleDeleteAbono(a);
+                                                                        }}
+                                                                        disabled={loading}
+                                                                        className="erp-pressable text-red-500 hover:text-red-700 font-semibold text-xs uppercase px-3 py-1 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        Anular
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                            {isExpanded && (
+                                                                <tr>
+                                                                    <td colSpan={6} className="bg-[#f7fbfd] px-4 py-4">
+                                                                        <AbonoDetalle detalle={detalleFacturas} fmt={fmt} />
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
