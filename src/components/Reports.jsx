@@ -7,7 +7,7 @@ import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
 import { resolveReportIncomeEntries } from '../services/incomeAggregation';
 import { getExpenseCategoryKey, normalizeExpenseClassification } from '../services/expenseCategories';
-import { getLocalMonthString } from '../utils/localDate';
+import { getLocalDateString, getLocalMonthString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -22,6 +22,7 @@ const Icons = {
     dollar: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
     wallet: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
     receipt: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
+    printer: "M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z",
     x: "M6 18L18 6M6 6l12 12",
     shoppingCart: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
     box: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
@@ -149,6 +150,71 @@ const splitExpenseCategoryKey = (categoryKey = '') => {
         subcategory: separatorIndex >= 0 ? categoryKey.slice(separatorIndex + 3) : 'Sin subcategoria',
     };
 };
+
+const getDateString = (value, fallback = '') => {
+    if (typeof value === 'string') return value.substring(0, 10);
+    if (value?.toDate) return value.toDate().toISOString().substring(0, 10);
+    if (value instanceof Date) return value.toISOString().substring(0, 10);
+    return fallback;
+};
+
+const isDateInRange = (dateString, startDate, endDate) => (
+    Boolean(dateString && startDate && endDate && dateString >= startDate && dateString <= endDate)
+);
+
+const getMonthEndDate = (month = '') => {
+    if (!/^\d{4}-\d{2}$/.test(month)) return getLocalDateString();
+    const [year, monthNumber] = month.split('-').map(Number);
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    return `${month}-${String(lastDay).padStart(2, '0')}`;
+};
+
+const getMonthStartDate = (month = '') => (
+    /^\d{4}-\d{2}$/.test(month) ? `${month}-01` : getLocalDateString()
+);
+
+const formatPeriodLabel = ({ mode, month, startDate, endDate }) => (
+    mode === 'monthly'
+        ? `Mes fiscal ${month}`
+        : `Del ${startDate} al ${endDate}`
+);
+
+const getMonthsBetweenDates = (startDate, endDate) => {
+    if (!startDate || !endDate) return [];
+    const [startYear, startMonth] = startDate.substring(0, 7).split('-').map(Number);
+    const [endYear, endMonth] = endDate.substring(0, 7).split('-').map(Number);
+    const startIndex = (startYear * 12) + (startMonth - 1);
+    const endIndex = (endYear * 12) + (endMonth - 1);
+    if (!Number.isFinite(startIndex) || !Number.isFinite(endIndex) || endIndex < startIndex) return [];
+
+    return Array.from({ length: endIndex - startIndex + 1 }, (_, offset) => {
+        const index = startIndex + offset;
+        const year = Math.floor(index / 12);
+        const month = String((index % 12) + 1).padStart(2, '0');
+        return `${year}-${month}`;
+    });
+};
+
+const countOverlapDays = (startDate, endDate, month) => {
+    const monthStart = getMonthStartDate(month);
+    const monthEnd = getMonthEndDate(month);
+    const effectiveStart = startDate > monthStart ? startDate : monthStart;
+    const effectiveEnd = endDate < monthEnd ? endDate : monthEnd;
+    if (effectiveEnd < effectiveStart) return 0;
+
+    const start = new Date(`${effectiveStart}T12:00:00`);
+    const end = new Date(`${effectiveEnd}T12:00:00`);
+    return Math.round((end - start) / 86400000) + 1;
+};
+
+const calculateDepreciationExpenseForRange = (items = [], startDate, endDate) => (
+    getMonthsBetweenDates(startDate, endDate).reduce((sum, month) => {
+        const daysInMonth = Number(getMonthEndDate(month).substring(8, 10));
+        const overlapDays = countOverlapDays(startDate, endDate, month);
+        if (!daysInMonth || !overlapDays) return sum;
+        return sum + (calculateDepreciationExpenseForMonth(items, month) * (overlapDays / daysInMonth));
+    }, 0)
+);
 
 const FinancialFlowChart = ({
     totalIncome,
@@ -564,6 +630,281 @@ const MonthlySalesWeekdayReport = ({ report }) => {
 };
 
 // --- LÓGICA DE AGREGACIÓN ---
+const FiscalReport = ({
+    report,
+    mode,
+    month,
+    startDate,
+    endDate,
+    onModeChange,
+    onMonthChange,
+    onStartDateChange,
+    onEndDateChange,
+    onExportPdf,
+}) => {
+    const margin = (value) => report.totalIncome > 0 ? `${((value / report.totalIncome) * 100).toFixed(1)}%` : '0.0%';
+    const fiscalRows = [
+        { label: 'Ingresos netos', value: report.totalIncome, tone: 'income', margin: margin(report.totalIncome) },
+        {
+            label: 'Costo de venta',
+            value: report.totalCOGS,
+            tone: 'cost',
+            margin: margin(report.totalCOGS),
+            children: [
+                { label: 'Compras de contado', value: report.cashPurchases },
+                { label: 'Compras de credito', value: report.creditPurchases },
+                ...(report.usesInventoryAdjustment ? [
+                    { label: 'Inventario inicial', value: report.initialInventory },
+                    { label: 'Inventario final', value: -report.finalInventory },
+                    { label: 'Ajuste inventario', value: report.inventoryAdjustment },
+                ] : []),
+            ],
+        },
+        { label: 'Utilidad bruta', value: report.grossProfit, tone: 'subtotal', margin: margin(report.grossProfit) },
+        { label: 'Gastos operativos', value: report.totalExpenses, tone: 'cost', margin: margin(report.totalExpenses) },
+        { label: 'Utilidad operativa bruta', value: report.operatingGrossProfit, tone: 'subtotal', margin: margin(report.operatingGrossProfit) },
+        { label: 'Depreciaciones', value: report.depreciation, tone: 'cost', margin: margin(report.depreciation) },
+        { label: 'IMI 1% sobre ingresos', value: report.imi, tone: 'cost', margin: margin(report.imi) },
+        { label: 'IR 30% sobre base imponible', value: report.ir, tone: 'cost', margin: margin(report.ir) },
+        { label: 'Utilidad neta fiscal', value: report.netProfit, tone: 'net', margin: margin(report.netProfit) },
+    ];
+
+    const amountTone = (tone) => {
+        if (tone === 'cost') return 'text-[#a81d24]';
+        if (tone === 'income') return 'text-[#1e7a4f]';
+        return '';
+    };
+
+    return (
+        <div className="animate-fade-in space-y-5">
+            <Card title="Reporte Fiscal" subtitle="Estado de resultado membretado para PDF" icon="receipt">
+                <div className="fiscal-no-print grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.5fr_auto] lg:items-end">
+                    <div>
+                        <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Tipo de periodo</div>
+                        <div className="mt-2 grid grid-cols-2 rounded-2xl border border-[#bdd5e1] bg-[#f7fbfd] p-1">
+                            {[
+                                ['monthly', 'Mensual'],
+                                ['range', 'Intervalo'],
+                            ].map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => onModeChange(value)}
+                                    className={`rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.16em] transition ${
+                                        mode === value ? 'bg-[#152533] text-white shadow-sm' : 'text-[#55717f] hover:bg-white'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {mode === 'monthly' ? (
+                        <div>
+                            <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">Mes fiscal</label>
+                            <input
+                                type="month"
+                                value={month}
+                                onChange={(e) => onMonthChange(e.target.value)}
+                                className="mt-2 w-full rounded-2xl border border-[#bdd5e1] bg-[#f7fbfd] px-3.5 py-2.5 text-sm font-bold text-[#173545] outline-none transition-all focus:border-[#0a628f] focus:ring-2 focus:ring-[#0a628f]/12"
+                            />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">Desde</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => onStartDateChange(e.target.value)}
+                                    className="mt-2 w-full rounded-2xl border border-[#bdd5e1] bg-[#f7fbfd] px-3.5 py-2.5 text-sm font-bold text-[#173545] outline-none transition-all focus:border-[#0a628f] focus:ring-2 focus:ring-[#0a628f]/12"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">Hasta</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => onEndDateChange(e.target.value)}
+                                    className="mt-2 w-full rounded-2xl border border-[#bdd5e1] bg-[#f7fbfd] px-3.5 py-2.5 text-sm font-bold text-[#173545] outline-none transition-all focus:border-[#0a628f] focus:ring-2 focus:ring-[#0a628f]/12"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={onExportPdf}
+                        className="erp-pressable flex items-center justify-center gap-2 rounded-2xl bg-[#152533] px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white shadow-[0_16px_24px_-18px_rgba(15,23,42,.9)] transition hover:bg-[#1f3548]"
+                    >
+                        <Icon path={Icons.printer} className="h-4 w-4" />
+                        Exportar PDF
+                    </button>
+                </div>
+            </Card>
+
+            <section className="fiscal-report-print overflow-hidden rounded-[28px] border border-[#d7e2e9] bg-white shadow-[0_22px_50px_-36px_rgba(15,23,42,.45)]">
+                <div className="border-b-[6px] border-[#a81d24] bg-[linear-gradient(135deg,#101c27_0%,#173042_58%,#1a6f93_100%)] px-6 py-6 text-white">
+                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-center gap-4">
+                            <img src="/amparito-logo.jpeg" alt="Carnes Amparito" className="h-20 w-20 rounded-2xl border-4 border-white/20 bg-white object-contain p-1 shadow-lg" />
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#adc8d7]">Reporte Fiscal</div>
+                                <h2 className="mt-1 text-3xl font-black tracking-tight">Carnes Amparito</h2>
+                                <p className="mt-1 text-sm font-semibold text-white/72">Estado de Resultado Fiscal y Gerencial</p>
+                            </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-right backdrop-blur">
+                            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-white/60">Periodo</div>
+                            <div className="mt-1 text-lg font-black">{report.periodLabel}</div>
+                            <div className="mt-1 text-xs font-semibold text-white/60">Generado: {report.generatedAt}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 border-b border-[#d7e2e9] bg-[#f7fbfd] px-6 py-4 md:grid-cols-4">
+                    <div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Ingresos</div>
+                        <div className="mt-1 text-xl font-black text-[#173042]">{fmt(report.totalIncome)}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Costo venta</div>
+                        <div className="mt-1 text-xl font-black text-[#a81d24]">{fmt(report.totalCOGS)}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Gastos operativos</div>
+                        <div className="mt-1 text-xl font-black text-[#a81d24]">{fmt(report.totalExpenses)}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d8390]">Utilidad neta</div>
+                        <div className={`mt-1 text-xl font-black ${report.netProfit >= 0 ? 'text-[#1e7a4f]' : 'text-[#a81d24]'}`}>{fmt(report.netProfit)}</div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 px-6 py-6 xl:grid-cols-[1.15fr_.85fr]">
+                    <div className="rounded-2xl border border-[#d7e2e9]">
+                        <div className="border-b border-[#d7e2e9] bg-[#f7fbfd] px-4 py-3">
+                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Estado de Resultado</div>
+                        </div>
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-[#d7e2e9] text-left text-[10px] font-black uppercase tracking-[0.16em] text-[#6d8390]">
+                                    <th className="px-4 py-3">Concepto</th>
+                                    <th className="px-4 py-3 text-right">Monto</th>
+                                    <th className="px-4 py-3 text-right">% Ingreso</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {fiscalRows.map((row) => (
+                                    <React.Fragment key={row.label}>
+                                        <tr className={`border-b border-[#eef3f6] ${
+                                            row.tone === 'net'
+                                                ? 'bg-[#152533] text-white'
+                                                : row.tone === 'subtotal'
+                                                    ? 'bg-[#eef8f0] text-[#173042]'
+                                                    : ''
+                                        }`}>
+                                            <td className="px-4 py-3 font-black uppercase">{row.label}</td>
+                                            <td className={`px-4 py-3 text-right font-black ${amountTone(row.tone)}`}>{fmt(row.value)}</td>
+                                            <td className="px-4 py-3 text-right font-bold">{row.margin}</td>
+                                        </tr>
+                                        {row.children?.map((child) => (
+                                            <tr key={`${row.label}-${child.label}`} className="border-b border-[#f2f5f7] bg-[#fbfdfe] text-xs text-[#5d7784]">
+                                                <td className="px-8 py-2 font-semibold">{child.label}</td>
+                                                <td className="px-4 py-2 text-right font-bold">{fmt(child.value)}</td>
+                                                <td className="px-4 py-2 text-right">-</td>
+                                            </tr>
+                                        ))}
+                                    </React.Fragment>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="rounded-2xl border border-[#d7e2e9] bg-[#fbfdfe] p-4">
+                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Base fiscal</div>
+                            <div className="mt-4 space-y-3 text-sm">
+                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">Base IR</span><span className="font-black text-[#173042]">{fmt(report.irBase)}</span></div>
+                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">IMI 1%</span><span className="font-black text-[#a81d24]">{fmt(report.imi)}</span></div>
+                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">IR 30%</span><span className="font-black text-[#a81d24]">{fmt(report.ir)}</span></div>
+                                <div className="border-t border-[#d7e2e9] pt-3">
+                                    <div className="flex justify-between gap-4"><span className="font-black uppercase text-[#173042]">Total impuesto</span><span className="font-black text-[#a81d24]">{fmt(report.totalTax)}</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-[#d7e2e9] bg-white p-4">
+                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Notas del reporte</div>
+                            <div className="mt-3 space-y-2 text-xs font-semibold leading-relaxed text-[#667b87]">
+                                <p>Moneda expresada en cordobas nicaraguenses (C$).</p>
+                                <p>IMI calculado automaticamente al 1% de ingresos.</p>
+                                <p>IR calculado al 30% sobre utilidad operativa menos IMI y depreciacion.</p>
+                                {!report.usesInventoryAdjustment && (
+                                    <p>Para intervalos de fechas, el costo de venta se basa en compras del periodo; el ajuste de inventario se aplica en reporte mensual completo.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="border-t border-[#d7e2e9] px-6 py-5">
+                    <div className="mb-4 text-[11px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Gastos por categoria y subcategoria</div>
+                    {report.groupedExpenses.length ? (
+                        <div className="overflow-hidden rounded-2xl border border-[#d7e2e9]">
+                            <table className="w-full text-sm">
+                                <thead className="bg-[#f7fbfd] text-left text-[10px] font-black uppercase tracking-[0.16em] text-[#6d8390]">
+                                    <tr>
+                                        <th className="px-4 py-3">Categoria / Subcategoria</th>
+                                        <th className="px-4 py-3 text-right">Monto</th>
+                                        <th className="px-4 py-3 text-right">% Gastos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {report.groupedExpenses.map((group) => (
+                                        <React.Fragment key={group.category}>
+                                            <tr className="border-t border-[#d7e2e9] bg-[#fbfdfe]">
+                                                <td className="px-4 py-3 font-black uppercase text-[#173042]">{group.category}</td>
+                                                <td className="px-4 py-3 text-right font-black text-[#173042]">{fmt(group.amount)}</td>
+                                                <td className="px-4 py-3 text-right font-bold text-[#5d7784]">{group.percentage.toFixed(1)}%</td>
+                                            </tr>
+                                            {group.subcategories.map((item) => (
+                                                <tr key={item.key} className="border-t border-[#eef3f6]">
+                                                    <td className="px-8 py-2 text-xs font-semibold uppercase text-[#5d7784]">{item.subcategory}</td>
+                                                    <td className="px-4 py-2 text-right text-xs font-bold text-[#173042]">{fmt(item.amount)}</td>
+                                                    <td className="px-4 py-2 text-right text-xs font-semibold text-[#6d8390]">{item.percentage.toFixed(1)}%</td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-[#d7e2e9] bg-[#fbfdfe] p-5 text-center text-sm font-semibold text-[#6d8390]">
+                            Sin gastos operativos registrados en este periodo.
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 border-t border-[#d7e2e9] px-6 py-6 text-xs text-[#5d7784] md:grid-cols-2">
+                    <div>
+                        <div className="h-12 border-b border-[#9fb7c4]" />
+                        <div className="mt-2 font-black uppercase tracking-[0.18em]">Elaborado por</div>
+                        <div className="mt-1 font-semibold">Sistema Contable Carnes Amparito</div>
+                    </div>
+                    <div>
+                        <div className="h-12 border-b border-[#9fb7c4]" />
+                        <div className="mt-2 font-black uppercase tracking-[0.18em]">Revisado / Autorizado</div>
+                        <div className="mt-1 font-semibold">Administracion</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    );
+};
+
 const aggregateData = (data) => {
     const results = {};
     const { ingresos = [], gastos = [], inventarios = [], compras = [], presupuestos = [], cuentas_por_pagar: facturasCredito = [] } = data;
@@ -747,11 +1088,143 @@ const aggregateData = (data) => {
     }).flat().sort((a, b) => b.month.localeCompare(a.month));
 };
 
+const buildGroupedExpenseBreakdown = (expenseDetails = {}) => (
+    Object.entries(expenseDetails)
+        .reduce((groups, [categoryKey, amount]) => {
+            const { mainCategory, subcategory } = splitExpenseCategoryKey(categoryKey);
+            if (!groups.has(mainCategory)) {
+                groups.set(mainCategory, {
+                    category: mainCategory,
+                    amount: 0,
+                    subcategories: [],
+                });
+            }
+
+            const group = groups.get(mainCategory);
+            group.amount += amount;
+            group.subcategories.push({
+                key: categoryKey,
+                subcategory,
+                amount,
+            });
+
+            return groups;
+        }, new Map())
+);
+
+const buildFiscalReportData = (data = {}, period = {}) => {
+    const { ingresos = [], gastos = [], compras = [], cuentas_por_pagar: facturasCredito = [], inventarios = [], depreciaciones = [] } = data;
+    const { mode = 'monthly', month = getLocalMonthString(), startDate, endDate } = period;
+    const safeStartDate = mode === 'monthly' ? getMonthStartDate(month) : startDate;
+    const safeEndDate = mode === 'monthly' ? getMonthEndDate(month) : endDate;
+    const reportMonth = safeStartDate?.substring(0, 7);
+    const isMonthlyInventoryPeriod = mode === 'monthly' && reportMonth === safeEndDate?.substring(0, 7);
+
+    const mirroredFacturaIds = new Set(
+        compras
+            .map((item) => item.sourceFacturaId || item.linkedPayableId || (item.id?.startsWith('credito_') ? item.id.replace('credito_', '') : ''))
+            .filter(Boolean)
+    );
+
+    const totalIncome = resolveReportIncomeEntries(ingresos)
+        .filter((income) => isDateInRange(income.date, safeStartDate, safeEndDate))
+        .reduce((sum, income) => sum + peso(income.amount), 0);
+
+    const expenseDetails = {};
+    const totalExpenses = gastos.reduce((sum, item) => {
+        const dateString = getDateString(item.date || item.fecha || item.timestamp);
+        if (!isDateInRange(dateString, safeStartDate, safeEndDate)) return sum;
+
+        const classification = normalizeExpenseClassification(item);
+        const categoryKey = `${classification.category} / ${classification.subcategory}`;
+        const amount = peso(item.amount ?? item.monto);
+        expenseDetails[categoryKey] = (expenseDetails[categoryKey] || 0) + amount;
+        return sum + amount;
+    }, 0);
+
+    const cashPurchases = compras.reduce((sum, item) => {
+        const dateString = getDateString(item.date || item.fecha || item.timestamp);
+        if (!isDateInRange(dateString, safeStartDate, safeEndDate)) return sum;
+        return sum + peso(item.amount ?? item.monto);
+    }, 0);
+
+    const creditPurchases = facturasCredito.reduce((sum, item) => {
+        if (item.id && mirroredFacturaIds.has(item.id)) return sum;
+        const dateString = getDateString(item.fecha || item.date || item.timestamp);
+        if (!isDateInRange(dateString, safeStartDate, safeEndDate)) return sum;
+        return sum + peso(item.monto ?? item.amount);
+    }, 0);
+
+    const initialInventory = isMonthlyInventoryPeriod
+        ? inventarios
+            .filter((item) => (item.month || item.mes) === reportMonth && item.type === 'inicial')
+            .reduce((sum, item) => sum + peso(item.amount ?? item.monto), 0)
+        : 0;
+
+    const finalInventory = isMonthlyInventoryPeriod
+        ? inventarios
+            .filter((item) => (item.month || item.mes) === reportMonth && item.type === 'final')
+            .reduce((sum, item) => sum + peso(item.amount ?? item.monto), 0)
+        : 0;
+
+    const inventoryAdjustment = initialInventory - finalInventory;
+    const totalPurchases = cashPurchases + creditPurchases;
+    const totalCOGS = totalPurchases + inventoryAdjustment;
+    const grossProfit = totalIncome - totalCOGS;
+    const operatingGrossProfit = grossProfit - totalExpenses;
+    const depreciation = calculateDepreciationExpenseForRange(depreciaciones, safeStartDate, safeEndDate);
+    const taxBreakdown = calculateGeneralRegimeTaxes(totalIncome, operatingGrossProfit, depreciation);
+    const groupedExpenses = Array.from(buildGroupedExpenseBreakdown(expenseDetails).values())
+        .map((group) => ({
+            ...group,
+            percentage: totalExpenses > 0 ? (group.amount / totalExpenses) * 100 : 0,
+            subcategories: group.subcategories
+                .map((item) => ({
+                    ...item,
+                    percentage: totalExpenses > 0 ? (item.amount / totalExpenses) * 100 : 0,
+                }))
+                .sort((a, b) => b.amount - a.amount),
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+    return {
+        mode,
+        month,
+        startDate: safeStartDate,
+        endDate: safeEndDate,
+        periodLabel: formatPeriodLabel({ mode, month, startDate: safeStartDate, endDate: safeEndDate }),
+        generatedAt: new Date().toLocaleString('es-NI', { dateStyle: 'medium', timeStyle: 'short' }),
+        totalIncome,
+        cashPurchases,
+        creditPurchases,
+        totalPurchases,
+        initialInventory,
+        finalInventory,
+        inventoryAdjustment,
+        totalCOGS,
+        grossProfit,
+        totalExpenses,
+        operatingGrossProfit,
+        depreciation,
+        imi: taxBreakdown.imi,
+        irBase: taxBreakdown.irBase,
+        ir: taxBreakdown.ir,
+        totalTax: taxBreakdown.totalTax,
+        netProfit: taxBreakdown.netProfit,
+        groupedExpenses,
+        usesInventoryAdjustment: isMonthlyInventoryPeriod,
+    };
+};
+
 export default function Reports({ data }) {
     const [activeTab, setActiveTab] = useState('Resultados');
     const [selectedMonth, setSelectedMonth] = useState(getLocalMonthString());
     const [modalCategory, setModalCategory] = useState(null);
     const [expandedExpenseCategories, setExpandedExpenseCategories] = useState(() => new Set());
+    const [fiscalMode, setFiscalMode] = useState('monthly');
+    const [fiscalMonth, setFiscalMonth] = useState(getLocalMonthString());
+    const [fiscalStartDate, setFiscalStartDate] = useState(getMonthStartDate(getLocalMonthString()));
+    const [fiscalEndDate, setFiscalEndDate] = useState(getLocalDateString());
 
     const aggregatedData = useMemo(() => aggregateData(data), [data]);
 
@@ -902,6 +1375,42 @@ export default function Reports({ data }) {
         setExpandedExpenseCategories(new Set());
     }, []);
 
+    const fiscalPeriod = useMemo(() => {
+        if (fiscalMode === 'monthly') {
+            return {
+                mode: 'monthly',
+                month: fiscalMonth || getLocalMonthString(),
+                startDate: getMonthStartDate(fiscalMonth || getLocalMonthString()),
+                endDate: getMonthEndDate(fiscalMonth || getLocalMonthString()),
+            };
+        }
+
+        const rawStart = fiscalStartDate || getLocalDateString();
+        const rawEnd = fiscalEndDate || rawStart;
+        const start = rawStart <= rawEnd ? rawStart : rawEnd;
+        const end = rawStart <= rawEnd ? rawEnd : rawStart;
+
+        return {
+            mode: 'range',
+            month: start.substring(0, 7),
+            startDate: start,
+            endDate: end,
+        };
+    }, [fiscalMode, fiscalMonth, fiscalStartDate, fiscalEndDate]);
+
+    const fiscalReport = useMemo(() => (
+        buildFiscalReportData(data, fiscalPeriod)
+    ), [data, fiscalPeriod]);
+
+    const handleExportFiscalPdf = useCallback(() => {
+        const previousTitle = document.title;
+        document.title = `Reporte Fiscal Carnes Amparito ${fiscalReport.periodLabel}`;
+        window.print();
+        window.setTimeout(() => {
+            document.title = previousTitle;
+        }, 500);
+    }, [fiscalReport.periodLabel]);
+
     const salesWeekdayReport = useMemo(() => {
         const weekCount = getWeeksInMonth(selectedMonth);
         const weekLabels = Array.from({ length: weekCount }, (_, index) => `Sem ${index + 1}`);
@@ -946,6 +1455,7 @@ export default function Reports({ data }) {
 
     const tabsConfig = {
         'Resultados': { icon: 'chart', label: 'Estado de Resultados' },
+        'Reporte Fiscal': { icon: 'printer', label: 'Reporte Fiscal' },
         'Gastos Mensuales': { icon: 'receipt', label: 'Gastos Mensuales' },
         'Ventas Mensuales': { icon: 'trendingUp', label: 'Ventas Mensuales' },
         'Balance': { icon: 'scale', label: 'Balance General' },
@@ -964,6 +1474,23 @@ export default function Reports({ data }) {
                 .custom-scrollbar::-webkit-scrollbar { width: 5px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: #f5f0ec; border-radius: 3px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #c8a898; border-radius: 3px; }
+                @media print {
+                    @page { size: letter portrait; margin: 10mm; }
+                    body { background: #fff !important; }
+                    body * { visibility: hidden !important; }
+                    .fiscal-report-print, .fiscal-report-print * { visibility: visible !important; }
+                    .fiscal-report-print {
+                        position: absolute !important;
+                        inset: 0 auto auto 0 !important;
+                        width: 100% !important;
+                        border: 0 !important;
+                        border-radius: 0 !important;
+                        box-shadow: none !important;
+                    }
+                    .fiscal-no-print, .fiscal-no-print * { display: none !important; visibility: hidden !important; }
+                    .fiscal-report-print table { page-break-inside: auto; }
+                    .fiscal-report-print tr { page-break-inside: avoid; page-break-after: auto; }
+                }
             `}</style>
 
             {/* Expense detail modal */}
@@ -1017,6 +1544,21 @@ export default function Reports({ data }) {
                 <div className="animate-fade-in">
                     <DashboardGeneral />
                 </div>
+            )}
+
+            {activeTab === 'Reporte Fiscal' && (
+                <FiscalReport
+                    report={fiscalReport}
+                    mode={fiscalMode}
+                    month={fiscalMonth}
+                    startDate={fiscalStartDate}
+                    endDate={fiscalEndDate}
+                    onModeChange={setFiscalMode}
+                    onMonthChange={setFiscalMonth}
+                    onStartDateChange={setFiscalStartDate}
+                    onEndDateChange={setFiscalEndDate}
+                    onExportPdf={handleExportFiscalPdf}
+                />
             )}
 
             {activeTab === 'Gastos Mensuales' && (
