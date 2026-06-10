@@ -688,6 +688,12 @@ const FiscalReport = ({
             margin: margin(report.totalExpenses),
             children: expenseCategoryRows,
         },
+        {
+            label: 'EBITDA',
+            value: report.ebitda,
+            tone: 'subtotal',
+            margin: margin(report.ebitda),
+        },
         ...(report.depreciation > 0 ? [{ label: 'Depreciaciones', value: report.depreciation, tone: 'cost', margin: margin(report.depreciation) }] : []),
         {
             label: 'Impuesto',
@@ -872,6 +878,7 @@ const FiscalReport = ({
                             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Base fiscal</div>
                             <div className="mt-3 grid gap-2 text-[12px]">
                                 <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">Base IR</span><span className="font-black text-[#173042]">{fmt(report.irBase)}</span></div>
+                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">EBITDA</span><span className="font-black text-[#173042]">{fmt(report.ebitda)}</span></div>
                                 <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">IMI 1%</span><span className="font-black text-[#a81d24]">{fmt(report.imi)}</span></div>
                                 <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">IR 30%</span><span className="font-black text-[#a81d24]">{fmt(report.ir)}</span></div>
                                 <div className="border-t border-[#d7e2e9] pt-2">
@@ -884,7 +891,7 @@ const FiscalReport = ({
                             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Notas del reporte</div>
                             <div className="mt-2 space-y-1 text-[10px] font-semibold leading-snug text-[#667b87]">
                                 <p>Moneda expresada en cordobas nicaraguenses (C$).</p>
-                                <p>IMI calculado automaticamente al 1% de ingresos. IR calculado al 30% sobre utilidad operativa menos IMI y depreciacion.</p>
+                                <p>EBITDA representa la utilidad antes de impuestos, depreciacion y amortizaciones. IMI calculado automaticamente al 1% de ingresos. IR calculado al 30% sobre EBITDA menos IMI y depreciacion.</p>
                                 {!report.usesInventoryAdjustment && (
                                     <p>Para intervalos, el costo de venta se basa en compras del periodo; el ajuste de inventario aplica en reporte mensual completo.</p>
                                 )}
@@ -1187,8 +1194,9 @@ const buildFiscalReportData = (data = {}, period = {}) => {
     const totalCOGS = totalPurchases + inventoryAdjustment;
     const grossProfit = totalIncome - totalCOGS;
     const operatingGrossProfit = grossProfit - totalExpenses;
+    const ebitda = operatingGrossProfit;
     const depreciation = calculateDepreciationExpenseForRange(depreciaciones, safeStartDate, safeEndDate);
-    const taxBreakdown = calculateGeneralRegimeTaxes(totalIncome, operatingGrossProfit, depreciation);
+    const taxBreakdown = calculateGeneralRegimeTaxes(totalIncome, ebitda, depreciation);
     const purchaseBreakdown = Object.entries(costDetails)
         .map(([subcategory, amount]) => ({
             key: subcategory,
@@ -1231,6 +1239,7 @@ const buildFiscalReportData = (data = {}, period = {}) => {
         grossProfit,
         totalExpenses,
         operatingGrossProfit,
+        ebitda,
         depreciation,
         imi: taxBreakdown.imi,
         irBase: taxBreakdown.irBase,
