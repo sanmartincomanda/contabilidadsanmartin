@@ -6,7 +6,7 @@ import { calculateGeneralRegimeTaxes } from '../services/tax';
 import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
 import { resolveReportIncomeEntries } from '../services/incomeAggregation';
-import { getExpenseCategoryKey, normalizeExpenseClassification } from '../services/expenseCategories';
+import { getExpenseCategoryKey, inferPurchaseSubcategory, normalizeExpenseClassification } from '../services/expenseCategories';
 import { getLocalDateString, getLocalMonthString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
@@ -643,15 +643,23 @@ const FiscalReport = ({
     onExportPdf,
 }) => {
     const margin = (value) => report.totalIncome > 0 ? `${((value / report.totalIncome) * 100).toFixed(1)}%` : '0.0%';
-    const expenseSubcategoryRows = report.groupedExpenses.flatMap((group) => (
-        group.subcategories.map((item) => ({
+    const expenseCategoryRows = report.groupedExpenses.flatMap((group) => ([
+        {
+            key: group.category,
+            label: group.category,
+            value: group.amount,
+            margin: margin(group.amount),
+            isGroup: true,
+        },
+        ...group.subcategories.map((item) => ({
             key: item.key,
             label: item.subcategory,
             parent: group.category,
             value: item.amount,
             margin: margin(item.amount),
-        }))
-    ));
+            isSubcategory: true,
+        })),
+    ]));
     const fiscalRows = [
         { label: 'Ingresos netos', value: report.totalIncome, tone: 'income', margin: margin(report.totalIncome) },
         {
@@ -678,7 +686,7 @@ const FiscalReport = ({
             value: report.totalExpenses,
             tone: 'cost',
             margin: margin(report.totalExpenses),
-            children: expenseSubcategoryRows,
+            children: expenseCategoryRows,
         },
         ...(report.depreciation > 0 ? [{ label: 'Depreciaciones', value: report.depreciation, tone: 'cost', margin: margin(report.depreciation) }] : []),
         {
@@ -835,13 +843,22 @@ const FiscalReport = ({
                                             <td className="px-4 py-2.5 text-right font-bold">{row.margin}</td>
                                         </tr>
                                         {row.children?.map((child) => (
-                                            <tr key={`${row.label}-${child.label}-${child.value}`} className="border-b border-[#f2f5f7] bg-[#fbfdfe] text-[11px] text-[#5d7784]">
-                                                <td className="px-8 py-1.5">
-                                                    <div className="font-bold uppercase">{child.label}</div>
-                                                    {child.parent && <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#91a3ad]">{child.parent}</div>}
+                                            <tr
+                                                key={`${row.label}-${child.key || child.label}-${child.value}`}
+                                                className={`border-b border-[#f2f5f7] text-[11px] ${
+                                                    child.isGroup
+                                                        ? 'bg-[#f3f8fb] text-[#173042]'
+                                                        : 'bg-[#fbfdfe] text-[#5d7784]'
+                                                }`}
+                                            >
+                                                <td className={`${child.isGroup ? 'px-6' : 'px-10'} py-1.5`}>
+                                                    <div className={`${child.isGroup ? 'font-black' : 'font-bold'} uppercase`}>
+                                                        {child.isSubcategory && <span className="mr-1.5 text-[#a81d24]">-</span>}
+                                                        {child.label}
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-1.5 text-right font-bold">{fmt(child.value)}</td>
-                                                <td className="px-4 py-1.5 text-right font-semibold">{child.margin || '-'}</td>
+                                                <td className={`${child.isGroup ? 'font-black text-[#173042]' : 'font-bold'} px-4 py-1.5 text-right`}>{fmt(child.value)}</td>
+                                                <td className={`${child.isGroup ? 'font-black text-[#173042]' : 'font-semibold'} px-4 py-1.5 text-right`}>{child.margin || '-'}</td>
                                             </tr>
                                         ))}
                                     </React.Fragment>
@@ -1120,15 +1137,8 @@ const buildFiscalReportData = (data = {}, period = {}) => {
 
     const expenseDetails = {};
     const costDetails = {};
-    const addCostDetail = (item, amount, fallbackSubcategory = 'Otros costos de producto') => {
-        const classification = normalizeExpenseClassification({
-            category: 'Costos de venta / compras',
-            subcategory: item.subcategory || item.subcategoria || fallbackSubcategory,
-            description: item.description || item.descripcion || item.detalle,
-            supplier: item.supplier || item.proveedor,
-            type: 'Compra',
-        });
-        const key = classification.subcategory || fallbackSubcategory;
+    const addCostDetail = (item, amount) => {
+        const key = inferPurchaseSubcategory(item);
         costDetails[key] = (costDetails[key] || 0) + amount;
     };
 

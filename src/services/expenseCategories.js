@@ -2,16 +2,16 @@ export const EXPENSE_CATEGORY_TREE = [
     {
         category: 'Costos de venta / compras',
         subcategories: [
-            'Compra de carne de res',
+            'Compra de carne res',
             'Compra de cerdo',
             'Compra de pollo',
             'Compra de embutidos',
             'Compra de mariscos',
             'Compra de productos procesados',
             'Fletes sobre compras',
-            'Material de empaque directo',
-            'Hielo y conservacion directa',
             'Merma / ajuste de inventario',
+            'Material de empaque directo',
+            'Hielo / conservacion directa',
             'Otros costos de producto',
         ],
     },
@@ -149,6 +149,7 @@ export const EXPENSE_CATEGORY_OPTIONS = EXPENSE_CATEGORY_TREE.map((item) => item
 export const PURCHASE_CATEGORY = 'Costos de venta / compras';
 export const DEFAULT_EXPENSE_CATEGORY = 'Otros Gastos';
 export const DEFAULT_EXPENSE_SUBCATEGORY = 'Otros gastos';
+export const DEFAULT_PURCHASE_SUBCATEGORY = 'Otros costos de producto';
 
 const directCategoryMap = new Map(
     EXPENSE_CATEGORY_TREE.map((item) => [normalizeText(item.category), item.category])
@@ -161,6 +162,16 @@ const directSubcategoryMap = new Map(
             subcategory,
         ])
     ))
+);
+
+const purchaseSubcategoryAliases = new Map(
+    [
+        ['Compra de carne de res', 'Compra de carne res'],
+        ['Carne de res', 'Compra de carne res'],
+        ['Compra res', 'Compra de carne res'],
+        ['Res', 'Compra de carne res'],
+        ['Hielo y conservacion directa', 'Hielo / conservacion directa'],
+    ].map(([from, to]) => [normalizeText(from), to])
 );
 
 export const LEGACY_CATEGORY_MAPPINGS = [
@@ -226,6 +237,49 @@ const keywordRules = [
     { words: ['donacion'], category: 'Otros Gastos', subcategory: 'Donaciones' },
 ];
 
+const purchaseKeywordRules = [
+    {
+        subcategory: 'Fletes sobre compras',
+        words: ['flete', 'fletes', 'transporte de compra', 'acarreo', 'envio proveedor', 'freight'],
+    },
+    {
+        subcategory: 'Merma / ajuste de inventario',
+        words: ['merma', 'ajuste inventario', 'ajuste de inventario', 'diferencia inventario', 'descarte', 'perdida producto'],
+    },
+    {
+        subcategory: 'Material de empaque directo',
+        words: ['material de empaque', 'empaque directo', 'bolsa', 'bolsas', 'bandeja', 'plastico', 'film', 'stretch', 'termoencogible', 'etiqueta'],
+    },
+    {
+        subcategory: 'Hielo / conservacion directa',
+        words: ['hielo', 'conservacion', 'conservacion directa', 'refrigerante', 'gel pack', 'cooler'],
+    },
+    {
+        subcategory: 'Compra de embutidos',
+        words: ['embutido', 'embutidos', 'chorizo', 'salchicha', 'hot dog', 'hotdog', 'jamon', 'mortadela', 'tocino', 'embutidos de la casa', 'delmor'],
+    },
+    {
+        subcategory: 'Compra de pollo',
+        words: ['pollo', 'gallina', 'pechuga', 'muslo', 'pierna de pollo', 'ala', 'alita', 'cargill', 'tip top', 'pollo la china'],
+    },
+    {
+        subcategory: 'Compra de cerdo',
+        words: ['cerdo', 'porcino', 'chancho', 'pork', 'chuleta', 'costilla de cerdo', 'lomo de cerdo', 'pierna de cerdo'],
+    },
+    {
+        subcategory: 'Compra de mariscos',
+        words: ['marisco', 'mariscos', 'pescado', 'camaron', 'tilapia', 'filete pescado', 'calamar', 'jaiba', 'langosta'],
+    },
+    {
+        subcategory: 'Compra de productos procesados',
+        words: ['procesado', 'procesados', 'hamburguesa', 'nugget', 'croqueta', 'torta', 'sazonado', 'preparado', 'ahumado', 'molinos de nicaragua', 'harina', 'condimento'],
+    },
+    {
+        subcategory: 'Compra de carne res',
+        words: ['carne de res', 'carne res', 'bovino', 'vaca', 'novillo', 'canal', 'posta', 'posta trasera', 'posta pierna', 'churrasco', 'lomo de res', 'molida', 'costilla', 'cecina', 'hueso corriente', 'mondongo', 'tripa', 'tiras p asar', 'carnes san martin', 'joksan reyes', 'lugar de bendicion'],
+    },
+];
+
 export const getExpenseSubcategories = (category) => (
     EXPENSE_CATEGORY_TREE.find((item) => item.category === category)?.subcategories || []
 );
@@ -241,12 +295,91 @@ const resolveKnownCategory = (category) => {
 
 const resolveKnownSubcategory = (category, subcategory) => {
     if (!category || !subcategory) return '';
-    return directSubcategoryMap.get(`${normalizeText(category)}|${normalizeText(subcategory)}`) || '';
+    const normalizedSubcategory = normalizeText(subcategory);
+    const direct = directSubcategoryMap.get(`${normalizeText(category)}|${normalizedSubcategory}`);
+    if (direct) return direct;
+
+    const alias = purchaseSubcategoryAliases.get(normalizedSubcategory);
+    if (!alias) return '';
+    return directSubcategoryMap.get(`${normalizeText(category)}|${normalizeText(alias)}`) || '';
 };
 
 const inferFromText = (text) => {
     const normalized = normalizeText(text);
     return keywordRules.find((rule) => rule.words.some((word) => normalized.includes(normalizeText(word))));
+};
+
+const inferPurchaseFromText = (text) => {
+    const normalized = normalizeText(text);
+    return purchaseKeywordRules.find((rule) => rule.words.some((word) => normalized.includes(normalizeText(word))));
+};
+
+const stringifyPurchaseText = (value, depth = 0) => {
+    if (value === null || value === undefined || depth > 2) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (Array.isArray(value)) return value.map((entry) => stringifyPurchaseText(entry, depth + 1)).join(' ');
+    if (typeof value === 'object') {
+        return Object.entries(value)
+            .filter(([key]) => !['timestamp', 'createdAt', 'updatedAt'].includes(key))
+            .map(([key, entry]) => `${key} ${stringifyPurchaseText(entry, depth + 1)}`)
+            .join(' ');
+    }
+    return '';
+};
+
+const extractKnownPurchaseSubcategory = (item = {}) => {
+    const candidates = [
+        item.subcategory,
+        item.subcategoria,
+        item.subCategory,
+        item.categoryKey,
+        item.categoriaSubcategoria,
+        item.category,
+        item.categoria,
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+        const candidateText = String(candidate);
+        const possibleSubcategory = candidateText.includes(' / ')
+            ? candidateText.split(' / ').pop()
+            : candidateText;
+        const knownSubcategory = resolveKnownSubcategory(PURCHASE_CATEGORY, possibleSubcategory);
+        if (knownSubcategory) return knownSubcategory;
+    }
+
+    return '';
+};
+
+export const inferPurchaseSubcategory = (item = {}, fallback = DEFAULT_PURCHASE_SUBCATEGORY) => {
+    const explicitSubcategory = extractKnownPurchaseSubcategory(item);
+    if (explicitSubcategory) return explicitSubcategory;
+
+    const text = [
+        item.description,
+        item.descripcion,
+        item.detalle,
+        item.concepto,
+        item.notes,
+        item.nota,
+        item.supplier,
+        item.proveedor,
+        item.vendor,
+        item.nombre_proveedor,
+        item.invoiceNumber,
+        item.numero,
+        item.folio,
+        item.purchaseFolio,
+        item.purchaseSeries,
+        item.tipo,
+        item.type,
+        stringifyPurchaseText(item.items || item.productos || item.lineas || item.lines || item.detalleProductos),
+        stringifyPurchaseText(item.raw || item.source || item.sicar),
+    ].filter(Boolean).join(' ');
+
+    const inferred = inferPurchaseFromText(text);
+    if (inferred) return inferred.subcategory;
+
+    return resolveKnownSubcategory(PURCHASE_CATEGORY, fallback) || DEFAULT_PURCHASE_SUBCATEGORY;
 };
 
 export const normalizeExpenseClassification = ({
@@ -266,9 +399,25 @@ export const normalizeExpenseClassification = ({
 
     if (directCategory) {
         const legacy = legacyMap.get(normalizeText(category));
+        if (directCategory === PURCHASE_CATEGORY) {
+            return {
+                category: directCategory,
+                subcategory: inferPurchaseSubcategory(
+                    { category, subcategory, description, supplier, type },
+                    legacy?.subcategory || DEFAULT_PURCHASE_SUBCATEGORY
+                ),
+            };
+        }
         return {
             category: directCategory,
             subcategory: legacy?.subcategory || directSubcategory || getDefaultSubcategory(directCategory),
+        };
+    }
+
+    if (normalizeText(type).includes('compra')) {
+        return {
+            category: PURCHASE_CATEGORY,
+            subcategory: inferPurchaseSubcategory({ category, subcategory, description, supplier, type }),
         };
     }
 
