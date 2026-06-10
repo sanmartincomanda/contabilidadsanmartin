@@ -1,13 +1,17 @@
 // src/components/ExpenseTracker.jsx
 
 import React, { useState } from 'react';
-import { db } from '../firebase'; // La ruta '../firebase' es correcta si estás en src/components/
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import {
+    EXPENSE_CATEGORY_OPTIONS,
+    getDefaultSubcategory,
+    getExpenseSubcategories,
+    normalizeExpenseClassification,
+} from '../services/expenseCategories';
 
-// --- Constantes de la aplicación ---
-const CATEGORIES = ['Alquiler', 'Servicios', 'Sueldos', 'Compra Inventario', 'Mantenimiento', 'Marketing', 'Otros'];
 export const BRANCHES = [
-    { id: 'granada', name: 'Distribuidora Granada San Martín' },
+    { id: 'granada', name: 'Distribuidora Granada San Martin' },
     { id: 'amparito', name: 'Carnes Amparito' },
     { id: 'inmaculada', name: 'Distribuidora Granada Inmaculada (en proceso)' },
     { id: 'ruta1', name: 'Ruta 1' },
@@ -15,13 +19,13 @@ export const BRANCHES = [
     { id: 'ruta3', name: 'Ruta 3' },
 ];
 
-// --- Componentes Reutilizables ---
 const Card = ({ title, children, className = '' }) => (
     <div className={`rounded-2xl shadow-sm border border-neutral-200 bg-white p-4 ${className}`}>
         <div className="text-lg font-semibold text-neutral-700 mb-3">{title}</div>
         {children}
     </div>
 );
+
 const NumberInput = ({ value, onChange, placeholder = '0.00', step = '0.01' }) => (
     <input
         type="number"
@@ -32,6 +36,7 @@ const NumberInput = ({ value, onChange, placeholder = '0.00', step = '0.01' }) =
         placeholder={placeholder}
     />
 );
+
 const TextInput = ({ value, onChange, placeholder = '' }) => (
     <input
         type="text"
@@ -41,59 +46,65 @@ const TextInput = ({ value, onChange, placeholder = '' }) => (
         placeholder={placeholder}
     />
 );
+
 const fmt = (n, currency = 'C$') =>
     `${currency} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const branchName = (id) => BRANCHES.find(b => b.id === id)?.name || id;
 
-// --- Componente Principal (con corrección de prop) ---
+const branchName = (id) => BRANCHES.find((b) => b.id === id)?.name || id;
+
 export default function expensetracker({ currentExpenses = [], isLoading }) {
-    //                                  ^^^^^^^^^^^^^^^^^ <-- CORRECCIÓN
-
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
-    const [category, setCategory] = useState(CATEGORIES[0]);
+    const [category, setCategory] = useState(EXPENSE_CATEGORY_OPTIONS[0]);
+    const [subcategory, setSubcategory] = useState(getDefaultSubcategory(EXPENSE_CATEGORY_OPTIONS[0]));
     const [branch, setBranch] = useState(BRANCHES[0].id);
     const [loading, setLoading] = useState(false);
+    const subcategoryOptions = getExpenseSubcategories(category);
 
-    // FUNCIÓN PARA REGISTRAR EL GASTO EN FIREBASE
+    const handleCategoryChange = (nextCategory) => {
+        setCategory(nextCategory);
+        setSubcategory(getDefaultSubcategory(nextCategory));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         const numAmount = Number(amount);
         if (!description || isNaN(numAmount) || numAmount <= 0) {
-            alert('Por favor, ingresa un monto válido y una descripción.');
+            alert('Por favor, ingresa un monto valido y una descripcion.');
             return;
         }
 
         setLoading(true);
         try {
+            const classification = normalizeExpenseClassification({ category, subcategory, description });
             await addDoc(collection(db, 'gastos'), {
                 description,
                 amount: numAmount,
-                category,
+                category: classification.category,
+                subcategory: classification.subcategory,
+                categoryKey: `${classification.category} / ${classification.subcategory}`,
                 branch,
-                date: Timestamp.now(), 
+                date: Timestamp.now(),
             });
-            // Limpiar formulario al éxito
             setDescription('');
             setAmount('');
         } catch (error) {
-            console.error('Error al añadir documento: ', error);
+            console.error('Error al anadir documento: ', error);
             alert('Hubo un error al registrar el gasto. Revisa la consola.');
         } finally {
             setLoading(false);
         }
     };
 
-    const totalGastos = currentExpenses.reduce((acc, expense) => acc + expense.amount, 0);
+    const totalGastos = currentExpenses.reduce((acc, expense) => acc + Number(expense.amount || 0), 0);
 
     return (
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Panel de Registro */}
             <div className="lg:col-span-1">
                 <Card title="Registrar Nuevo Gasto (en Firebase)">
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-1">
-                            <label className="text-sm font-medium block">Descripción</label>
+                            <label className="text-sm font-medium block">Descripcion</label>
                             <TextInput value={description} onChange={setDescription} placeholder="Ej: Pago de Luz Oficina Principal" />
                         </div>
                         <div className="space-y-1">
@@ -101,13 +112,23 @@ export default function expensetracker({ currentExpenses = [], isLoading }) {
                             <NumberInput value={amount} onChange={setAmount} placeholder="150.00" />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-sm font-medium block">Categoría</label>
+                            <label className="text-sm font-medium block">Categoria</label>
                             <select
                                 value={category}
-                                onChange={(e) => setCategory(e.target.value)}
+                                onChange={(e) => handleCategoryChange(e.target.value)}
                                 className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
-                                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                {EXPENSE_CATEGORY_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium block">Subcategoria</label>
+                            <select
+                                value={subcategory}
+                                onChange={(e) => setSubcategory(e.target.value)}
+                                className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            >
+                                {subcategoryOptions.map((item) => <option key={item} value={item}>{item}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
@@ -117,7 +138,7 @@ export default function expensetracker({ currentExpenses = [], isLoading }) {
                                 onChange={(e) => setBranch(e.target.value)}
                                 className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
-                                {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                {BRANCHES.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                             </select>
                         </div>
                         <button
@@ -131,7 +152,6 @@ export default function expensetracker({ currentExpenses = [], isLoading }) {
                 </Card>
             </div>
 
-            {/* Panel de Lista de Gastos */}
             <div className="lg:col-span-2">
                 <Card title={`Gastos Registrados Recientes (Total: ${isLoading ? 'Cargando...' : fmt(totalGastos, 'C$')})`} className="h-full">
                     <div className="overflow-x-auto max-h-96">
@@ -141,15 +161,16 @@ export default function expensetracker({ currentExpenses = [], isLoading }) {
                                     <th className="py-2 pr-3">Fecha</th>
                                     <th className="py-2 pr-3">Monto</th>
                                     <th className="py-2 pr-3">Sucursal</th>
-                                    <th className="py-2 pr-3">Categoría</th>
-                                    <th className="py-2">Descripción</th>
+                                    <th className="py-2 pr-3">Categoria</th>
+                                    <th className="py-2 pr-3">Subcategoria</th>
+                                    <th className="py-2">Descripcion</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {isLoading ? (
-                                    <tr><td colSpan="5" className="py-4 text-center text-neutral-500">Cargando gastos de Firebase...</td></tr>
+                                    <tr><td colSpan="6" className="py-4 text-center text-neutral-500">Cargando gastos de Firebase...</td></tr>
                                 ) : currentExpenses.length === 0 ? (
-                                    <tr><td colSpan="5" className="py-4 text-center text-neutral-500">No hay gastos registrados en Firebase.</td></tr>
+                                    <tr><td colSpan="6" className="py-4 text-center text-neutral-500">No hay gastos registrados en Firebase.</td></tr>
                                 ) : (
                                     currentExpenses.map((expense) => (
                                         <tr key={expense.id} className="border-t border-neutral-100">
@@ -157,6 +178,7 @@ export default function expensetracker({ currentExpenses = [], isLoading }) {
                                             <td className="py-2 pr-3 font-semibold">{fmt(expense.amount, 'C$')}</td>
                                             <td className="py-2 pr-3">{branchName(expense.branch)}</td>
                                             <td className="py-2 pr-3">{expense.category}</td>
+                                            <td className="py-2 pr-3">{expense.subcategory || '-'}</td>
                                             <td className="py-2 text-neutral-600">{expense.description}</td>
                                         </tr>
                                     ))

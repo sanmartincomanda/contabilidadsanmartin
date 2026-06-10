@@ -6,6 +6,12 @@ import {
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { getLocalDateString } from '../utils/localDate';
+import {
+    EXPENSE_CATEGORY_OPTIONS,
+    getDefaultSubcategory,
+    getExpenseSubcategories,
+    normalizeExpenseClassification,
+} from '../services/expenseCategories';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -125,7 +131,14 @@ export default function GastosDiarios({ categories = [] }) {
     const [descripcion, setDescripcion] = useState('');
     const [monto, setMonto] = useState('');
     const [tipo, setTipo] = useState('Gasto');
-    const [categoriaId, setCategoriaId] = useState('');
+    const [categoria, setCategoria] = useState('');
+    const [subcategoria, setSubcategoria] = useState('');
+    const subcategoryOptions = getExpenseSubcategories(categoria);
+
+    const handleCategoriaChange = (value) => {
+        setCategoria(value);
+        setSubcategoria(getDefaultSubcategory(value));
+    };
 
     // Historial
     const [filtroFecha, setFiltroFecha] = useState(getLocalDateString());
@@ -136,11 +149,23 @@ export default function GastosDiarios({ categories = [] }) {
         try {
             const snapshot = await getDocs(collection(db, 'gastosDiarios'));
 
-            let docs = snapshot.docs.map(d => ({
-                id: d.id,
-                ...d.data(),
-                timestamp: d.data().timestamp || null
-            }));
+            let docs = snapshot.docs.map(d => {
+                const record = { id: d.id, ...d.data(), timestamp: d.data().timestamp || null };
+                if (record.tipo !== 'Gasto') return record;
+                const classification = normalizeExpenseClassification({
+                    category: record.category || record.categoria,
+                    subcategory: record.subcategory || record.subcategoria,
+                    description: record.descripcion,
+                });
+                return {
+                    ...record,
+                    categoria: classification.category,
+                    subcategoria: classification.subcategory,
+                    category: classification.category,
+                    subcategory: classification.subcategory,
+                    categoryKey: `${classification.category} / ${classification.subcategory}`,
+                };
+            });
 
             docs.sort((a, b) => {
                 const timeA = a.timestamp?.toMillis?.() || 0;
@@ -172,14 +197,15 @@ export default function GastosDiarios({ categories = [] }) {
         const numMonto = Number(monto);
         if (isNaN(numMonto) || numMonto <= 0) return alert('Monto inválido.');
         if (!descripcion) return alert('Ingrese una descripción.');
-        if (tipo === 'Gasto' && !categoriaId) return alert('Categoría requerida para gastos.');
+        if (tipo === 'Gasto' && (!categoria || !subcategoria)) return alert('Categoria y subcategoria requeridas para gastos.');
 
         setLoading(true);
         try {
             const timestamp = Timestamp.now();
-            const categoriaNombre = tipo === 'Gasto'
-                ? categories.find(c => c.id === categoriaId)?.name
-                : 'Compra';
+            const classification = tipo === 'Gasto'
+                ? normalizeExpenseClassification({ category: categoria, subcategory: subcategoria, description: descripcion })
+                : normalizeExpenseClassification({ category: 'Costos de venta / compras', description: descripcion, type: 'Compra' });
+            const categoriaNombre = classification.category;
             const gastoDiarioRef = doc(collection(db, 'gastosDiarios'));
             const gastoRef = tipo === 'Gasto' ? doc(collection(db, 'gastos')) : null;
             const compraRef = tipo === 'Compra' ? doc(collection(db, 'compras')) : null;
@@ -192,6 +218,10 @@ export default function GastosDiarios({ categories = [] }) {
                 monto: numMonto,
                 tipo,
                 categoria: categoriaNombre || null,
+                subcategoria: classification.subcategory || null,
+                category: categoriaNombre || null,
+                subcategory: classification.subcategory || null,
+                categoryKey: `${classification.category} / ${classification.subcategory}`,
                 sucursal: DEFAULT_BRANCH_ID,
                 branch: DEFAULT_BRANCH_ID,
                 branchName: DEFAULT_BRANCH_NAME,
@@ -206,6 +236,8 @@ export default function GastosDiarios({ categories = [] }) {
                     description: descripcion,
                     amount: numMonto,
                     category: categoriaNombre,
+                    subcategory: classification.subcategory,
+                    categoryKey: `${classification.category} / ${classification.subcategory}`,
                     branch: DEFAULT_BRANCH_ID,
                     branchName: DEFAULT_BRANCH_NAME,
                     timestamp,
@@ -222,6 +254,9 @@ export default function GastosDiarios({ categories = [] }) {
                     supplier: descripcion.trim().toUpperCase(),
                     invoiceNumber: `GD-${gastoDiarioRef.id.slice(0, 8).toUpperCase()}`,
                     amount: numMonto,
+                    category: classification.category,
+                    subcategory: classification.subcategory,
+                    categoryKey: `${classification.category} / ${classification.subcategory}`,
                     branch: DEFAULT_BRANCH_ID,
                     branchName: DEFAULT_BRANCH_NAME,
                     paymentType: 'contado',
@@ -237,7 +272,8 @@ export default function GastosDiarios({ categories = [] }) {
 
             setDescripcion('');
             setMonto('');
-            setCategoriaId('');
+            setCategoria('');
+            setSubcategoria('');
             alert(`${tipo} registrado correctamente`);
             setRefreshKey(prev => prev + 1);
 
@@ -370,7 +406,10 @@ export default function GastosDiarios({ categories = [] }) {
                                     value={tipo}
                                     onChange={e => {
                                         setTipo(e.target.value);
-                                        if (e.target.value !== 'Gasto') setCategoriaId('');
+                                        if (e.target.value !== 'Gasto') {
+                                            setCategoria('');
+                                            setSubcategoria('');
+                                        }
                                     }}
                                     options={
                                         <>
@@ -403,19 +442,35 @@ export default function GastosDiarios({ categories = [] }) {
                             />
 
                             {tipo === 'Gasto' && (
-                                <Select
-                                    label="Categoría"
-                                    icon="tag"
-                                    value={categoriaId}
-                                    onChange={e => setCategoriaId(e.target.value)}
-                                    required
-                                    options={
-                                        <>
-                                            <option value="">Seleccionar categoría...</option>
-                                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </>
-                                    }
-                                />
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <Select
+                                        label="Categoria"
+                                        icon="tag"
+                                        value={categoria}
+                                        onChange={e => handleCategoriaChange(e.target.value)}
+                                        required
+                                        options={
+                                            <>
+                                                <option value="">Seleccionar categoria...</option>
+                                                {EXPENSE_CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </>
+                                        }
+                                    />
+                                    <Select
+                                        label="Subcategoria"
+                                        icon="tag"
+                                        value={subcategoria}
+                                        onChange={e => setSubcategoria(e.target.value)}
+                                        required
+                                        disabled={!categoria}
+                                        options={
+                                            <>
+                                                <option value="">Seleccionar subcategoria...</option>
+                                                {subcategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </>
+                                        }
+                                    />
+                                </div>
                             )}
 
                             <Button
@@ -522,6 +577,10 @@ export default function GastosDiarios({ categories = [] }) {
                                                     <span>{reg.categoria || '—'}</span>
                                                 </div>
                                                 <div className="erp-mobile-keyvalue-row">
+                                                    <span>Subcategoria</span>
+                                                    <span>{reg.subcategoria || reg.subcategory || '—'}</span>
+                                                </div>
+                                                <div className="erp-mobile-keyvalue-row">
                                                     <span>Monto</span>
                                                     <span className="erp-mono font-extrabold text-[#16222d]">{fmt(reg.monto)}</span>
                                                 </div>
@@ -547,6 +606,7 @@ export default function GastosDiarios({ categories = [] }) {
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Descripción</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Tipo</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Categoría</th>
+                                            <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Subcategoria</th>
                                             <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Monto</th>
                                             <th className="px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-slate-400 no-print">Acción</th>
                                         </tr>
@@ -554,7 +614,7 @@ export default function GastosDiarios({ categories = [] }) {
                                     <tbody className="divide-y divide-slate-100">
                                         {registros.length === 0 ? (
                                             <tr>
-                                                <td colSpan="6" className="px-4 py-10 text-center text-slate-400">
+                                                <td colSpan="7" className="px-4 py-10 text-center text-slate-400">
                                                     <Icon path={Icons.alertCircle} className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                                                     <p className="text-sm">No hay registros para esta fecha</p>
                                                 </td>
@@ -572,6 +632,7 @@ export default function GastosDiarios({ categories = [] }) {
                                                         </Badge>
                                                     </td>
                                                     <td className="px-4 py-3 text-sm text-slate-400">{reg.categoria || '—'}</td>
+                                                    <td className="px-4 py-3 text-sm text-slate-400">{reg.subcategoria || reg.subcategory || '—'}</td>
                                                     <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">{fmt(reg.monto)}</td>
                                                     <td className="px-4 py-3 text-center no-print">
                                                         <button

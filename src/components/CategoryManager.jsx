@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { EXPENSE_CATEGORY_TREE, getLegacyCategoryMappingRows } from '../services/expenseCategories';
 
 const Card = ({ title, eyebrow, children, className = '' }) => (
     <div className={`erp-panel erp-panel-hover overflow-hidden rounded-[24px] ${className}`}>
@@ -17,6 +18,8 @@ export default function CategoryManager({ categories }) {
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [editingName, setEditingName] = useState('');
+    const officialSubcategoryCount = EXPENSE_CATEGORY_TREE.reduce((sum, item) => sum + item.subcategories.length, 0);
+    const legacyMappings = getLegacyCategoryMappingRows();
 
     const handleAddCategory = async () => {
         if (!newCategoryName.trim()) return;
@@ -68,10 +71,50 @@ export default function CategoryManager({ categories }) {
                         <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Categorias</h1>
                     </div>
                     <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
-                        {categories.length} activas
+                        {EXPENSE_CATEGORY_TREE.length} categorias / {officialSubcategoryCount} subcategorias
                     </span>
                 </div>
             </div>
+
+            <Card title="Catalogo contable oficial" eyebrow="Categorias y subcategorias">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {EXPENSE_CATEGORY_TREE.map((group) => (
+                        <div key={group.category} className="rounded-2xl border border-[#d7e2e9] bg-white p-4">
+                            <div className="text-sm font-black uppercase tracking-[0.12em] text-[#16222d]">{group.category}</div>
+                            <div className="mt-3 space-y-1.5">
+                                {group.subcategories.map((subcategory) => (
+                                    <div key={subcategory} className="rounded-lg bg-[#f5f9fb] px-3 py-2 text-xs font-semibold text-[#536b78]">
+                                        {subcategory}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Card>
+
+            <Card title="Mapeo de categorias anteriores" eyebrow="Normalizacion">
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[680px] text-sm">
+                        <thead>
+                            <tr className="border-b border-[#d7e2e9] text-left">
+                                <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#607888]">Anterior</th>
+                                <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#607888]">Nueva categoria</th>
+                                <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#607888]">Nueva subcategoria</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#edf3f6]">
+                            {legacyMappings.map((item) => (
+                                <tr key={item.anterior}>
+                                    <td className="px-3 py-2 font-semibold text-[#16222d]">{item.anterior}</td>
+                                    <td className="px-3 py-2 text-[#536b78]">{item.nuevaCategoria}</td>
+                                    <td className="px-3 py-2 text-[#536b78]">{item.nuevaSubcategoria}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
 
             <div className="grid gap-5 xl:grid-cols-[420px_minmax(0,1fr)]">
                 <Card title="Nueva categoria" eyebrow="Captura">

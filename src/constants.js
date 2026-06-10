@@ -1,10 +1,12 @@
 // src/constants.js
 
+import { EXPENSE_CATEGORY_OPTIONS } from './services/expenseCategories';
+
 export const DEFAULT_BRANCH_ID = 'amparito';
 export const DEFAULT_BRANCH_NAME = 'CARNES AMPARITO';
 
 // 1. Constantes de Categorias
-export const CATEGORIES = ['Alquiler', 'Servicios', 'Sueldos', 'Compra Inventario', 'Mantenimiento', 'Marketing', 'Otros'];
+export const CATEGORIES = EXPENSE_CATEGORY_OPTIONS;
 
 // 2. Sucursal unica del sistema
 export const BRANCHES = [
@@ -12,7 +14,7 @@ export const BRANCHES = [
 ];
 
 // 3. Constantes de Columnas para Carga CSV
-export const GASTOS_CSV_COLUMNS = ['Fecha', 'Descripcion', 'Categoria', 'Monto'];
+export const GASTOS_CSV_COLUMNS = ['Fecha', 'Descripcion', 'Categoria', 'Subcategoria', 'Monto'];
 
 // 4. Utilidades generales
 export const peso = (n) => (isNaN(n) || n === null || n === '' ? 0 : Number(n));

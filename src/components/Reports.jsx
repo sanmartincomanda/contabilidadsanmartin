@@ -6,6 +6,7 @@ import { calculateGeneralRegimeTaxes } from '../services/tax';
 import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
 import { resolveReportIncomeEntries } from '../services/incomeAggregation';
+import { getExpenseCategoryKey, normalizeExpenseClassification } from '../services/expenseCategories';
 import { getLocalMonthString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
@@ -389,7 +390,7 @@ const MonthlyExpenseReport = ({ rows, totalExpenses, onSelectCategory }) => {
                 <StatCard
                     title="Mayor categoria"
                     value={topCategory ? `${topCategory.percentage.toFixed(1)}%` : '0%'}
-                    subtitle={topCategory?.category || 'Sin datos'}
+                    subtitle={topCategory ? `${topCategory.mainCategory} / ${topCategory.subcategory}` : 'Sin datos'}
                     icon="chart"
                     variant="warning"
                 />
@@ -406,8 +407,9 @@ const MonthlyExpenseReport = ({ rows, totalExpenses, onSelectCategory }) => {
                         >
                             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Categoria</div>
-                                    <div className="mt-1 text-sm font-black uppercase text-[#182b36]">{row.category}</div>
+                                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Categoria / Subcategoria</div>
+                                    <div className="mt-1 text-sm font-black uppercase text-[#182b36]">{row.mainCategory}</div>
+                                    <div className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#6b7f8c]">{row.subcategory}</div>
                                 </div>
                                 <div className="text-right">
                                     <div className="erp-mono text-base font-black text-[#b1393e]">{fmt(row.amount)}</div>
@@ -590,8 +592,9 @@ const aggregateData = (data) => {
     const legacyPurchasesByMonth = {};
 
     const budgetsByMonth = presupuestos.reduce((acc, p) => {
+        const categoryKey = getExpenseCategoryKey(p);
         acc[p.month] = acc[p.month] || {};
-        acc[p.month][p.category] = (acc[p.month][p.category] || 0) + peso(p.amount);
+        acc[p.month][categoryKey] = (acc[p.month][categoryKey] || 0) + peso(p.amount);
         return acc;
     }, {});
 
@@ -609,9 +612,18 @@ const aggregateData = (data) => {
         if (!branchData) return;
 
         if (item.category) {
+            const classification = normalizeExpenseClassification(item);
+            const categoryKey = `${classification.category} / ${classification.subcategory}`;
             branchData.totalExpense += peso(item.amount ?? item.monto);
-            branchData.expenseDetails[item.category] = (branchData.expenseDetails[item.category] || 0) + peso(item.amount ?? item.monto);
-            branchData.rawExpenses.push({ ...item, dateStr: dateString, amount: peso(item.amount ?? item.monto) });
+            branchData.expenseDetails[categoryKey] = (branchData.expenseDetails[categoryKey] || 0) + peso(item.amount ?? item.monto);
+            branchData.rawExpenses.push({
+                ...item,
+                category: classification.category,
+                subcategory: classification.subcategory,
+                categoryKey,
+                dateStr: dateString,
+                amount: peso(item.amount ?? item.monto),
+            });
         } else {
             branchData.totalIncome += peso(item.amount ?? item.monto);
         }
@@ -804,11 +816,19 @@ export default function Reports({ data }) {
 
     const totalExecution = totalBudgetLimit > 0 ? (totalExpenses / totalBudgetLimit) * 100 : 0;
     const expenseCategoryRows = finalExpenseRows
-        .map(([category, amount]) => ({
-            category,
-            amount,
-            percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
-        }))
+        .map(([category, amount]) => {
+            const separatorIndex = category.lastIndexOf(' / ');
+            const mainCategory = separatorIndex >= 0 ? category.slice(0, separatorIndex) : category;
+            const subcategory = separatorIndex >= 0 ? category.slice(separatorIndex + 3) : 'Sin subcategoria';
+
+            return {
+                category,
+                mainCategory,
+                subcategory,
+                amount,
+                percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
+            };
+        })
         .filter((row) => row.amount > 0)
         .sort((a, b) => b.amount - a.amount);
 
@@ -863,7 +883,7 @@ export default function Reports({ data }) {
     };
 
     const modalExpenses = modalCategory
-        ? filteredRawExpenses.filter(item => item.category === modalCategory)
+        ? filteredRawExpenses.filter(item => (item.categoryKey || getExpenseCategoryKey(item)) === modalCategory)
         : [];
 
     return (

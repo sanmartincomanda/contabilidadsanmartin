@@ -737,7 +737,7 @@ function AppContent() {
     const isLimitedUser = user?.email === 'adriandiazc95@gmail.com';
     const isAdmin = !isLimitedUser;
     const currentPath = location.pathname;
-    const needsCategories = currentPath === '/ingresar' || currentPath === '/gastos-diarios' || currentPath.startsWith('/maestros/categorias');
+    const needsCategories = currentPath.startsWith('/maestros/categorias');
 
     const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, !!user && needsCategories, true);
     const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(DATA_ENTRY_COLLECTIONS, !!user && isAdmin && currentPath === '/ingresar', true);

@@ -11,6 +11,13 @@ import { getDepreciationEndMonth, getMonthlyDepreciationAmount } from '../servic
 import { resolveIncomeEntries } from '../services/incomeAggregation';
 import { syncSicarDailyIncome } from '../services/sicarIncomeSync';
 import { deletePurchaseTransaction, updatePurchaseTransaction } from '../services/linkedTransactions';
+import {
+    EXPENSE_CATEGORY_OPTIONS,
+    PURCHASE_CATEGORY,
+    getDefaultSubcategory,
+    getExpenseSubcategories,
+    normalizeExpenseClassification,
+} from '../services/expenseCategories';
 import { getLocalDateString, getLocalMonthString } from '../utils/localDate';
 
 // --- ICONOS SVG INLINE ---
@@ -172,6 +179,17 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
                 }
             }
 
+            if (collectionName === 'gastos' || collectionName === 'presupuestos' || collectionName === 'compras') {
+                const normalized = normalizeExpenseClassification({
+                    ...editData,
+                    supplier: editData.supplier || editData.proveedor,
+                    type: collectionName === 'compras' ? PURCHASE_CATEGORY : editData.type,
+                });
+                dataToSave.category = normalized.category;
+                dataToSave.subcategory = normalized.subcategory;
+                dataToSave.categoryKey = `${normalized.category} / ${normalized.subcategory}`;
+            }
+
             let savedData = dataToSave;
             if (collectionName === 'compras') {
                 const result = await updatePurchaseTransaction(item.id, dataToSave);
@@ -230,6 +248,44 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
         const field = fields[key];
         if (key === 'timestamp') return <span className='text-stone-400 text-xs'>No editable</span>;
         if (field?.readonly) return <span className='text-stone-400 text-xs'>No editable</span>;
+
+        if (field?.type === 'select') {
+            const options = typeof field.options === 'function' ? field.options(editData) : (field.options || []);
+            return (
+                <select
+                    value={value === null || value === undefined ? '' : String(value)}
+                    onChange={(e) => {
+                        const nextValue = e.target.value;
+                        if (key === 'category') {
+                            const nextSubcategory = getDefaultSubcategory(nextValue);
+                            setEditData({
+                                ...editData,
+                                category: nextValue,
+                                subcategory: nextSubcategory,
+                                categoryKey: `${nextValue} / ${nextSubcategory}`,
+                            });
+                            return;
+                        }
+                        if (key === 'subcategory') {
+                            setEditData({
+                                ...editData,
+                                subcategory: nextValue,
+                                categoryKey: `${editData.category} / ${nextValue}`,
+                            });
+                            return;
+                        }
+                        setEditData({ ...editData, [key]: nextValue });
+                    }}
+                    className="w-full rounded border border-[#a81d24]/40 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#a81d24]/30"
+                    disabled={loading}
+                >
+                    <option value="">Seleccionar...</option>
+                    {options.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                    ))}
+                </select>
+            );
+        }
 
         if (field?.type === 'branch') {
             return (
@@ -545,17 +601,24 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
+const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
     const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
-    const [categoryId, setCategoryId] = useState('');
+    const [category, setCategory] = useState('');
+    const [subcategory, setSubcategory] = useState('');
+    const subcategoryOptions = getExpenseSubcategories(category);
+
+    const handleCategoryChange = (value) => {
+        setCategory(value);
+        setSubcategory(getDefaultSubcategory(value));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         const numAmount = Number(amount);
-        const selectedCategoryName = categories.find(c => c.id === categoryId)?.name;
-        if (!description || isNaN(numAmount) || numAmount <= 0 || !selectedCategoryName) return alert('Complete todos los campos.');
+        if (!description || isNaN(numAmount) || numAmount <= 0 || !category || !subcategory) return alert('Complete todos los campos.');
+        const classification = normalizeExpenseClassification({ category, subcategory, description });
 
         setLoading(true);
         try {
@@ -563,13 +626,15 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
                 date,
                 description,
                 amount: numAmount,
-                category: selectedCategoryName,
+                category: classification.category,
+                subcategory: classification.subcategory,
+                categoryKey: `${classification.category} / ${classification.subcategory}`,
                 branch: DEFAULT_BRANCH_ID,
                 branchName: DEFAULT_BRANCH_NAME,
                 timestamp: Timestamp.now(),
                 is_conciled: false,
             });
-            setDescription(''); setAmount(''); setCategoryId('');
+            setDescription(''); setAmount(''); setCategory(''); setSubcategory('');
             onSuccess?.();
         } catch (error) {
             console.error('Error:', error);
@@ -587,15 +652,24 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
             skipEmptyLines: true,
             complete: async ({ data, errors }) => {
                 if (errors.length) return alert("Error en CSV.");
-                const validData = data.filter(row => row['Monto'] && !isNaN(parseFloat(row['Monto']))).map(row => ({
+                const validData = data.filter(row => row['Monto'] && !isNaN(parseFloat(row['Monto']))).map(row => {
+                    const classification = normalizeExpenseClassification({
+                        category: row['Categoria'] || 'Otros',
+                        subcategory: row['Subcategoria'] || row['Subcategoría'],
+                        description: row['Descripcion'] || row['Descripción'],
+                    });
+                    return ({
                     date: row['Fecha'] || getLocalDateString(),
                     description: row['Descripcion'] || 'Sin Descripción',
                     amount: parseFloat(row['Monto']),
-                    category: row['Categoria'] || 'Otros',
+                    category: classification.category,
+                    subcategory: classification.subcategory,
+                    categoryKey: `${classification.category} / ${classification.subcategory}`,
                     branch: DEFAULT_BRANCH_ID,
                     branchName: DEFAULT_BRANCH_NAME,
                     timestamp: Timestamp.now(), is_conciled: false
-                }));
+                    });
+                });
                 setLoading(true);
                 try {
                     for (const item of validData) await addDoc(collection(db, 'gastos'), item);
@@ -620,8 +694,9 @@ const ExpenseForm = ({ categories, loading, setLoading, onSuccess }) => {
                 <Input label="Descripción" icon="fileText" placeholder="Ej: Pago de servicios..." value={description} onChange={e => setDescription(e.target.value)} required />
                 <div className="grid grid-cols-2 gap-3">
                     <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" className="text-lg font-bold text-rose-600" value={amount} onChange={e => setAmount(e.target.value)} required />
-                    <Select label="Categoría" icon="tag" value={categoryId} onChange={e => setCategoryId(e.target.value)} required options={<><option value="">Seleccionar...</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</>} />
+                    <Select label="Categoria" icon="tag" value={category} onChange={e => handleCategoryChange(e.target.value)} required options={<><option value="">Seleccionar...</option>{EXPENSE_CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}</>} />
                 </div>
+                <Select label="Subcategoria" icon="tag" value={subcategory} onChange={e => setSubcategory(e.target.value)} required disabled={!category} options={<><option value="">Seleccionar...</option>{subcategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}</>} />
                 <Button type="submit" variant="danger" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Gasto'}</Button>
             </form>
             <div className="border-t border-stone-200 pt-4">
@@ -681,6 +756,8 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
     const [supplier, setSupplier] = useState('');
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [amount, setAmount] = useState('');
+    const [subcategory, setSubcategory] = useState(getDefaultSubcategory(PURCHASE_CATEGORY));
+    const purchaseSubcategories = getExpenseSubcategories(PURCHASE_CATEGORY);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -690,12 +767,20 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
         }
         setLoading(true);
         try {
+            const classification = normalizeExpenseClassification({
+                category: PURCHASE_CATEGORY,
+                subcategory,
+                supplier,
+            });
             await addDoc(collection(db, 'compras'), {
                 date,
                 month: date.substring(0, 7),
                 supplier: supplier.trim().toUpperCase(),
                 invoiceNumber: invoiceNumber.trim() || 'S/N',
                 amount: numAmount,
+                category: classification.category,
+                subcategory: classification.subcategory,
+                categoryKey: `${classification.category} / ${classification.subcategory}`,
                 branch: DEFAULT_BRANCH_ID,
                 branchName: DEFAULT_BRANCH_NAME,
                 paymentType: 'contado',
@@ -705,6 +790,7 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
             setSupplier('');
             setInvoiceNumber('');
             setAmount('');
+            setSubcategory(getDefaultSubcategory(PURCHASE_CATEGORY));
             onSuccess?.();
         } catch (error) {
             console.error('Error:', error);
@@ -728,6 +814,7 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
                 <Input label="Numero de Factura" icon="fileText" placeholder="Ej: 001-001-000000001" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} />
                 <Input label="Monto Factura" type="number" step="0.01" icon="shoppingCart" placeholder="0.00" className="text-lg font-bold text-purple-600" value={amount} onChange={e => setAmount(e.target.value)} required />
             </div>
+            <Select label="Subcategoria de costo" icon="tag" value={subcategory} onChange={e => setSubcategory(e.target.value)} required options={<>{purchaseSubcategories.map(c => <option key={c} value={c}>{c}</option>)}</>} />
             <Button type="submit" variant="purple" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Compra de Contado'}</Button>
         </form>
     );
@@ -824,18 +911,32 @@ const DepreciationForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const BudgetForm = ({ categories, loading, setLoading, onSuccess }) => {
+const BudgetForm = ({ loading, setLoading, onSuccess }) => {
     const [month, setMonth] = useState(getCurrentMonth());
     const [amount, setAmount] = useState('');
-    const [categoryId, setCategoryId] = useState('');
+    const [category, setCategory] = useState('');
+    const [subcategory, setSubcategory] = useState('');
+    const subcategoryOptions = getExpenseSubcategories(category);
+
+    const handleCategoryChange = (value) => {
+        setCategory(value);
+        setSubcategory(getDefaultSubcategory(value));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const catName = categories.find(c => c.id === categoryId)?.name;
-            await addDoc(collection(db, 'presupuestos'), { month, category: catName, amount: Number(amount) || 0, timestamp: Timestamp.now() });
-            setAmount(''); setCategoryId(''); onSuccess?.();
+            const classification = normalizeExpenseClassification({ category, subcategory });
+            await addDoc(collection(db, 'presupuestos'), {
+                month,
+                category: classification.category,
+                subcategory: classification.subcategory,
+                categoryKey: `${classification.category} / ${classification.subcategory}`,
+                amount: Number(amount) || 0,
+                timestamp: Timestamp.now()
+            });
+            setAmount(''); setCategory(''); setSubcategory(''); onSuccess?.();
         } catch (error) { alert('Error'); }
         finally { setLoading(false); }
     };
@@ -843,9 +944,10 @@ const BudgetForm = ({ categories, loading, setLoading, onSuccess }) => {
     return (
         <form onSubmit={handleSubmit} className="space-y-3">
             <Input label="Mes" type="month" icon="calendar" value={month} onChange={e => setMonth(e.target.value)} required />
-            <Select label="Categoría" icon="tag" value={categoryId} onChange={e => setCategoryId(e.target.value)} required options={<><option value="">Seleccionar...</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</>} />
+            <Select label="Categoria" icon="tag" value={category} onChange={e => handleCategoryChange(e.target.value)} required options={<><option value="">Seleccionar...</option>{EXPENSE_CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}</>} />
+            <Select label="Subcategoria" icon="tag" value={subcategory} onChange={e => setSubcategory(e.target.value)} required disabled={!category} options={<><option value="">Seleccionar...</option>{subcategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}</>} />
             <Input label="Monto" type="number" step="0.01" icon="dollar" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} required />
-            <Button type="submit" variant="warning" disabled={loading || !categoryId} className="w-full">{loading ? 'Guardando...' : 'Establecer Presupuesto'}</Button>
+            <Button type="submit" variant="warning" disabled={loading || !category || !subcategory} className="w-full">{loading ? 'Guardando...' : 'Establecer Presupuesto'}</Button>
         </form>
     );
 };
@@ -988,7 +1090,8 @@ export function DataEntry({ categories, data }) {
         Gastos: {
             date: { label: 'Fecha', type: 'date' },
             description: { label: 'Descripción', type: 'text' },
-            category: { label: 'Categoría', type: 'text' },
+            category: { label: 'Categoria', type: 'select', options: EXPENSE_CATEGORY_OPTIONS },
+            subcategory: { label: 'Subcategoria', type: 'select', options: (item) => getExpenseSubcategories(item.category) },
             amount: { label: 'Monto', type: 'currency' }
         },
         Inventario: {
@@ -1001,6 +1104,8 @@ export function DataEntry({ categories, data }) {
             month: { label: 'Mes', type: 'month' },
             supplier: { label: 'Proveedor', type: 'text' },
             invoiceNumber: { label: 'Factura', type: 'text' },
+            category: { label: 'Categoria', type: 'select', options: [PURCHASE_CATEGORY] },
+            subcategory: { label: 'Subcategoria', type: 'select', options: (item) => getExpenseSubcategories(item.category) },
             paymentType: { label: 'Tipo', type: 'text' },
             amount: { label: 'Monto', type: 'currency' }
         },
@@ -1015,7 +1120,8 @@ export function DataEntry({ categories, data }) {
         },
         Presupuesto: {
             month: { label: 'Mes', type: 'month' },
-            category: { label: 'Categoría', type: 'text' },
+            category: { label: 'Categoria', type: 'select', options: EXPENSE_CATEGORY_OPTIONS },
+            subcategory: { label: 'Subcategoria', type: 'select', options: (item) => getExpenseSubcategories(item.category) },
             amount: { label: 'Presupuesto', type: 'currency' }
         },
         'Cuentas por Cobrar': {
@@ -1039,7 +1145,7 @@ export function DataEntry({ categories, data }) {
         Gastos: [
             { key: 'dateFrom', label: 'Desde', type: 'date' },
             { key: 'dateTo', label: 'Hasta', type: 'date' },
-            { key: 'search', label: 'Descripcion / Categoria', type: 'text', placeholder: 'Buscar gasto...', keys: ['description', 'category'] },
+            { key: 'search', label: 'Descripcion / Categoria', type: 'text', placeholder: 'Buscar gasto...', keys: ['description', 'category', 'subcategory', 'categoryKey'] },
         ],
         Compras: [
             { key: 'dateFrom', label: 'Desde', type: 'date' },
@@ -1087,7 +1193,21 @@ export function DataEntry({ categories, data }) {
                 branch: item.branch || DEFAULT_BRANCH_ID,
                 branchName: item.branchName || DEFAULT_BRANCH_NAME,
                 paymentType: item.paymentType || (item.sourceFacturaId || item.linkedPayableId ? 'credito' : ((item.date || item.fecha) ? 'contado' : 'legacy')),
-            }));
+            })).map((item) => {
+                const classification = normalizeExpenseClassification({
+                    category: item.category || PURCHASE_CATEGORY,
+                    subcategory: item.subcategory,
+                    description: item.description,
+                    supplier: item.supplier,
+                    type: PURCHASE_CATEGORY,
+                });
+                return {
+                    ...item,
+                    category: classification.category,
+                    subcategory: classification.subcategory,
+                    categoryKey: `${classification.category} / ${classification.subcategory}`,
+                };
+            });
         }
 
         if (activeTab === 'Depreciaciones') {
@@ -1102,6 +1222,30 @@ export function DataEntry({ categories, data }) {
                 endMonth: getDepreciationEndMonth(item),
                 amount: Number(item.amount ?? item.monto ?? 0) || 0,
             }));
+        }
+
+        if (activeTab === 'Gastos') {
+            return (data.gastos || []).map((item) => {
+                const classification = normalizeExpenseClassification(item);
+                return {
+                    ...item,
+                    category: classification.category,
+                    subcategory: classification.subcategory,
+                    categoryKey: `${classification.category} / ${classification.subcategory}`,
+                };
+            });
+        }
+
+        if (activeTab === 'Presupuesto') {
+            return (data.presupuestos || []).map((item) => {
+                const classification = normalizeExpenseClassification(item);
+                return {
+                    ...item,
+                    category: classification.category,
+                    subcategory: classification.subcategory,
+                    categoryKey: `${classification.category} / ${classification.subcategory}`,
+                };
+            });
         }
 
         return data[collectionMap[activeTab]] || [];
@@ -1172,11 +1316,11 @@ export function DataEntry({ categories, data }) {
                 <div className="no-print animate-fade-in">
                     <Card title={`Captura activa · ${tabsConfig[activeTab].label}`} icon={tabsConfig[activeTab].icon} gradient={true}>
                         {activeTab === 'Ingresos' && <IncomeForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Gastos' && <ExpenseForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Gastos' && <ExpenseForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Inventario' && <InventoryForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Compras' && <PurchasesForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Depreciaciones' && <DepreciationForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Presupuesto' && <BudgetForm categories={categories} loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Presupuesto' && <BudgetForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Cuentas por Cobrar' && <ReceivableForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                         {activeTab === 'Patrimonio' && <EquityForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
                     </Card>
