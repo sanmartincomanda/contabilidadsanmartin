@@ -12,6 +12,7 @@ import { DataEntry } from './components/DataEntry';
 import { BankReconciliation } from './components/BankReconciliation';
 import Reports from './components/Reports';
 import CategoryManager from './components/CategoryManager';
+import Settings from './components/Settings';
 import { AccountsPayable } from './components/AccountsPayable';
 import { fmt } from './constants';
 import { resolveReportIncomeEntries } from './services/incomeAggregation';
@@ -737,7 +738,7 @@ function AppContent() {
     const isLimitedUser = user?.email === 'adriandiazc95@gmail.com';
     const isAdmin = !isLimitedUser;
     const currentPath = location.pathname;
-    const needsCategories = currentPath.startsWith('/maestros/categorias');
+    const needsCategories = currentPath.startsWith('/maestros/categorias') || currentPath.startsWith('/configuraciones');
 
     const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, !!user && needsCategories, true);
     const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(DATA_ENTRY_COLLECTIONS, !!user && isAdmin && currentPath === '/ingresar', true);
@@ -773,6 +774,7 @@ function AppContent() {
                         <Route path="/conciliacion" element={<PrivateRoute element={isAdmin ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="/cuentas-pagar" element={<PrivateRoute element={accountsPayableLoading ? <AppLoadingState /> : accountsPayableError ? <AppErrorState /> : <AccountsPayable data={accountsPayableData} />} />} />
                         <Route path="/reportes" element={<PrivateRoute element={isAdmin ? (reportsLoading ? <AppLoadingState /> : reportsError ? <AppErrorState /> : <Reports data={reportsData} />) : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/configuraciones" element={<PrivateRoute element={isAdmin ? <Settings categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="/maestros/categorias" element={<PrivateRoute element={isAdmin ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
