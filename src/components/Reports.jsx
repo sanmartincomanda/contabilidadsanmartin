@@ -142,6 +142,14 @@ const getWeeksInMonth = (month) => {
     return Math.ceil(days / 7);
 };
 
+const splitExpenseCategoryKey = (categoryKey = '') => {
+    const separatorIndex = categoryKey.lastIndexOf(' / ');
+    return {
+        mainCategory: separatorIndex >= 0 ? categoryKey.slice(0, separatorIndex) : categoryKey,
+        subcategory: separatorIndex >= 0 ? categoryKey.slice(separatorIndex + 3) : 'Sin subcategoria',
+    };
+};
+
 const FinancialFlowChart = ({
     totalIncome,
     totalGrossProfit,
@@ -743,6 +751,7 @@ export default function Reports({ data }) {
     const [activeTab, setActiveTab] = useState('Resultados');
     const [selectedMonth, setSelectedMonth] = useState(getLocalMonthString());
     const [modalCategory, setModalCategory] = useState(null);
+    const [expandedExpenseCategories, setExpandedExpenseCategories] = useState(() => new Set());
 
     const aggregatedData = useMemo(() => aggregateData(data), [data]);
 
@@ -817,9 +826,7 @@ export default function Reports({ data }) {
     const totalExecution = totalBudgetLimit > 0 ? (totalExpenses / totalBudgetLimit) * 100 : 0;
     const expenseCategoryRows = finalExpenseRows
         .map(([category, amount]) => {
-            const separatorIndex = category.lastIndexOf(' / ');
-            const mainCategory = separatorIndex >= 0 ? category.slice(0, separatorIndex) : category;
-            const subcategory = separatorIndex >= 0 ? category.slice(separatorIndex + 3) : 'Sin subcategoria';
+            const { mainCategory, subcategory } = splitExpenseCategoryKey(category);
 
             return {
                 category,
@@ -831,6 +838,69 @@ export default function Reports({ data }) {
         })
         .filter((row) => row.amount > 0)
         .sort((a, b) => b.amount - a.amount);
+
+    const groupedExpenseRows = useMemo(() => {
+        const groups = new Map();
+
+        finalExpenseRows.forEach(([categoryKey, amount]) => {
+            const { mainCategory, subcategory } = splitExpenseCategoryKey(categoryKey);
+            const budget = currentBudgets[categoryKey] || 0;
+
+            if (!groups.has(mainCategory)) {
+                groups.set(mainCategory, {
+                    category: mainCategory,
+                    amount: 0,
+                    budget: 0,
+                    subcategories: [],
+                });
+            }
+
+            const group = groups.get(mainCategory);
+            group.amount += amount;
+            group.budget += budget;
+            group.subcategories.push({
+                key: categoryKey,
+                category: mainCategory,
+                subcategory,
+                amount,
+                budget,
+                execPercent: budget > 0 ? (amount / budget) * 100 : 0,
+                hasData: amount > 0,
+            });
+        });
+
+        return Array.from(groups.values())
+            .map((group) => ({
+                ...group,
+                execPercent: group.budget > 0 ? (group.amount / group.budget) * 100 : 0,
+                hasData: group.amount > 0,
+                subcategories: group.subcategories.sort((a, b) => {
+                    if (b.amount !== a.amount) return b.amount - a.amount;
+                    return b.budget - a.budget;
+                }),
+            }))
+            .sort((a, b) => {
+                if (b.amount !== a.amount) return b.amount - a.amount;
+                return b.budget - a.budget;
+            });
+    }, [finalExpenseRows, currentBudgets]);
+
+    const toggleExpenseCategory = useCallback((category) => {
+        setExpandedExpenseCategories((prev) => {
+            const next = new Set(prev);
+            if (next.has(category)) next.delete(category);
+            else next.add(category);
+            return next;
+        });
+    }, []);
+
+    const expandAllExpenseCategories = useCallback(() => {
+        setExpandedExpenseCategories(new Set(groupedExpenseRows.map((group) => group.category)));
+    }, [groupedExpenseRows]);
+
+    const collapseAllExpenseCategories = useCallback(() => {
+        setExpandedExpenseCategories(new Set());
+    }, []);
 
     const salesWeekdayReport = useMemo(() => {
         const weekCount = getWeeksInMonth(selectedMonth);
@@ -1228,10 +1298,259 @@ export default function Reports({ data }) {
                         <div className="lg:col-span-2">
                             <Card
                                 title="Desglose Operativo"
-                                subtitle="Haz clic en una categoría para ver el detalle"
+                                subtitle="Haz clic en una categoria para desplegar sus subcategorias"
                                 icon="receipt"
                             >
+                                <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={expandAllExpenseCategories}
+                                        className="rounded-full border border-[#bdd5e1] bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#1a6f93] transition hover:border-[#1a6f93] hover:bg-[#eef8fb]"
+                                    >
+                                        Expandir todo
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={collapseAllExpenseCategories}
+                                        className="rounded-full border border-[#ead5c5] bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#a81d24] transition hover:border-[#a81d24] hover:bg-[#fff6f4]"
+                                    >
+                                        Colapsar todo
+                                    </button>
+                                </div>
+
                                 <div className="space-y-3 md:hidden">
+                                    {groupedExpenseRows.map((group) => {
+                                        const isExpanded = expandedExpenseCategories.has(group.category);
+
+                                        return (
+                                            <div key={group.category} className={`erp-mobile-record overflow-hidden ${group.hasData ? '' : 'opacity-70'}`}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleExpenseCategory(group.category)}
+                                                    className="erp-pressable w-full p-4 text-left"
+                                                >
+                                                    <div className="mb-3 flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Categoria</div>
+                                                            <div className="mt-1 text-sm font-black uppercase text-stone-700">{group.category}</div>
+                                                            <div className="mt-1 text-[11px] font-bold text-[#7a919d]">{group.subcategories.length} subcategorias</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-bold ${
+                                                                group.budget > 0
+                                                                    ? group.execPercent > 100
+                                                                        ? 'bg-rose-100 text-rose-700'
+                                                                        : group.execPercent > 80
+                                                                            ? 'bg-amber-100 text-amber-700'
+                                                                            : 'bg-emerald-100 text-emerald-700'
+                                                                    : 'bg-slate-100 text-slate-500'
+                                                            }`}>
+                                                                {group.budget > 0 ? `${group.execPercent.toFixed(1)}%` : 'Sin presupuesto'}
+                                                            </div>
+                                                            <div className="rounded-full bg-[#e8f0f5] p-1.5 text-[#1a6f93]">
+                                                                <Icon path={isExpanded ? Icons.chevronDown : Icons.chevronRight} className="h-3.5 w-3.5" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="erp-mobile-keyvalue">
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Total real</span>
+                                                            <span className="erp-mono font-extrabold text-stone-800">{fmt(group.amount)}</span>
+                                                        </div>
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Presupuesto</span>
+                                                            <span>{group.budget > 0 ? fmt(group.budget) : '-'}</span>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                                {isExpanded && (
+                                                    <div className="border-t border-[#d9e6ed] bg-[#f8fbfd] px-4 py-3">
+                                                        <div className="space-y-2">
+                                                            {group.subcategories.map((item) => (
+                                                                <button
+                                                                    key={item.key}
+                                                                    type="button"
+                                                                    disabled={!item.hasData}
+                                                                    onClick={() => item.hasData && setModalCategory(item.key)}
+                                                                    className={`w-full rounded-xl border border-[#d9e6ed] bg-white p-3 text-left transition ${item.hasData ? 'hover:border-[#a81d24]/45 hover:bg-[#fff8f5]' : 'opacity-60'}`}
+                                                                >
+                                                                    <div className="flex items-start justify-between gap-3">
+                                                                        <div>
+                                                                            <div className="text-xs font-black uppercase text-[#263842]">{item.subcategory}</div>
+                                                                            <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#a81d24]">
+                                                                                {item.hasData ? 'Ver detalle' : 'Sin movimientos'}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <div className="erp-mono text-sm font-black text-stone-800">{fmt(item.amount)}</div>
+                                                                            <div className="mt-1 text-[11px] font-semibold text-[#7a919d]">
+                                                                                {item.budget > 0 ? fmt(item.budget) : 'Sin presupuesto'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="mt-3 rounded-2xl border border-[#ead5c5] bg-stone-50 p-4 md:hidden">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500">Total Operativo</div>
+                                            <div className="mt-1 text-xs font-semibold text-[#7a919d]">
+                                                Presupuesto: {totalBudgetLimit > 0 ? fmt(totalBudgetLimit) : '-'}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="erp-mono text-base font-black text-stone-800">{fmt(totalExpenses)}</div>
+                                            <div className={`mt-1 inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-black ${
+                                                totalExecution > 100
+                                                    ? 'bg-rose-600 text-white'
+                                                    : totalExecution > 90
+                                                        ? 'bg-amber-500 text-white'
+                                                        : 'bg-emerald-600 text-white'
+                                            }`}>
+                                                {totalExecution.toFixed(1)}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="hidden overflow-x-auto custom-scrollbar md:block">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="text-left border-b-2 border-[#ead5c5]">
+                                                <th className="pb-3 text-xs font-bold uppercase tracking-wider text-stone-500">Categoria</th>
+                                                <th className="pb-3 text-xs font-bold uppercase tracking-wider text-stone-500 text-right">Real</th>
+                                                <th className="pb-3 text-xs font-bold uppercase tracking-wider text-stone-500 text-right">Presupuesto</th>
+                                                <th className="pb-3 text-xs font-bold uppercase tracking-wider text-stone-500 text-right">Ejec.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-stone-100">
+                                            {groupedExpenseRows.map((group) => {
+                                                const isExpanded = expandedExpenseCategories.has(group.category);
+
+                                                return (
+                                                    <React.Fragment key={group.category}>
+                                                        <tr
+                                                            className={`transition-colors ${group.hasData || group.budget > 0 ? 'cursor-pointer hover:bg-[#f5fbfd]' : 'opacity-60'}`}
+                                                            onClick={() => toggleExpenseCategory(group.category)}
+                                                        >
+                                                            <td className="py-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isExpanded ? 'bg-[#1a6f93] text-white' : 'bg-[#e8f0f5] text-[#1a6f93]'}`}>
+                                                                        <Icon path={isExpanded ? Icons.chevronDown : Icons.chevronRight} className="w-3.5 h-3.5" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-black text-stone-800 text-sm uppercase">{group.category}</div>
+                                                                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#7a919d]">{group.subcategories.length} subcategorias</div>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-3 text-right">
+                                                                <div className="font-black text-stone-800 text-sm">{fmt(group.amount)}</div>
+                                                            </td>
+                                                            <td className="py-3 text-right">
+                                                                <div className="text-stone-600 text-sm font-bold">{group.budget > 0 ? fmt(group.budget) : '-'}</div>
+                                                            </td>
+                                                            <td className="py-3 text-right">
+                                                                {group.budget > 0 ? (
+                                                                    <div className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold ${
+                                                                        group.execPercent > 100
+                                                                            ? 'bg-rose-100 text-rose-700'
+                                                                            : group.execPercent > 80
+                                                                                ? 'bg-amber-100 text-amber-700'
+                                                                                : 'bg-emerald-100 text-emerald-700'
+                                                                    }`}>
+                                                                        {group.execPercent.toFixed(1)}%
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-stone-400">-</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                        {isExpanded && group.subcategories.map((item) => (
+                                                            <tr
+                                                                key={item.key}
+                                                                className={`bg-[#f8fbfd] transition-colors ${item.hasData ? 'cursor-pointer hover:bg-[#fff8f5]' : 'opacity-60'}`}
+                                                                onClick={() => item.hasData && setModalCategory(item.key)}
+                                                            >
+                                                                <td className="py-2.5 pl-10">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className={`w-5 h-5 rounded-md flex items-center justify-center ${item.hasData ? 'bg-[#fff0f0]' : 'bg-stone-100'}`}>
+                                                                            <Icon
+                                                                                path={Icons.receipt}
+                                                                                className={`w-3 h-3 ${item.hasData ? 'text-[#a81d24]' : 'text-stone-400'}`}
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="font-bold text-stone-700 text-xs uppercase">{item.subcategory}</div>
+                                                                            <div className="text-[10px] text-[#a81d24] font-semibold">
+                                                                                {item.hasData ? 'Ver detalle ->' : 'Sin movimientos'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-2.5 text-right">
+                                                                    <div className="font-bold text-stone-800 text-sm">{fmt(item.amount)}</div>
+                                                                </td>
+                                                                <td className="py-2.5 text-right">
+                                                                    <div className="text-stone-500 text-sm font-medium">{item.budget > 0 ? fmt(item.budget) : '-'}</div>
+                                                                </td>
+                                                                <td className="py-2.5 text-right">
+                                                                    {item.budget > 0 ? (
+                                                                        <div className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold ${
+                                                                            item.execPercent > 100
+                                                                                ? 'bg-rose-100 text-rose-700'
+                                                                                : item.execPercent > 80
+                                                                                    ? 'bg-amber-100 text-amber-700'
+                                                                                    : 'bg-emerald-100 text-emerald-700'
+                                                                        }`}>
+                                                                            {item.execPercent.toFixed(1)}%
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-stone-400">-</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t-2 border-[#7f1218] bg-stone-50">
+                                                <td className="py-3 pl-2">
+                                                    <div className="font-bold text-stone-800 uppercase text-xs tracking-wider">Total Operativo</div>
+                                                </td>
+                                                <td className="py-3 text-right">
+                                                    <div className="font-black text-stone-800 text-sm">{fmt(totalExpenses)}</div>
+                                                </td>
+                                                <td className="py-3 text-right">
+                                                    <div className="font-bold text-stone-600 text-sm">{fmt(totalBudgetLimit)}</div>
+                                                </td>
+                                                <td className="py-3 text-right pr-1">
+                                                    <div className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-black ${
+                                                        totalExecution > 100
+                                                            ? 'bg-rose-600 text-white'
+                                                            : totalExecution > 90
+                                                                ? 'bg-amber-500 text-white'
+                                                                : 'bg-emerald-600 text-white'
+                                                    }`}>
+                                                        {totalExecution.toFixed(1)}%
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <div className="hidden">
                                     {finalExpenseRows.map(([category, amount]) => {
                                         const budget = currentBudgets[category] || 0;
                                         const execPercent = budget > 0 ? (amount / budget) * 100 : 0;
@@ -1282,7 +1601,7 @@ export default function Reports({ data }) {
                                     })}
                                 </div>
 
-                                <div className="hidden overflow-x-auto custom-scrollbar md:block">
+                                <div className="hidden">
                                     <table className="w-full">
                                         <thead>
                                             <tr className="text-left border-b-2 border-[#ead5c5]">
