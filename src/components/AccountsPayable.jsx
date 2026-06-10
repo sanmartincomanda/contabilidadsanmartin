@@ -32,7 +32,9 @@ const Icons = {
     receipt: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
     arrowRightCircle: "M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z",
     calculator: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z",
-    square: "M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"
+    square: "M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z",
+    search: "M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z",
+    filter: "M3 4a1 1 0 011-1h16a1 1 0 01.8 1.6l-5.8 7.73V19a1 1 0 01-.55.9l-4 2A1 1 0 019 21v-8.67L3.2 4.6A1 1 0 013 4z"
 };
 
 // --- ANIMACIONES ---
@@ -167,6 +169,82 @@ const useCompactViewport = (breakpoint = 1023) => {
     return isCompact;
 };
 
+const emptyPayableFilters = {
+    proveedor: '',
+    fechaDesde: '',
+    fechaHasta: '',
+};
+
+const invoiceStatusOptions = [
+    { value: 'todos', label: 'Todos los estados' },
+    { value: 'pagada', label: 'Pagadas' },
+    { value: 'vencida', label: 'Vencidas' },
+    { value: 'vigente', label: 'Vigentes' },
+];
+
+const normalizeFilterText = (value) => (
+    String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+);
+
+const parseLocalDate = (dateString) => {
+    if (!dateString) return null;
+    const [year, month, day] = String(dateString).slice(0, 10).split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+};
+
+const getTodayStart = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+};
+
+const matchesProviderFilter = (provider, filterValue) => {
+    const needle = normalizeFilterText(filterValue);
+    if (!needle) return true;
+    return normalizeFilterText(provider).includes(needle);
+};
+
+const isDateInRange = (dateValue, from, to) => {
+    const date = String(dateValue || '').slice(0, 10);
+    if (!date) return false;
+    if (from && date < from) return false;
+    if (to && date > to) return false;
+    return true;
+};
+
+const hasActivePayableFilters = (filters) => (
+    Boolean(filters.proveedor || filters.fechaDesde || filters.fechaHasta)
+);
+
+const getPayableInvoiceStatus = (factura) => {
+    const saldo = Number(factura.saldo || 0);
+    if (factura.estado === 'pagado' || saldo <= 0) {
+        return { status: 'pagada', label: 'Pagada', variant: 'success' };
+    }
+
+    const vencimiento = parseLocalDate(factura.vencimiento);
+    if (vencimiento && vencimiento < getTodayStart()) {
+        return { status: 'vencida', label: 'Vencida', variant: 'danger' };
+    }
+
+    return { status: 'vigente', label: factura.estado === 'parcial' ? 'Vigente parcial' : 'Vigente', variant: 'info' };
+};
+
+const getInvoicePaidAmount = (factura) => (
+    Number((Number(factura.monto || 0) - Number(factura.saldo || 0)).toFixed(2))
+);
+
+const toInvoiceView = (factura) => ({
+    ...factura,
+    yaAbonado: getInvoicePaidAmount(factura),
+    statusInfo: getPayableInvoiceStatus(factura),
+});
+
 // --- COMPONENTE PRINCIPAL ---
 export function AccountsPayable({ data }) {
     const isCompactViewport = useCompactViewport();
@@ -174,6 +252,13 @@ export function AccountsPayable({ data }) {
     const [loading, setLoading] = useState(false);
     const [nuevoProveedor, setNuevoProveedor] = useState('');
     const [expandedProvider, setExpandedProvider] = useState(null);
+    const [estadoCuentaFilters, setEstadoCuentaFilters] = useState(emptyPayableFilters);
+    const [abonosFilters, setAbonosFilters] = useState(emptyPayableFilters);
+    const [facturasHistoryFilters, setFacturasHistoryFilters] = useState({
+        ...emptyPayableFilters,
+        estado: 'todos',
+        factura: '',
+    });
 
     // Ref para bloquear doble-submit en cualquier operación crítica
     const isProcessingRef = useRef(false);
@@ -204,22 +289,26 @@ export function AccountsPayable({ data }) {
         let totalGeneral = 0;
         let vencidas = 0;
         let porVencer = 0;
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
+        const hoy = getTodayStart();
 
         const facturasOrdenadas = [...facturas]
-            .filter(f => f.estado !== 'pagado')
+            .filter(f => (
+                f.estado !== 'pagado'
+                && Number(f.saldo || 0) > 0
+                && matchesProviderFilter(f.proveedor, estadoCuentaFilters.proveedor)
+                && isDateInRange(f.fecha, estadoCuentaFilters.fechaDesde, estadoCuentaFilters.fechaHasta)
+            ))
             .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
         facturasOrdenadas.forEach(f => {
             if (!groups[f.proveedor]) groups[f.proveedor] = { saldoTotal: 0, items: [] };
-            const yaAbonado = Number((f.monto - (f.saldo || 0)).toFixed(2));
-            groups[f.proveedor].items.push({ ...f, yaAbonado });
+            const invoiceView = toInvoiceView(f);
+            groups[f.proveedor].items.push(invoiceView);
             groups[f.proveedor].saldoTotal += (f.saldo || 0);
             totalGeneral += (f.saldo || 0);
 
             if (f.vencimiento) {
-                const venc = new Date(f.vencimiento);
+                const venc = parseLocalDate(f.vencimiento);
                 const diff = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24));
                 if (diff < 0) vencidas += f.saldo || 0;
                 else if (diff <= 3) porVencer += f.saldo || 0;
@@ -231,7 +320,60 @@ export function AccountsPayable({ data }) {
             saldoTotalGeneral: totalGeneral,
             stats: { vencidas, porVencer, count: facturasOrdenadas.length }
         };
-    }, [facturas]);
+    }, [estadoCuentaFilters, facturas]);
+
+    const providerEntries = useMemo(() => (
+        Object.entries(facturasPorProveedor).sort(([left], [right]) => left.localeCompare(right))
+    ), [facturasPorProveedor]);
+
+    const abonosFiltrados = useMemo(() => (
+        [...abonos]
+            .filter((abono) => (
+                matchesProviderFilter(abono.proveedor, abonosFilters.proveedor)
+                && isDateInRange(abono.fecha, abonosFilters.fechaDesde, abonosFilters.fechaHasta)
+            ))
+            .sort((a, b) => {
+                const sequenceDiff = Number(b.secuencia || 0) - Number(a.secuencia || 0);
+                if (sequenceDiff !== 0) return sequenceDiff;
+                return String(b.fecha || '').localeCompare(String(a.fecha || ''));
+            })
+    ), [abonos, abonosFilters]);
+
+    const historialFacturasCredito = useMemo(() => {
+        const facturaNeedle = normalizeFilterText(facturasHistoryFilters.factura);
+
+        return facturas
+            .map(toInvoiceView)
+            .filter((factura) => {
+                const matchesStatus = facturasHistoryFilters.estado === 'todos'
+                    || factura.statusInfo.status === facturasHistoryFilters.estado;
+                const matchesFactura = !facturaNeedle
+                    || normalizeFilterText(factura.numero).includes(facturaNeedle);
+
+                return matchesStatus
+                    && matchesFactura
+                    && matchesProviderFilter(factura.proveedor, facturasHistoryFilters.proveedor)
+                    && isDateInRange(factura.fecha, facturasHistoryFilters.fechaDesde, facturasHistoryFilters.fechaHasta);
+            })
+            .sort((a, b) => {
+                const dateDiff = String(b.fecha || '').localeCompare(String(a.fecha || ''));
+                if (dateDiff !== 0) return dateDiff;
+                return String(a.proveedor || '').localeCompare(String(b.proveedor || ''));
+            });
+    }, [facturas, facturasHistoryFilters]);
+
+    const historialFacturasStats = useMemo(() => (
+        historialFacturasCredito.reduce((acc, factura) => {
+            acc.total += Number(factura.monto || 0);
+            acc.saldo += Number(factura.saldo || 0);
+            acc[factura.statusInfo.status] += 1;
+            return acc;
+        }, { total: 0, saldo: 0, pagada: 0, vencida: 0, vigente: 0 })
+    ), [historialFacturasCredito]);
+
+    const totalAbonosFiltrados = useMemo(() => (
+        abonosFiltrados.reduce((sum, abono) => sum + Number(abono.montoTotal || 0), 0)
+    ), [abonosFiltrados]);
 
     // --- HANDLERS ---
     const handleSaveFactura = useCallback(async (e) => {
@@ -518,6 +660,7 @@ export function AccountsPayable({ data }) {
         { id: 'Ingresar Factura',    icon: 'plus',         label: 'Nueva Factura' },
         { id: 'Estado de Cuenta',    icon: 'trendingDown',  label: 'Estado de Cuenta' },
         { id: 'Historial Abonos',    icon: 'receipt',       label: 'Historial Abonos' },
+        { id: 'Historial Facturas',  icon: 'fileText',      label: 'Historial Facturas' },
         { id: 'Base de Proveedores', icon: 'users',         label: 'Proveedores' }
     ];
 
@@ -697,7 +840,56 @@ export function AccountsPayable({ data }) {
                     {/* TAB: Estado de Cuenta */}
                     {activeTab === 'Estado de Cuenta' && (
                         <div className="space-y-5">
-                            {Object.entries(facturasPorProveedor).map(([prov, provData], idx) => (
+                            <Card
+                                title="Filtros de estado de cuenta"
+                                icon="filter"
+                                right={
+                                    <div className="text-right">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Resultado</div>
+                                        <div className="erp-mono text-sm font-black text-[#16222d]">{providerEntries.length} proveedores</div>
+                                    </div>
+                                }
+                            >
+                                <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                    <Input
+                                        label="Proveedor"
+                                        icon="search"
+                                        placeholder="Buscar por nombre..."
+                                        value={estadoCuentaFilters.proveedor}
+                                        onChange={e => setEstadoCuentaFilters(prev => ({ ...prev, proveedor: e.target.value }))}
+                                    />
+                                    <Input
+                                        label="Fecha desde"
+                                        type="date"
+                                        icon="calendar"
+                                        value={estadoCuentaFilters.fechaDesde}
+                                        onChange={e => setEstadoCuentaFilters(prev => ({ ...prev, fechaDesde: e.target.value }))}
+                                    />
+                                    <Input
+                                        label="Fecha hasta"
+                                        type="date"
+                                        icon="calendar"
+                                        value={estadoCuentaFilters.fechaHasta}
+                                        onChange={e => setEstadoCuentaFilters(prev => ({ ...prev, fechaHasta: e.target.value }))}
+                                    />
+                                    <div className="flex items-end">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            onClick={() => setEstadoCuentaFilters(emptyPayableFilters)}
+                                            disabled={!hasActivePayableFilters(estadoCuentaFilters)}
+                                            className="w-full whitespace-nowrap"
+                                        >
+                                            Limpiar
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="mt-3 text-xs font-semibold text-[#6b7f8c]">
+                                    Mostrando {stats.count} factura{stats.count === 1 ? '' : 's'} pendiente{stats.count === 1 ? '' : 's'} por fecha de emision.
+                                </div>
+                            </Card>
+
+                            {providerEntries.map(([prov, provData], idx) => (
                                 <FadeIn key={prov} delay={idx * 70}>
                                     {(() => {
                                         const isExpanded = expandedProvider === prov;
@@ -908,7 +1100,7 @@ export function AccountsPayable({ data }) {
                                 </FadeIn>
                             ))}
 
-                            {Object.keys(facturasPorProveedor).length === 0 && (
+                            {providerEntries.length === 0 && (
                                 <div className="erp-empty-state px-6 py-16 text-center">
                                     <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
                                         <Icon path={Icons.checkCircle} className="w-7 h-7 text-emerald-500" />
@@ -924,15 +1116,58 @@ export function AccountsPayable({ data }) {
                     {activeTab === 'Historial Abonos' && (
                         <SlideIn>
                             <Card title="Historial de Abonos" icon="receipt">
-                                {abonos.length === 0 ? (
+                                <div className="mb-5 rounded-2xl border border-[#d7e2e9] bg-[#f7fbfd] p-4">
+                                    <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                        <Input
+                                            label="Proveedor"
+                                            icon="search"
+                                            placeholder="Buscar proveedor..."
+                                            value={abonosFilters.proveedor}
+                                            onChange={e => setAbonosFilters(prev => ({ ...prev, proveedor: e.target.value }))}
+                                        />
+                                        <Input
+                                            label="Fecha desde"
+                                            type="date"
+                                            icon="calendar"
+                                            value={abonosFilters.fechaDesde}
+                                            onChange={e => setAbonosFilters(prev => ({ ...prev, fechaDesde: e.target.value }))}
+                                        />
+                                        <Input
+                                            label="Fecha hasta"
+                                            type="date"
+                                            icon="calendar"
+                                            value={abonosFilters.fechaHasta}
+                                            onChange={e => setAbonosFilters(prev => ({ ...prev, fechaHasta: e.target.value }))}
+                                        />
+                                        <div className="flex items-end">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                onClick={() => setAbonosFilters(emptyPayableFilters)}
+                                                disabled={!hasActivePayableFilters(abonosFilters)}
+                                                className="w-full whitespace-nowrap"
+                                            >
+                                                Limpiar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[#6b7f8c]">
+                                        <span>{abonosFiltrados.length} abono{abonosFiltrados.length === 1 ? '' : 's'} encontrados por fecha de pago.</span>
+                                        <span className="erp-mono font-black text-[#16222d]">{fmt(totalAbonosFiltrados)}</span>
+                                    </div>
+                                </div>
+
+                                {abonosFiltrados.length === 0 ? (
                                     <div className="text-center py-12">
                                         <Icon path={Icons.receipt} className="w-10 h-10 mx-auto mb-3 text-stone-300" />
-                                        <p className="text-sm font-medium text-slate-400">No hay abonos registrados</p>
+                                        <p className="text-sm font-medium text-slate-400">
+                                            {hasActivePayableFilters(abonosFilters) ? 'No hay abonos con esos filtros' : 'No hay abonos registrados'}
+                                        </p>
                                     </div>
                                 ) : (
                                     isCompactViewport ? (
                                         <div className="space-y-3">
-                                            {abonos.sort((a, b) => b.secuencia - a.secuencia).map(a => (
+                                            {abonosFiltrados.map(a => (
                                                 <div key={a.id} className="erp-mobile-record p-4">
                                                     <div className="mb-3 flex items-start justify-between gap-3">
                                                         <div>
@@ -981,7 +1216,7 @@ export function AccountsPayable({ data }) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {abonos.sort((a, b) => b.secuencia - a.secuencia).map(a => (
+                                                {abonosFiltrados.map(a => (
                                                     <tr key={a.id} className="hover:bg-stone-50 transition-colors">
                                                         <td className="px-4 py-3 font-mono font-bold text-[#a81d24]">#{a.secuencia}</td>
                                                         <td className="px-4 py-3 text-xs text-slate-500">{a.fecha}</td>
@@ -1007,6 +1242,191 @@ export function AccountsPayable({ data }) {
                                         </table>
                                     </div>
                                     )
+                                )}
+                            </Card>
+                        </SlideIn>
+                    )}
+
+                    {/* TAB: Historial Facturas */}
+                    {activeTab === 'Historial Facturas' && (
+                        <SlideIn>
+                            <Card
+                                title="Historial de Facturas de Credito"
+                                icon="fileText"
+                                right={
+                                    <div className="text-right">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Saldo filtrado</div>
+                                        <div className="erp-mono text-sm font-black text-[#a81d24]">{fmt(historialFacturasStats.saldo)}</div>
+                                    </div>
+                                }
+                            >
+                                <div className="mb-5 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-medium text-sky-800">
+                                    Vista solo lectura. Estas facturas salen de cuentas_por_pagar y siguen vinculadas a sus compras/gastos originales.
+                                </div>
+
+                                <div className="mb-5 rounded-2xl border border-[#d7e2e9] bg-[#f7fbfd] p-4">
+                                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,.9fr)_minmax(0,.8fr)_minmax(0,.8fr)_minmax(0,.9fr)_auto]">
+                                        <Input
+                                            label="Proveedor"
+                                            icon="search"
+                                            placeholder="Buscar proveedor..."
+                                            value={facturasHistoryFilters.proveedor}
+                                            onChange={e => setFacturasHistoryFilters(prev => ({ ...prev, proveedor: e.target.value }))}
+                                        />
+                                        <Input
+                                            label="Factura"
+                                            icon="fileText"
+                                            placeholder="Numero..."
+                                            value={facturasHistoryFilters.factura}
+                                            onChange={e => setFacturasHistoryFilters(prev => ({ ...prev, factura: e.target.value }))}
+                                        />
+                                        <Input
+                                            label="Fecha desde"
+                                            type="date"
+                                            icon="calendar"
+                                            value={facturasHistoryFilters.fechaDesde}
+                                            onChange={e => setFacturasHistoryFilters(prev => ({ ...prev, fechaDesde: e.target.value }))}
+                                        />
+                                        <Input
+                                            label="Fecha hasta"
+                                            type="date"
+                                            icon="calendar"
+                                            value={facturasHistoryFilters.fechaHasta}
+                                            onChange={e => setFacturasHistoryFilters(prev => ({ ...prev, fechaHasta: e.target.value }))}
+                                        />
+                                        <Select
+                                            label="Estado"
+                                            value={facturasHistoryFilters.estado}
+                                            onChange={e => setFacturasHistoryFilters(prev => ({ ...prev, estado: e.target.value }))}
+                                            options={invoiceStatusOptions.map(option => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        />
+                                        <div className="flex items-end">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                onClick={() => setFacturasHistoryFilters({ ...emptyPayableFilters, estado: 'todos', factura: '' })}
+                                                disabled={
+                                                    !hasActivePayableFilters(facturasHistoryFilters)
+                                                    && !facturasHistoryFilters.factura
+                                                    && facturasHistoryFilters.estado === 'todos'
+                                                }
+                                                className="w-full whitespace-nowrap"
+                                            >
+                                                Limpiar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+                                    <div className="rounded-2xl border border-[#d7e2e9] bg-white p-4">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Facturas</div>
+                                        <div className="mt-1 text-xl font-black text-[#16222d]">{historialFacturasCredito.length}</div>
+                                    </div>
+                                    <div className="rounded-2xl border border-[#d7e2e9] bg-white p-4">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Total</div>
+                                        <div className="mt-1 erp-mono text-sm font-black text-[#16222d]">{fmt(historialFacturasStats.total)}</div>
+                                    </div>
+                                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Pagadas</div>
+                                        <div className="mt-1 text-xl font-black text-emerald-700">{historialFacturasStats.pagada}</div>
+                                    </div>
+                                    <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-red-700">Vencidas</div>
+                                        <div className="mt-1 text-xl font-black text-red-700">{historialFacturasStats.vencida}</div>
+                                    </div>
+                                    <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Vigentes</div>
+                                        <div className="mt-1 text-xl font-black text-sky-700">{historialFacturasStats.vigente}</div>
+                                    </div>
+                                </div>
+
+                                {historialFacturasCredito.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <Icon path={Icons.fileText} className="w-10 h-10 mx-auto mb-3 text-stone-300" />
+                                        <p className="text-sm font-medium text-slate-400">No hay facturas con esos filtros</p>
+                                    </div>
+                                ) : isCompactViewport ? (
+                                    <div className="space-y-3">
+                                        {historialFacturasCredito.map((factura) => {
+                                            const vencInfo = getVencimientoInfo(factura.vencimiento);
+                                            return (
+                                                <div key={factura.id} className="erp-mobile-record p-4">
+                                                    <div className="mb-3 flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Factura</div>
+                                                            <div className="mt-1 break-all text-sm font-black text-slate-800">{factura.numero}</div>
+                                                            <div className="mt-1 text-xs font-semibold text-[#607888]">{factura.proveedor}</div>
+                                                        </div>
+                                                        <Badge variant={factura.statusInfo.variant}>{factura.statusInfo.label}</Badge>
+                                                    </div>
+                                                    <div className="erp-mobile-keyvalue">
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Emision</span>
+                                                            <span>{factura.fecha}</span>
+                                                        </div>
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Vence</span>
+                                                            <span>{factura.statusInfo.status === 'pagada' ? 'Pagada' : vencInfo.text}</span>
+                                                        </div>
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Monto</span>
+                                                            <span className="erp-mono font-bold">{fmt(factura.monto)}</span>
+                                                        </div>
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Abonado</span>
+                                                            <span className="erp-mono font-semibold text-emerald-600">{factura.yaAbonado > 0 ? fmt(factura.yaAbonado) : '-'}</span>
+                                                        </div>
+                                                        <div className="erp-mobile-keyvalue-row">
+                                                            <span>Saldo</span>
+                                                            <span className="erp-mono font-extrabold text-[#a81d24]">{fmt(factura.saldo)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="erp-table-shell overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr>
+                                                    {['Factura', 'Fecha', 'Proveedor', 'Vencimiento', 'Estado', 'Monto', 'Abonado', 'Saldo'].map(h => (
+                                                        <th key={h} className={`px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${['Monto', 'Abonado', 'Saldo'].includes(h) ? 'text-right' : h === 'Estado' ? 'text-center' : 'text-left'}`}>
+                                                            {h}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {historialFacturasCredito.map((factura) => {
+                                                    const vencInfo = getVencimientoInfo(factura.vencimiento);
+                                                    return (
+                                                        <tr key={factura.id} className="hover:bg-stone-50 transition-colors">
+                                                            <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">{factura.numero}</td>
+                                                            <td className="px-4 py-3 text-xs text-slate-500">{factura.fecha}</td>
+                                                            <td className="px-4 py-3 text-xs font-semibold text-slate-800">{factura.proveedor}</td>
+                                                            <td className="px-4 py-3">
+                                                                {factura.statusInfo.status === 'pagada'
+                                                                    ? <span className="text-xs text-slate-400">-</span>
+                                                                    : <Badge variant={vencInfo.variant}>{vencInfo.text}</Badge>}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <Badge variant={factura.statusInfo.variant}>{factura.statusInfo.label}</Badge>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right text-xs font-medium text-slate-500">{fmt(factura.monto)}</td>
+                                                            <td className="px-4 py-3 text-right text-xs font-semibold text-emerald-600">
+                                                                {factura.yaAbonado > 0 ? fmt(factura.yaAbonado) : <span className="text-stone-300">-</span>}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right font-bold text-[#a81d24]">{fmt(factura.saldo)}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 )}
                             </Card>
                         </SlideIn>
