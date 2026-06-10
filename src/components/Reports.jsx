@@ -106,6 +106,9 @@ const StatCard = ({ title, value, subtitle, icon, variant = 'default', trend }) 
 
 const clampFlow = (value) => Math.max(Number(value) || 0, 0);
 
+const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
+const WEEKDAY_COLORS = ['#0a628f', '#1e7a4f', '#b1393e', '#a56b00', '#6d5bd0', '#168c8c', '#5c6773'];
+
 const buildRibbonPath = ({ x0, x1, y0, h0, y1, h1 }) => {
     const startTop = y0 - (h0 / 2);
     const startBottom = y0 + (h0 / 2);
@@ -120,6 +123,22 @@ const buildRibbonPath = ({ x0, x1, y0, h0, y1, h1 }) => {
         `C ${x1 - curve} ${endBottom}, ${x0 + curve} ${startBottom}, ${x0} ${startBottom}`,
         'Z',
     ].join(' ');
+};
+
+const getDateAtMidday = (dateString) => new Date(`${dateString}T12:00:00`);
+
+const getWeekdayIndex = (dateString) => {
+    const day = getDateAtMidday(dateString).getDay();
+    return day === 0 ? 6 : day - 1;
+};
+
+const getWeekIndex = (dateString) => Math.max(Math.ceil(Number(dateString.substring(8, 10)) / 7) - 1, 0);
+
+const getWeeksInMonth = (month) => {
+    if (!month) return 5;
+    const [year, monthNumber] = month.split('-').map(Number);
+    const days = new Date(year, monthNumber, 0).getDate();
+    return Math.ceil(days / 7);
 };
 
 const FinancialFlowChart = ({
@@ -346,7 +365,195 @@ const ExpenseDetailModal = ({ category, expenses, onClose }) => {
     );
 };
 
-// --- LÓGICA DE AGREGACIÓN (preservada exactamente) ---
+// --- REPORTES ESPECIALES ---
+const MonthlyExpenseReport = ({ rows, totalExpenses, onSelectCategory }) => {
+    const activeRows = rows.filter((row) => row.amount > 0);
+    const topCategory = activeRows[0];
+
+    if (!activeRows.length) {
+        return (
+            <Card title="Reporte de Gastos Mensuales" subtitle="Categorias y participacion del periodo" icon="receipt">
+                <div className="erp-empty-state p-8 text-center">
+                    <div className="text-sm font-semibold text-slate-500">Sin gastos registrados en este periodo.</div>
+                    <div className="mt-1 text-xs text-slate-400">Selecciona otro mes o registra gastos para ver el analisis.</div>
+                </div>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <StatCard title="Gasto total" value={fmt(totalExpenses)} icon="trendingDown" variant="danger" />
+                <StatCard title="Categorias activas" value={activeRows.length} icon="receipt" />
+                <StatCard
+                    title="Mayor categoria"
+                    value={topCategory ? `${topCategory.percentage.toFixed(1)}%` : '0%'}
+                    subtitle={topCategory?.category || 'Sin datos'}
+                    icon="chart"
+                    variant="warning"
+                />
+            </div>
+
+            <Card title="Reporte de Gastos Mensuales" subtitle="Participacion por categoria sobre el gasto total" icon="receipt">
+                <div className="space-y-3">
+                    {activeRows.map((row, index) => (
+                        <button
+                            key={row.category}
+                            type="button"
+                            onClick={() => onSelectCategory(row.category)}
+                            className="erp-pressable w-full rounded-xl border border-[#d9e6ed] bg-white p-4 text-left shadow-[0_10px_22px_-20px_rgba(15,23,42,.45)] transition hover:border-[#9fc3d5]"
+                        >
+                            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Categoria</div>
+                                    <div className="mt-1 text-sm font-black uppercase text-[#182b36]">{row.category}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="erp-mono text-base font-black text-[#b1393e]">{fmt(row.amount)}</div>
+                                    <div className="text-xs font-bold text-[#6b7f8c]">{row.percentage.toFixed(1)}%</div>
+                                </div>
+                            </div>
+                            <div className="h-2.5 overflow-hidden rounded-full bg-[#e9f1f5]">
+                                <div
+                                    className="h-full rounded-full bg-[#b1393e] transition-all duration-700"
+                                    style={{ width: `${Math.min(row.percentage, 100)}%` }}
+                                />
+                            </div>
+                            <div className="mt-2 flex justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                                <span>Rank #{index + 1}</span>
+                                <span>Ver detalle</span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </Card>
+        </div>
+    );
+};
+
+const MonthlySalesWeekdayReport = ({ report }) => {
+    const { totalSales, maxAmount, weekLabels, weekdayRows, weekTotals, bestDay, bestWeek } = report;
+
+    if (!totalSales) {
+        return (
+            <Card title="Reporte de Ventas Mensual" subtitle="Ventas por semana y dia de la semana" icon="chart">
+                <div className="erp-empty-state p-8 text-center">
+                    <div className="text-sm font-semibold text-slate-500">Sin ventas registradas en este periodo.</div>
+                    <div className="mt-1 text-xs text-slate-400">Selecciona un mes con ingresos para ver la tendencia.</div>
+                </div>
+            </Card>
+        );
+    }
+
+    const width = 900;
+    const height = 360;
+    const left = 72;
+    const right = 28;
+    const top = 32;
+    const bottom = 58;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const safeMax = Math.max(maxAmount, 1);
+    const xForWeek = (index) => left + (weekLabels.length <= 1 ? 0 : (plotWidth / (weekLabels.length - 1)) * index);
+    const yForValue = (value) => top + plotHeight - ((Number(value) || 0) / safeMax) * plotHeight;
+
+    return (
+        <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <StatCard title="Ventas del mes" value={fmt(totalSales)} icon="trendingUp" variant="success" />
+                <StatCard title="Dia mas fuerte" value={bestDay?.label || 'N/D'} subtitle={bestDay ? fmt(bestDay.total) : ''} icon="calendar" />
+                <StatCard title="Semana mas fuerte" value={bestWeek?.label || 'N/D'} subtitle={bestWeek ? fmt(bestWeek.total) : ''} icon="chart" variant="warning" />
+            </div>
+
+            <Card title="Reporte de Ventas Mensual" subtitle="Comportamiento por dia de la semana entre semanas del mes" icon="chart">
+                <div className="overflow-x-auto">
+                    <div className="min-w-[900px]">
+                        <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full">
+                            <rect x="0" y="0" width={width} height={height} rx="18" fill="#f8fbfd" />
+                            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                                const y = top + plotHeight * ratio;
+                                const value = safeMax * (1 - ratio);
+                                return (
+                                    <g key={ratio}>
+                                        <line x1={left} x2={width - right} y1={y} y2={y} stroke="#d9e6ed" strokeDasharray="4 6" />
+                                        <text x={left - 10} y={y + 4} textAnchor="end" fontSize="11" fontWeight="700" fill="#7a919d">
+                                            {fmt(value)}
+                                        </text>
+                                    </g>
+                                );
+                            })}
+
+                            {weekLabels.map((label, index) => {
+                                const x = xForWeek(index);
+                                return (
+                                    <g key={label}>
+                                        <line x1={x} x2={x} y1={top} y2={top + plotHeight} stroke="#edf3f6" />
+                                        <text x={x} y={height - 24} textAnchor="middle" fontSize="12" fontWeight="800" fill="#5d7784">
+                                            {label}
+                                        </text>
+                                    </g>
+                                );
+                            })}
+
+                            {weekdayRows.map((row) => {
+                                if (row.total <= 0) return null;
+                                const points = row.values.map((value, index) => `${xForWeek(index)},${yForValue(value)}`).join(' ');
+                                return (
+                                    <g key={row.label}>
+                                        <polyline points={points} fill="none" stroke={row.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                        {row.values.map((value, index) => (
+                                            <circle key={`${row.label}-${index}`} cx={xForWeek(index)} cy={yForValue(value)} r={value > 0 ? 4.5 : 2.5} fill={row.color} stroke="#ffffff" strokeWidth="2" />
+                                        ))}
+                                    </g>
+                                );
+                            })}
+                        </svg>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            {weekdayRows.map((row) => (
+                                <div key={row.label} className="flex items-center gap-2 rounded-full border border-[#d9e6ed] bg-white px-3 py-1.5 text-xs font-bold text-[#445b68]">
+                                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
+                                    {row.label}
+                                    <span className="erp-mono text-[#7a919d]">{fmt(row.total)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-5 overflow-x-auto">
+                    <table className="w-full min-w-[720px]">
+                        <thead>
+                            <tr className="border-b border-[#d9e6ed] text-left">
+                                <th className="pb-3 text-xs font-bold uppercase tracking-wider text-[#607888]">Semana</th>
+                                {WEEKDAY_LABELS.map((day) => (
+                                    <th key={day} className="pb-3 text-right text-xs font-bold uppercase tracking-wider text-[#607888]">{day}</th>
+                                ))}
+                                <th className="pb-3 text-right text-xs font-bold uppercase tracking-wider text-[#607888]">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#edf3f6]">
+                            {weekLabels.map((label, weekIndex) => (
+                                <tr key={label}>
+                                    <td className="py-3 text-sm font-black text-[#182b36]">{label}</td>
+                                    {WEEKDAY_LABELS.map((day, dayIndex) => (
+                                        <td key={`${label}-${day}`} className="py-3 text-right text-sm font-semibold text-[#445b68]">
+                                            {fmt(weekdayRows[dayIndex]?.values[weekIndex] || 0)}
+                                        </td>
+                                    ))}
+                                    <td className="py-3 text-right text-sm font-black text-[#0a628f]">{fmt(weekTotals[weekIndex] || 0)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+        </div>
+    );
+};
+
+// --- LÓGICA DE AGREGACIÓN ---
 const aggregateData = (data) => {
     const results = {};
     const { ingresos = [], gastos = [], inventarios = [], compras = [], presupuestos = [], cuentas_por_pagar: facturasCredito = [] } = data;
@@ -596,9 +803,61 @@ export default function Reports({ data }) {
     }, [currentBudgets]);
 
     const totalExecution = totalBudgetLimit > 0 ? (totalExpenses / totalBudgetLimit) * 100 : 0;
+    const expenseCategoryRows = finalExpenseRows
+        .map(([category, amount]) => ({
+            category,
+            amount,
+            percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
+        }))
+        .filter((row) => row.amount > 0)
+        .sort((a, b) => b.amount - a.amount);
+
+    const salesWeekdayReport = useMemo(() => {
+        const weekCount = getWeeksInMonth(selectedMonth);
+        const weekLabels = Array.from({ length: weekCount }, (_, index) => `Sem ${index + 1}`);
+        const matrix = WEEKDAY_LABELS.map((label, dayIndex) => ({
+            label,
+            dayIndex,
+            color: WEEKDAY_COLORS[dayIndex],
+            values: Array.from({ length: weekCount }, () => 0),
+        }));
+
+        resolveReportIncomeEntries(data.ingresos || [])
+            .filter((income) => income.date?.startsWith(selectedMonth))
+            .forEach((income) => {
+                const weekIndex = getWeekIndex(income.date);
+                const dayIndex = getWeekdayIndex(income.date);
+                if (weekIndex < 0 || weekIndex >= weekCount || dayIndex < 0 || dayIndex > 6) return;
+                matrix[dayIndex].values[weekIndex] += peso(income.amount);
+            });
+
+        const weekdayRows = matrix.map((row) => ({
+            ...row,
+            total: row.values.reduce((sum, value) => sum + value, 0),
+        }));
+        const weekTotals = weekLabels.map((_, weekIndex) => (
+            weekdayRows.reduce((sum, row) => sum + row.values[weekIndex], 0)
+        ));
+        const totalSales = weekTotals.reduce((sum, value) => sum + value, 0);
+        const maxAmount = Math.max(...weekdayRows.flatMap((row) => row.values), 0);
+        const bestDay = weekdayRows.reduce((best, row) => row.total > (best?.total || 0) ? row : best, null);
+        const bestWeekIndex = weekTotals.reduce((bestIndex, total, index) => total > (weekTotals[bestIndex] || 0) ? index : bestIndex, 0);
+
+        return {
+            totalSales,
+            maxAmount,
+            weekLabels,
+            weekdayRows,
+            weekTotals,
+            bestDay,
+            bestWeek: weekLabels.length ? { label: weekLabels[bestWeekIndex], total: weekTotals[bestWeekIndex] || 0 } : null,
+        };
+    }, [data.ingresos, selectedMonth]);
 
     const tabsConfig = {
         'Resultados': { icon: 'chart', label: 'Estado de Resultados' },
+        'Gastos Mensuales': { icon: 'receipt', label: 'Gastos Mensuales' },
+        'Ventas Mensuales': { icon: 'trendingUp', label: 'Ventas Mensuales' },
         'Balance': { icon: 'scale', label: 'Balance General' },
         'Dashboard': { icon: 'dashboard', label: 'Dashboard' }
     };
@@ -667,6 +926,50 @@ export default function Reports({ data }) {
             {activeTab === 'Dashboard' && (
                 <div className="animate-fade-in">
                     <DashboardGeneral />
+                </div>
+            )}
+
+            {activeTab === 'Gastos Mensuales' && (
+                <div className="animate-fade-in space-y-5">
+                    <div className="max-w-sm">
+                        <Select
+                            label="Periodo de Analisis"
+                            icon="calendar"
+                            value={selectedMonth || ''}
+                            onChange={(e) => {
+                                setSelectedMonth(e.target.value);
+                                setModalCategory(null);
+                            }}
+                            options={availableMonths.map(month => (
+                                <option key={month} value={month}>{month}</option>
+                            ))}
+                        />
+                    </div>
+                    <MonthlyExpenseReport
+                        rows={expenseCategoryRows}
+                        totalExpenses={totalExpenses}
+                        onSelectCategory={setModalCategory}
+                    />
+                </div>
+            )}
+
+            {activeTab === 'Ventas Mensuales' && (
+                <div className="animate-fade-in space-y-5">
+                    <div className="max-w-sm">
+                        <Select
+                            label="Periodo de Analisis"
+                            icon="calendar"
+                            value={selectedMonth || ''}
+                            onChange={(e) => {
+                                setSelectedMonth(e.target.value);
+                                setModalCategory(null);
+                            }}
+                            options={availableMonths.map(month => (
+                                <option key={month} value={month}>{month}</option>
+                            ))}
+                        />
+                    </div>
+                    <MonthlySalesWeekdayReport report={salesWeekdayReport} />
                 </div>
             )}
 
