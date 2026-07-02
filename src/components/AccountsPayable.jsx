@@ -579,7 +579,7 @@ export function AccountsPayable({ data }) {
     const handleRealizarAbono = useCallback(async () => {
         if (isProcessingRef.current) return;
 
-        const montoTotalAbono = parseFloat(montoAbono);
+        const montoTotalAbono = Number(parseFloat(montoAbono).toFixed(2));
         if (isNaN(montoTotalAbono) || montoTotalAbono <= 0 || selectedFacturas.length === 0) return;
 
         isProcessingRef.current = true;
@@ -608,8 +608,13 @@ export function AccountsPayable({ data }) {
 
                 for (const item of refsYDocs) {
                     if (restante <= 0) break;
-                    const pagoParaEstaFactura = Math.min(item.data.saldo, restante);
-                    const nuevoSaldo = Number((item.data.saldo - pagoParaEstaFactura).toFixed(2));
+                    const saldoActual = Number(item.data.saldo || 0);
+                    if (saldoActual <= 0) {
+                        throw new Error(`La factura ${item.data.numero || item.snapshot.id} ya no tiene saldo pendiente. Actualiza la pantalla antes de abonar.`);
+                    }
+
+                    const pagoParaEstaFactura = Number(Math.min(saldoActual, restante).toFixed(2));
+                    const nuevoSaldo = Number((saldoActual - pagoParaEstaFactura).toFixed(2));
                     transaction.update(item.ref, {
                         saldo: nuevoSaldo,
                         estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial'
@@ -618,9 +623,17 @@ export function AccountsPayable({ data }) {
                     restante = Number((restante - pagoParaEstaFactura).toFixed(2));
                 }
 
+                const montoAplicado = Number((montoTotalAbono - restante).toFixed(2));
+                if (facturasAfectadas.length === 0 || montoAplicado <= 0) {
+                    throw new Error('No se aplico ningun monto a facturas pendientes. Actualiza la pantalla e intenta de nuevo.');
+                }
+                if (Math.abs(montoAplicado - montoTotalAbono) > 0.009) {
+                    throw new Error(`El abono de ${fmt(montoTotalAbono)} supera el saldo seleccionado. Solo hay ${fmt(montoAplicado)} disponible.`);
+                }
+
                 transaction.set(abonoRef, {
                     fecha: fechaAbono,
-                    montoTotal: montoTotalAbono,
+                    montoTotal: montoAplicado,
                     proveedor: proveedorSeleccionado,
                     secuencia: nuevaSecuencia,
                     paymentMethod,
@@ -634,7 +647,7 @@ export function AccountsPayable({ data }) {
                         fecha: fechaAbono,
                         caja: 'Caja Carnes Amparito',
                         descripcion: `ABONO A PROVEEDOR ${proveedorSeleccionado}`,
-                        monto: montoTotalAbono,
+                        monto: montoAplicado,
                         tipo: 'ABONO',
                         categoria: 'ABONO',
                         sucursal: DEFAULT_BRANCH_ID,
