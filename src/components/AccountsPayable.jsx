@@ -8,6 +8,15 @@ import {
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { deletePayableTransaction } from '../services/linkedTransactions';
 import { getLocalDateString } from '../utils/localDate';
+import {
+    CASH_PAYMENT_METHOD,
+    PAYABLE_PAYMENT_METHOD_OPTIONS,
+    TRANSFER_PAYMENT_METHOD,
+    buildCreditCardCharge,
+    getCreditCardMovementRef,
+    getPaymentMethodLabel,
+    isCreditCardPayment,
+} from '../services/creditCardLiabilities';
 
 // --- ICONOS SVG INLINE ---
 const Icon = ({ path, className = "w-5 h-5" }) => (
@@ -126,7 +135,8 @@ const Badge = ({ children, variant = 'default' }) => {
         danger:  'bg-red-50 text-red-700 border border-red-200',
         warning: 'bg-amber-50 text-amber-700 border border-amber-200',
         success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-        info:    'bg-sky-50 text-sky-700 border border-sky-200'
+        info:    'bg-sky-50 text-sky-700 border border-sky-200',
+        purple:  'bg-violet-50 text-violet-700 border border-violet-200'
     };
     return (
         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${variants[variant]}`}>
@@ -537,14 +547,14 @@ export function AccountsPayable({ data }) {
     const [montoAbono, setMontoAbono] = useState('');
     const [proveedorSeleccionado, setProveedorSeleccionado] = useState('');
     const [montoPrevisualizado, setMontoPrevisualizado] = useState(0);
-    const [paymentMethod, setPaymentMethod] = useState('transferencia');
+    const [paymentMethod, setPaymentMethod] = useState(TRANSFER_PAYMENT_METHOD);
 
     const resetAbonoDraft = useCallback((nextProveedor = '') => {
         setProveedorSeleccionado(nextProveedor);
         setSelectedFacturas([]);
         setMontoAbono('');
         setMontoPrevisualizado(0);
-        setPaymentMethod('transferencia');
+        setPaymentMethod(TRANSFER_PAYMENT_METHOD);
     }, []);
 
     const closeModalAbono = useCallback(() => {
@@ -590,7 +600,10 @@ export function AccountsPayable({ data }) {
             const snap = await getDocs(q);
             const nuevaSecuencia = snap.empty ? 1 : (snap.docs[0].data().secuencia + 1);
             const abonoRef = doc(collection(db, 'abonos_pagar'));
-            const gastoDiarioRef = paymentMethod === 'efectivo' ? doc(collection(db, 'gastosDiarios')) : null;
+            const gastoDiarioRef = paymentMethod === CASH_PAYMENT_METHOD ? doc(collection(db, 'gastosDiarios')) : null;
+            const creditCardMovementRef = isCreditCardPayment(paymentMethod)
+                ? getCreditCardMovementRef('abonos_pagar', abonoRef.id)
+                : null;
 
             await runTransaction(db, async (transaction) => {
                 let restante = montoTotalAbono;
@@ -638,6 +651,7 @@ export function AccountsPayable({ data }) {
                     secuencia: nuevaSecuencia,
                     paymentMethod,
                     linkedGastoDiarioId: gastoDiarioRef?.id || null,
+                    linkedCreditCardMovementId: creditCardMovementRef?.id || null,
                     detalleAfectado: facturasAfectadas,
                     timestamp: Timestamp.now()
                 });
@@ -658,6 +672,21 @@ export function AccountsPayable({ data }) {
                         paymentMethod,
                         timestamp: Timestamp.now()
                     });
+                }
+
+                if (creditCardMovementRef) {
+                    transaction.set(creditCardMovementRef, buildCreditCardCharge({
+                        sourceCollection: 'abonos_pagar',
+                        sourceId: abonoRef.id,
+                        sourceType: 'Abono proveedor',
+                        date: fechaAbono,
+                        description: `ABONO A PROVEEDOR ${proveedorSeleccionado}`,
+                        amount: montoAplicado,
+                        category: 'ABONO',
+                        subcategory: 'ABONO',
+                        provider: proveedorSeleccionado,
+                        paymentMethod,
+                    }), { merge: true });
                 }
             });
 
@@ -700,8 +729,11 @@ export function AccountsPayable({ data }) {
                         estado: nuevoSaldo >= dataF.monto ? 'pendiente' : 'parcial'
                     });
                 }
-                if (currentAbono.paymentMethod === 'efectivo' && currentAbono.linkedGastoDiarioId) {
+                if (currentAbono.paymentMethod === CASH_PAYMENT_METHOD && currentAbono.linkedGastoDiarioId) {
                     transaction.delete(doc(db, 'gastosDiarios', currentAbono.linkedGastoDiarioId));
+                }
+                if (isCreditCardPayment(currentAbono.paymentMethod)) {
+                    transaction.delete(getCreditCardMovementRef('abonos_pagar', currentAbono.id));
                 }
                 transaction.delete(abonoRef);
             });
@@ -1296,8 +1328,8 @@ export function AccountsPayable({ data }) {
                                                             </div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-2">
-                                                            <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
-                                                                {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                                                            <Badge variant={isCreditCardPayment(a.paymentMethod) ? 'purple' : a.paymentMethod === CASH_PAYMENT_METHOD ? 'warning' : 'info'}>
+                                                                {getPaymentMethodLabel(a.paymentMethod || TRANSFER_PAYMENT_METHOD)}
                                                             </Badge>
                                                             <Icon path={Icons.chevronRight} className={`h-4 w-4 text-[#607888] transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                                         </div>
@@ -1363,8 +1395,8 @@ export function AccountsPayable({ data }) {
                                                                 <td className="px-4 py-3 text-xs text-slate-500">{a.fecha}</td>
                                                                 <td className="px-4 py-3 font-semibold text-slate-800 text-xs">{a.proveedor}</td>
                                                                 <td className="px-4 py-3">
-                                                                    <Badge variant={a.paymentMethod === 'efectivo' ? 'warning' : 'info'}>
-                                                                        {a.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                                                                    <Badge variant={isCreditCardPayment(a.paymentMethod) ? 'purple' : a.paymentMethod === CASH_PAYMENT_METHOD ? 'warning' : 'info'}>
+                                                                        {getPaymentMethodLabel(a.paymentMethod || TRANSFER_PAYMENT_METHOD)}
                                                                     </Badge>
                                                                 </td>
                                                                 <td className="px-4 py-3 text-right font-bold text-emerald-600">{fmt(a.montoTotal)}</td>
@@ -1774,15 +1806,18 @@ export function AccountsPayable({ data }) {
                                         onChange={e => setPaymentMethod(e.target.value)}
                                         options={
                                             <>
-                                                <option value="transferencia">Transferencia</option>
-                                                <option value="efectivo">Efectivo</option>
+                                                {PAYABLE_PAYMENT_METHOD_OPTIONS.map(option => (
+                                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                                ))}
                                             </>
                                         }
                                     />
                                     <p className="text-xs text-slate-400 mt-1.5">
-                                        {paymentMethod === 'efectivo'
-                                            ? 'Se registrará también en Gastos Diarios como salida de caja.'
-                                            : 'Solo actualiza el saldo de la cuenta por pagar.'}
+                                        {paymentMethod === CASH_PAYMENT_METHOD
+                                            ? 'Se registrara tambien en Gastos Diarios como salida de caja.'
+                                            : isCreditCardPayment(paymentMethod)
+                                                ? 'Aumenta el saldo de Tarjeta Infinite Lafise en Pasivos.'
+                                                : 'Solo actualiza el saldo de la cuenta por pagar.'}
                                     </p>
                                 </div>
 

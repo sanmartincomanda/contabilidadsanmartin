@@ -14,6 +14,7 @@ import Reports from './components/Reports';
 import CategoryManager from './components/CategoryManager';
 import Settings from './components/Settings';
 import { AccountsPayable } from './components/AccountsPayable';
+import Liabilities from './components/Liabilities';
 import { fmt } from './constants';
 import { resolveReportIncomeEntries } from './services/incomeAggregation';
 import { getLocalDateString, getLocalMonthString } from './utils/localDate';
@@ -22,6 +23,7 @@ const BRAND_LOGO = '/amparito-logo.jpeg';
 
 const DATA_ENTRY_COLLECTIONS = ['ingresos', 'gastos', 'categorias', 'inventarios', 'compras', 'presupuestos', 'cuentasPorCobrar', 'patrimonio', 'depreciaciones'];
 const ACCOUNTS_PAYABLE_COLLECTIONS = ['cuentas_por_pagar', 'abonos_pagar', 'proveedores'];
+const LIABILITIES_COLLECTIONS = ['pasivos_tarjeta_movimientos'];
 const CATEGORY_COLLECTIONS = ['categorias'];
 const REPORT_COLLECTIONS = ['ingresos', 'gastos', 'inventarios', 'compras', 'presupuestos', 'cuentas_por_pagar', 'depreciaciones'];
 const DASHBOARD_COLLECTIONS = ['ingresos', 'gastos', 'compras', 'cuentas_por_pagar'];
@@ -743,6 +745,7 @@ function AppContent() {
     const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, !!user && needsCategories, true);
     const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(DATA_ENTRY_COLLECTIONS, !!user && isAdmin && currentPath === '/ingresar', true);
     const { data: accountsPayableData, loading: accountsPayableLoading, error: accountsPayableError } = useFirestoreCollections(ACCOUNTS_PAYABLE_COLLECTIONS, !!user && currentPath === '/cuentas-pagar', true);
+    const { data: liabilitiesData, loading: liabilitiesLoading, error: liabilitiesError } = useFirestoreCollections(LIABILITIES_COLLECTIONS, !!user && isAdmin && currentPath === '/pasivos', true);
     const { data: reportsData, loading: reportsLoading, error: reportsError } = useFirestoreCollections(REPORT_COLLECTIONS, !!user && isAdmin && currentPath === '/reportes', false);
     const { data: dashboardData, loading: dashboardLoading } = useFirestoreCollections(DASHBOARD_COLLECTIONS, !!user && isAdmin && currentPath === '/', false);
 
@@ -773,6 +776,7 @@ function AppContent() {
                         <Route path="/gastos-diarios" element={<PrivateRoute element={<GastosDiarios categories={categoriesList} />} />} />
                         <Route path="/conciliacion" element={<PrivateRoute element={isAdmin ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="/cuentas-pagar" element={<PrivateRoute element={accountsPayableLoading ? <AppLoadingState /> : accountsPayableError ? <AppErrorState /> : <AccountsPayable data={accountsPayableData} />} />} />
+                        <Route path="/pasivos" element={<PrivateRoute element={isAdmin ? (liabilitiesLoading ? <AppLoadingState /> : liabilitiesError ? <AppErrorState /> : <Liabilities data={liabilitiesData} />) : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="/reportes" element={<PrivateRoute element={isAdmin ? (reportsLoading ? <AppLoadingState /> : reportsError ? <AppErrorState /> : <Reports data={reportsData} />) : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="/configuraciones" element={<PrivateRoute element={isAdmin ? <Settings categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="/maestros/categorias" element={<PrivateRoute element={isAdmin ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} />} />

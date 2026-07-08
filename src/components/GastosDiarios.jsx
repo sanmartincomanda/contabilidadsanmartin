@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
 import {
-    collection, Timestamp, getDocs, doc, deleteDoc, writeBatch
+    collection, Timestamp, getDocs, doc, writeBatch
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { getLocalDateString } from '../utils/localDate';
@@ -12,6 +12,15 @@ import {
     getExpenseSubcategories,
     normalizeExpenseClassification,
 } from '../services/expenseCategories';
+import {
+    CASH_PAYMENT_METHOD,
+    ENTRY_PAYMENT_METHOD_OPTIONS,
+    getPaymentMethodLabel,
+    isCreditCardPayment,
+    normalizePaymentMethod,
+    setCreditCardChargeInBatch,
+    deleteCreditCardMovementInBatch,
+} from '../services/creditCardLiabilities';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -133,6 +142,7 @@ export default function GastosDiarios({ categories = [] }) {
     const [tipo, setTipo] = useState('Gasto');
     const [categoria, setCategoria] = useState('');
     const [subcategoria, setSubcategoria] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState(CASH_PAYMENT_METHOD);
     const subcategoryOptions = getExpenseSubcategories(categoria);
 
     const handleCategoriaChange = (value) => {
@@ -210,6 +220,21 @@ export default function GastosDiarios({ categories = [] }) {
             const gastoRef = tipo === 'Gasto' ? doc(collection(db, 'gastos')) : null;
             const compraRef = tipo === 'Compra' ? doc(collection(db, 'compras')) : null;
             const batch = writeBatch(db);
+            const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod, CASH_PAYMENT_METHOD);
+            const creditCardMovement = isCreditCardPayment(normalizedPaymentMethod)
+                ? setCreditCardChargeInBatch(batch, {
+                    sourceCollection: 'gastosDiarios',
+                    sourceId: gastoDiarioRef.id,
+                    sourceType: tipo,
+                    date: fecha,
+                    description: descripcion,
+                    amount: numMonto,
+                    category: categoriaNombre,
+                    subcategory: classification.subcategory,
+                    provider: tipo === 'Compra' ? descripcion.trim().toUpperCase() : null,
+                    paymentMethod: normalizedPaymentMethod,
+                })
+                : null;
 
             batch.set(gastoDiarioRef, {
                 fecha,
@@ -227,6 +252,9 @@ export default function GastosDiarios({ categories = [] }) {
                 branchName: DEFAULT_BRANCH_NAME,
                 linkedExpenseId: gastoRef?.id || null,
                 linkedPurchaseId: compraRef?.id || null,
+                paymentMethod: normalizedPaymentMethod,
+                paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
+                linkedCreditCardMovementId: creditCardMovement?.id || null,
                 timestamp
             });
 
@@ -240,6 +268,9 @@ export default function GastosDiarios({ categories = [] }) {
                     categoryKey: `${classification.category} / ${classification.subcategory}`,
                     branch: DEFAULT_BRANCH_ID,
                     branchName: DEFAULT_BRANCH_NAME,
+                    paymentMethod: normalizedPaymentMethod,
+                    paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
+                    linkedCreditCardMovementId: creditCardMovement?.id || null,
                     timestamp,
                     is_conciled: false,
                     origen: 'gastosDiarios',
@@ -260,6 +291,9 @@ export default function GastosDiarios({ categories = [] }) {
                     branch: DEFAULT_BRANCH_ID,
                     branchName: DEFAULT_BRANCH_NAME,
                     paymentType: 'contado',
+                    paymentMethod: normalizedPaymentMethod,
+                    paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
+                    linkedCreditCardMovementId: creditCardMovement?.id || null,
                     isInventoryCost: true,
                     description: descripcion,
                     sourceCollection: 'gastosDiarios',
@@ -274,6 +308,7 @@ export default function GastosDiarios({ categories = [] }) {
             setMonto('');
             setCategoria('');
             setSubcategoria('');
+            setPaymentMethod(CASH_PAYMENT_METHOD);
             alert(`${tipo} registrado correctamente`);
             setRefreshKey(prev => prev + 1);
 
@@ -293,36 +328,39 @@ export default function GastosDiarios({ categories = [] }) {
 
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'gastosDiarios', registro.id));
+            const batch = writeBatch(db);
+            batch.delete(doc(db, 'gastosDiarios', registro.id));
+            deleteCreditCardMovementInBatch(batch, 'gastosDiarios', registro.id);
 
             if (registro.tipo === 'Gasto') {
                 if (registro.linkedExpenseId) {
-                    await deleteDoc(doc(db, 'gastos', registro.linkedExpenseId));
+                    batch.delete(doc(db, 'gastos', registro.linkedExpenseId));
                 } else {
                     const gastosSnapshot = await getDocs(collection(db, 'gastos'));
                     const gastosRelacionados = gastosSnapshot.docs.filter(
                         d => d.data().gastoDiarioId === registro.id
                     );
                     for (const gastoDoc of gastosRelacionados) {
-                        await deleteDoc(doc(db, 'gastos', gastoDoc.id));
+                        batch.delete(doc(db, 'gastos', gastoDoc.id));
                     }
                 }
             }
 
             if (registro.tipo === 'Compra') {
                 if (registro.linkedPurchaseId) {
-                    await deleteDoc(doc(db, 'compras', registro.linkedPurchaseId));
+                    batch.delete(doc(db, 'compras', registro.linkedPurchaseId));
                 } else {
                     const comprasSnapshot = await getDocs(collection(db, 'compras'));
                     const comprasRelacionadas = comprasSnapshot.docs.filter(
                         item => item.data().sourceGastoDiarioId === registro.id
                     );
                     for (const compraDoc of comprasRelacionadas) {
-                        await deleteDoc(doc(db, 'compras', compraDoc.id));
+                        batch.delete(doc(db, 'compras', compraDoc.id));
                     }
                 }
             }
 
+            await batch.commit();
             cargarRegistros();
         } catch (error) {
             console.error('Error al eliminar:', error);
@@ -439,6 +477,20 @@ export default function GastosDiarios({ categories = [] }) {
                                 value={monto}
                                 onChange={e => setMonto(e.target.value)}
                                 required
+                            />
+
+                            <Select
+                                label="Metodo de pago"
+                                icon="cash"
+                                value={paymentMethod}
+                                onChange={e => setPaymentMethod(e.target.value)}
+                                options={
+                                    <>
+                                        {ENTRY_PAYMENT_METHOD_OPTIONS.map(option => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </>
+                                }
                             />
 
                             {tipo === 'Gasto' && (
@@ -581,6 +633,10 @@ export default function GastosDiarios({ categories = [] }) {
                                                     <span>{reg.subcategoria || reg.subcategory || '—'}</span>
                                                 </div>
                                                 <div className="erp-mobile-keyvalue-row">
+                                                    <span>Metodo</span>
+                                                    <span>{getPaymentMethodLabel(reg.paymentMethod)}</span>
+                                                </div>
+                                                <div className="erp-mobile-keyvalue-row">
                                                     <span>Monto</span>
                                                     <span className="erp-mono font-extrabold text-[#16222d]">{fmt(reg.monto)}</span>
                                                 </div>
@@ -607,6 +663,7 @@ export default function GastosDiarios({ categories = [] }) {
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Tipo</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Categoría</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Subcategoria</th>
+                                            <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Metodo</th>
                                             <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Monto</th>
                                             <th className="px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-slate-400 no-print">Acción</th>
                                         </tr>
@@ -614,7 +671,7 @@ export default function GastosDiarios({ categories = [] }) {
                                     <tbody className="divide-y divide-slate-100">
                                         {registros.length === 0 ? (
                                             <tr>
-                                                <td colSpan="7" className="px-4 py-10 text-center text-slate-400">
+                                                <td colSpan="8" className="px-4 py-10 text-center text-slate-400">
                                                     <Icon path={Icons.alertCircle} className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                                                     <p className="text-sm">No hay registros para esta fecha</p>
                                                 </td>
@@ -633,6 +690,7 @@ export default function GastosDiarios({ categories = [] }) {
                                                     </td>
                                                     <td className="px-4 py-3 text-sm text-slate-400">{reg.categoria || '—'}</td>
                                                     <td className="px-4 py-3 text-sm text-slate-400">{reg.subcategoria || reg.subcategory || '—'}</td>
+                                                    <td className="px-4 py-3 text-sm font-semibold text-slate-500">{getPaymentMethodLabel(reg.paymentMethod)}</td>
                                                     <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">{fmt(reg.monto)}</td>
                                                     <td className="px-4 py-3 text-center no-print">
                                                         <button
@@ -649,7 +707,7 @@ export default function GastosDiarios({ categories = [] }) {
                                     </tbody>
                                     <tfoot className="border-t-2 border-slate-200 bg-slate-50">
                                         <tr>
-                                            <td colSpan="4" className="px-4 py-3 font-semibold text-slate-700 uppercase text-xs tracking-widest">Total del Día</td>
+                                            <td colSpan="6" className="px-4 py-3 font-semibold text-slate-700 uppercase text-xs tracking-widest">Total del Día</td>
                                             <td className="px-4 py-3 text-right font-black text-lg text-[#7f1218] font-mono">{fmt(totalGeneral)}</td>
                                             <td className="no-print"></td>
                                         </tr>

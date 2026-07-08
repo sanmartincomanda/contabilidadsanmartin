@@ -3,7 +3,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { db } from '../firebase';
 import {
-    collection, addDoc, Timestamp, query, where, getDocs, orderBy, doc, deleteDoc, updateDoc
+    collection, addDoc, Timestamp, query, where, getDocs, orderBy, doc, deleteDoc, updateDoc, writeBatch
 } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../constants';
@@ -19,6 +19,17 @@ import {
     normalizeExpenseClassification,
 } from '../services/expenseCategories';
 import { getLocalDateString, getLocalMonthString } from '../utils/localDate';
+import {
+    CASH_PAYMENT_METHOD,
+    ENTRY_PAYMENT_METHOD_OPTIONS,
+    HISTORY_PAYMENT_METHOD_OPTIONS,
+    getPaymentMethodLabel,
+    isCreditCardPayment,
+    normalizePaymentMethod,
+    setCreditCardChargeInBatch,
+    syncCreditCardMovementForSource,
+    deleteCreditCardMovementForSource,
+} from '../services/creditCardLiabilities';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -201,6 +212,31 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
                 await updateDoc(doc(db, collectionName, item.id), dataToSave);
             }
 
+            if (collectionName === 'gastos') {
+                const mergedExpense = { ...item, ...editData, ...savedData };
+                const normalizedPaymentMethod = normalizePaymentMethod(mergedExpense.paymentMethod, CASH_PAYMENT_METHOD);
+                const movementId = await syncCreditCardMovementForSource({
+                    sourceCollection: 'gastos',
+                    sourceId: item.id,
+                    sourceType: 'Gasto',
+                    date: mergedExpense.date,
+                    description: mergedExpense.description,
+                    amount: mergedExpense.amount,
+                    category: mergedExpense.category,
+                    subcategory: mergedExpense.subcategory,
+                    paymentMethod: normalizedPaymentMethod,
+                });
+                await updateDoc(doc(db, collectionName, item.id), {
+                    paymentMethod: normalizedPaymentMethod,
+                    linkedCreditCardMovementId: movementId,
+                });
+                savedData = {
+                    ...savedData,
+                    paymentMethod: normalizedPaymentMethod,
+                    linkedCreditCardMovementId: movementId,
+                };
+            }
+
             setIsEditing(false);
             onUpdate(item.id, savedData);
         } catch (error) {
@@ -223,6 +259,9 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
                 }
             } else {
                 await deleteDoc(doc(db, collectionName, item.id));
+                if (collectionName === 'gastos') {
+                    await deleteCreditCardMovementForSource('gastos', item.id);
+                }
             }
             onDelete(item.id);
         } catch (error) {
@@ -241,6 +280,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
         }
         if (field?.type === 'branch') return branchName(value);
         if (field?.type === 'currency') return fmt(Number(value));
+        if (key === 'paymentMethod') return getPaymentMethodLabel(value);
         return String(value);
     };
 
@@ -280,9 +320,11 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
                     disabled={loading}
                 >
                     <option value="">Seleccionar...</option>
-                    {options.map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                    ))}
+                    {options.map((option) => {
+                        const optionValue = typeof option === 'object' ? option.value : option;
+                        const optionLabel = typeof option === 'object' ? option.label : option;
+                        return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
+                    })}
                 </select>
             );
         }
@@ -607,6 +649,7 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState('');
     const [subcategory, setSubcategory] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState(CASH_PAYMENT_METHOD);
     const subcategoryOptions = getExpenseSubcategories(category);
 
     const handleCategoryChange = (value) => {
@@ -622,7 +665,24 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
 
         setLoading(true);
         try {
-            await addDoc(collection(db, 'gastos'), {
+            const expenseRef = doc(collection(db, 'gastos'));
+            const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod, CASH_PAYMENT_METHOD);
+            const batch = writeBatch(db);
+            const creditCardMovement = isCreditCardPayment(normalizedPaymentMethod)
+                ? setCreditCardChargeInBatch(batch, {
+                    sourceCollection: 'gastos',
+                    sourceId: expenseRef.id,
+                    sourceType: 'Gasto',
+                    date,
+                    description,
+                    amount: numAmount,
+                    category: classification.category,
+                    subcategory: classification.subcategory,
+                    paymentMethod: normalizedPaymentMethod,
+                })
+                : null;
+
+            batch.set(expenseRef, {
                 date,
                 description,
                 amount: numAmount,
@@ -631,10 +691,14 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
                 categoryKey: `${classification.category} / ${classification.subcategory}`,
                 branch: DEFAULT_BRANCH_ID,
                 branchName: DEFAULT_BRANCH_NAME,
+                paymentMethod: normalizedPaymentMethod,
+                paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
+                linkedCreditCardMovementId: creditCardMovement?.id || null,
                 timestamp: Timestamp.now(),
                 is_conciled: false,
             });
-            setDescription(''); setAmount(''); setCategory(''); setSubcategory('');
+            await batch.commit();
+            setDescription(''); setAmount(''); setCategory(''); setSubcategory(''); setPaymentMethod(CASH_PAYMENT_METHOD);
             onSuccess?.();
         } catch (error) {
             console.error('Error:', error);
@@ -667,6 +731,8 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
                     categoryKey: `${classification.category} / ${classification.subcategory}`,
                     branch: DEFAULT_BRANCH_ID,
                     branchName: DEFAULT_BRANCH_NAME,
+                    paymentMethod: CASH_PAYMENT_METHOD,
+                    paymentMethodLabel: getPaymentMethodLabel(CASH_PAYMENT_METHOD),
                     timestamp: Timestamp.now(), is_conciled: false
                     });
                 });
@@ -697,6 +763,13 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
                     <Select label="Categoria" icon="tag" value={category} onChange={e => handleCategoryChange(e.target.value)} required options={<><option value="">Seleccionar...</option>{EXPENSE_CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}</>} />
                 </div>
                 <Select label="Subcategoria" icon="tag" value={subcategory} onChange={e => setSubcategory(e.target.value)} required disabled={!category} options={<><option value="">Seleccionar...</option>{subcategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}</>} />
+                <Select
+                    label="Metodo de pago"
+                    icon="cash"
+                    value={paymentMethod}
+                    onChange={e => setPaymentMethod(e.target.value)}
+                    options={<>{ENTRY_PAYMENT_METHOD_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</>}
+                />
                 <Button type="submit" variant="danger" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Gasto'}</Button>
             </form>
             <div className="border-t border-stone-200 pt-4">
@@ -757,6 +830,7 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [amount, setAmount] = useState('');
     const [subcategory, setSubcategory] = useState(getDefaultSubcategory(PURCHASE_CATEGORY));
+    const [paymentMethod, setPaymentMethod] = useState(CASH_PAYMENT_METHOD);
     const purchaseSubcategories = getExpenseSubcategories(PURCHASE_CATEGORY);
 
     const handleSubmit = async (e) => {
@@ -772,7 +846,26 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
                 subcategory,
                 supplier,
             });
-            await addDoc(collection(db, 'compras'), {
+            const purchaseRef = doc(collection(db, 'compras'));
+            const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod, CASH_PAYMENT_METHOD);
+            const batch = writeBatch(db);
+            const creditCardMovement = isCreditCardPayment(normalizedPaymentMethod)
+                ? setCreditCardChargeInBatch(batch, {
+                    sourceCollection: 'compras',
+                    sourceId: purchaseRef.id,
+                    sourceType: 'Compra',
+                    date,
+                    description: supplier.trim().toUpperCase(),
+                    amount: numAmount,
+                    category: classification.category,
+                    subcategory: classification.subcategory,
+                    provider: supplier.trim().toUpperCase(),
+                    invoiceNumber: invoiceNumber.trim() || 'S/N',
+                    paymentMethod: normalizedPaymentMethod,
+                })
+                : null;
+
+            batch.set(purchaseRef, {
                 date,
                 month: date.substring(0, 7),
                 supplier: supplier.trim().toUpperCase(),
@@ -784,13 +877,18 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
                 branch: DEFAULT_BRANCH_ID,
                 branchName: DEFAULT_BRANCH_NAME,
                 paymentType: 'contado',
+                paymentMethod: normalizedPaymentMethod,
+                paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
+                linkedCreditCardMovementId: creditCardMovement?.id || null,
                 isInventoryCost: true,
                 timestamp: Timestamp.now(),
             });
+            await batch.commit();
             setSupplier('');
             setInvoiceNumber('');
             setAmount('');
             setSubcategory(getDefaultSubcategory(PURCHASE_CATEGORY));
+            setPaymentMethod(CASH_PAYMENT_METHOD);
             onSuccess?.();
         } catch (error) {
             console.error('Error:', error);
@@ -815,6 +913,13 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
                 <Input label="Monto Factura" type="number" step="0.01" icon="shoppingCart" placeholder="0.00" className="text-lg font-bold text-purple-600" value={amount} onChange={e => setAmount(e.target.value)} required />
             </div>
             <Select label="Subcategoria de costo" icon="tag" value={subcategory} onChange={e => setSubcategory(e.target.value)} required options={<>{purchaseSubcategories.map(c => <option key={c} value={c}>{c}</option>)}</>} />
+            <Select
+                label="Metodo de pago"
+                icon="cash"
+                value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value)}
+                options={<>{ENTRY_PAYMENT_METHOD_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</>}
+            />
             <Button type="submit" variant="purple" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Compra de Contado'}</Button>
         </form>
     );
@@ -1092,6 +1197,7 @@ export function DataEntry({ categories, data }) {
             description: { label: 'Descripción', type: 'text' },
             category: { label: 'Categoria', type: 'select', options: EXPENSE_CATEGORY_OPTIONS },
             subcategory: { label: 'Subcategoria', type: 'select', options: (item) => getExpenseSubcategories(item.category) },
+            paymentMethod: { label: 'Metodo', type: 'select', options: HISTORY_PAYMENT_METHOD_OPTIONS },
             amount: { label: 'Monto', type: 'currency' }
         },
         Inventario: {
@@ -1107,6 +1213,7 @@ export function DataEntry({ categories, data }) {
             category: { label: 'Categoria', type: 'select', options: [PURCHASE_CATEGORY] },
             subcategory: { label: 'Subcategoria', type: 'select', options: (item) => getExpenseSubcategories(item.category) },
             paymentType: { label: 'Tipo', type: 'text' },
+            paymentMethod: { label: 'Metodo', type: 'select', options: HISTORY_PAYMENT_METHOD_OPTIONS },
             amount: { label: 'Monto', type: 'currency' }
         },
         Depreciaciones: {
@@ -1193,6 +1300,10 @@ export function DataEntry({ categories, data }) {
                 branch: item.branch || DEFAULT_BRANCH_ID,
                 branchName: item.branchName || DEFAULT_BRANCH_NAME,
                 paymentType: item.paymentType || (item.sourceFacturaId || item.linkedPayableId ? 'credito' : ((item.date || item.fecha) ? 'contado' : 'legacy')),
+                paymentMethod: normalizePaymentMethod(
+                    item.paymentMethod,
+                    item.paymentType === 'credito' || item.sourceFacturaId || item.linkedPayableId ? 'credito' : CASH_PAYMENT_METHOD
+                ),
             })).map((item) => {
                 const classification = normalizeExpenseClassification({
                     category: item.category || PURCHASE_CATEGORY,
@@ -1206,6 +1317,7 @@ export function DataEntry({ categories, data }) {
                     category: classification.category,
                     subcategory: classification.subcategory,
                     categoryKey: `${classification.category} / ${classification.subcategory}`,
+                    paymentMethod: normalizePaymentMethod(item.paymentMethod, CASH_PAYMENT_METHOD),
                 };
             });
         }

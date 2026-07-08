@@ -8,6 +8,13 @@ import {
     writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import {
+    deleteCreditCardMovementInBatch,
+    getCreditCardMovementId,
+    isCreditCardPayment,
+    normalizePaymentMethod,
+    syncCreditCardMovementInBatch,
+} from './creditCardLiabilities';
 
 const uniqueRefs = (refs) => {
     const refMap = new Map();
@@ -130,6 +137,8 @@ const buildGastoMirrorUpdate = (purchaseData, gastoData) => ({
     branch: purchaseData.branch || gastoData?.branch || '',
     branchName: purchaseData.branchName || gastoData?.branchName || '',
     sucursal: purchaseData.branch || gastoData?.sucursal || '',
+    paymentMethod: purchaseData.paymentMethod || gastoData?.paymentMethod || 'efectivo',
+    linkedCreditCardMovementId: purchaseData.linkedCreditCardMovementId || gastoData?.linkedCreditCardMovementId || null,
 });
 
 export async function deletePayableTransaction(payableId) {
@@ -158,7 +167,10 @@ export async function deletePayableTransaction(payableId) {
 
     const batch = writeBatch(db);
     batch.delete(payableRef);
-    purchaseRefs.forEach((purchaseRef) => batch.delete(purchaseRef));
+    purchaseRefs.forEach((purchaseRef) => {
+        batch.delete(purchaseRef);
+        deleteCreditCardMovementInBatch(batch, 'compras', purchaseRef.id);
+    });
     await batch.commit();
 
     return {
@@ -191,8 +203,12 @@ export async function deletePurchaseTransaction(purchaseId) {
 
     const batch = writeBatch(db);
     batch.delete(purchaseRef);
+    deleteCreditCardMovementInBatch(batch, 'compras', purchaseId);
     payableRefs.forEach((payableRef) => batch.delete(payableRef));
-    gastoRefs.forEach((gastoRef) => batch.delete(gastoRef));
+    gastoRefs.forEach((gastoRef) => {
+        batch.delete(gastoRef);
+        deleteCreditCardMovementInBatch(batch, 'gastosDiarios', gastoRef.id);
+    });
     await batch.commit();
 
     return {
@@ -220,11 +236,38 @@ export async function updatePurchaseTransaction(purchaseId, purchaseUpdates) {
         nextPurchase.month = getMonthFromDate(nextPurchase.date, nextPurchase.month || '');
     }
 
+    nextPurchase.paymentMethod = normalizePaymentMethod(
+        nextPurchase.paymentMethod,
+        nextPurchase.paymentType === 'credito' ? 'credito' : 'efectivo'
+    );
+
+    const movementSourceCollection = nextPurchase.sourceGastoDiarioId ? 'gastosDiarios' : 'compras';
+    const movementSourceId = nextPurchase.sourceGastoDiarioId || purchaseId;
+    nextPurchase.linkedCreditCardMovementId = isCreditCardPayment(nextPurchase.paymentMethod)
+        ? getCreditCardMovementId(movementSourceCollection, movementSourceId)
+        : null;
+
     const payableRefs = await findPayableRefsForPurchase(purchaseId, nextPurchase);
     const gastoRefs = await findGastoRefsForPurchase(purchaseId, nextPurchase);
 
     const batch = writeBatch(db);
     batch.update(purchaseRef, nextPurchase);
+    syncCreditCardMovementInBatch(batch, {
+        sourceCollection: movementSourceCollection,
+        sourceId: movementSourceId,
+        sourceType: 'Compra',
+        date: nextPurchase.date,
+        description: nextPurchase.description || nextPurchase.supplier || 'COMPRA',
+        amount: nextPurchase.amount,
+        category: nextPurchase.category,
+        subcategory: nextPurchase.subcategory,
+        provider: nextPurchase.supplier,
+        invoiceNumber: nextPurchase.invoiceNumber,
+        paymentMethod: nextPurchase.paymentMethod,
+    });
+    if (movementSourceCollection !== 'compras') {
+        deleteCreditCardMovementInBatch(batch, 'compras', purchaseId);
+    }
 
     for (const payableRef of payableRefs) {
         const payableSnap = await getDoc(payableRef);
