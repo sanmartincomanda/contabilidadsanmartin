@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt, branchName } from '../constants';
+import { companyCollection, companyDoc } from '../services/companyFirestore';
 import { getDepreciationEndMonth, getMonthlyDepreciationAmount } from '../services/depreciation';
 import { resolveIncomeEntries } from '../services/incomeAggregation';
 import { syncSicarDailyIncome } from '../services/sicarIncomeSync';
@@ -30,6 +31,11 @@ import {
     syncCreditCardMovementForSource,
     deleteCreditCardMovementForSource,
 } from '../services/creditCardLiabilities';
+
+const getCompanyBranch = (activeCompany) => ({
+    branch: activeCompany?.branchId || DEFAULT_BRANCH_ID,
+    branchName: activeCompany?.branchName || DEFAULT_BRANCH_NAME,
+});
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -164,7 +170,7 @@ const normalizeFilterText = (value) => (
 
 // --- COMPONENTE: EDITABLE LIST ---
 
-const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
+const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeCompany }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState(item);
     const [loading, setLoading] = useState(false);
@@ -203,19 +209,20 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
 
             let savedData = dataToSave;
             if (collectionName === 'compras') {
-                const result = await updatePurchaseTransaction(item.id, dataToSave);
+                const result = await updatePurchaseTransaction(item.id, dataToSave, activeCompany);
                 if (result?.missing) {
                     throw new Error('La compra ya no existe.');
                 }
                 savedData = result?.purchase || dataToSave;
             } else {
-                await updateDoc(doc(db, collectionName, item.id), dataToSave);
+                await updateDoc(companyDoc(db, activeCompany, collectionName, item.id), dataToSave);
             }
 
             if (collectionName === 'gastos') {
                 const mergedExpense = { ...item, ...editData, ...savedData };
                 const normalizedPaymentMethod = normalizePaymentMethod(mergedExpense.paymentMethod, CASH_PAYMENT_METHOD);
                 const movementId = await syncCreditCardMovementForSource({
+                    activeCompany,
                     sourceCollection: 'gastos',
                     sourceId: item.id,
                     sourceType: 'Gasto',
@@ -226,7 +233,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
                     subcategory: mergedExpense.subcategory,
                     paymentMethod: normalizedPaymentMethod,
                 });
-                await updateDoc(doc(db, collectionName, item.id), {
+                await updateDoc(companyDoc(db, activeCompany, collectionName, item.id), {
                     paymentMethod: normalizedPaymentMethod,
                     linkedCreditCardMovementId: movementId,
                 });
@@ -252,15 +259,15 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete }) => {
         setLoading(true);
         try {
             if (collectionName === 'compras') {
-                const result = await deletePurchaseTransaction(item.id);
+                const result = await deletePurchaseTransaction(item.id, activeCompany);
                 if (result?.blocked) {
                     alert(buildBlockingMessage(result.blockingAbonos));
                     return;
                 }
             } else {
-                await deleteDoc(doc(db, collectionName, item.id));
+                await deleteDoc(companyDoc(db, activeCompany, collectionName, item.id));
                 if (collectionName === 'gastos') {
-                    await deleteCreditCardMovementForSource('gastos', item.id);
+                    await deleteCreditCardMovementForSource('gastos', item.id, activeCompany);
                 }
             }
             onDelete(item.id);
@@ -393,6 +400,7 @@ const EditableList = ({
     data,
     collectionName,
     fields,
+    activeCompany,
     filterValue,
     filterType = 'month',
     filterLabel = 'Filtrar por Mes',
@@ -540,6 +548,7 @@ const EditableList = ({
                                     item={item}
                                     collectionName={collectionName}
                                     fields={fields}
+                                    activeCompany={activeCompany}
                                     onUpdate={handleUpdate}
                                     onDelete={handleDelete}
                                 />
@@ -554,13 +563,14 @@ const EditableList = ({
 
 // --- FORMULARIOS ---
 
-const IncomeForm = ({ loading, setLoading, onSuccess }) => {
+const IncomeForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('VENTA DEL DIA');
     const [reference, setReference] = useState('');
     const [amount, setAmount] = useState('');
     const [syncDate, setSyncDate] = useState(getLocalDateString());
     const [syncLoading, setSyncLoading] = useState(false);
+    const canSyncSicar = activeCompany?.dataMode === 'legacy';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -570,14 +580,15 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
 
         setLoading(true);
         try {
-            await addDoc(collection(db, 'ingresos'), {
+            const companyBranch = getCompanyBranch(activeCompany);
+            await addDoc(companyCollection(db, activeCompany, 'ingresos'), {
                 date,
                 month: date.substring(0, 7),
                 description: description.trim().toUpperCase(),
                 reference: reference.trim().toUpperCase(),
                 amount: numAmount,
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
+                branch: companyBranch.branch,
+                branchName: companyBranch.branchName,
                 source: 'manual',
                 sourceLabel: 'MANUAL',
                 timestamp: Timestamp.now(),
@@ -596,9 +607,13 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
     };
 
     const handleSyncIncome = async () => {
+        if (!canSyncSicar) {
+            alert('La sincronizacion SICAR de esta empresa se configura aparte para mantener bases separadas.');
+            return;
+        }
         setSyncLoading(true);
         try {
-            const result = await syncSicarDailyIncome({ date: syncDate });
+            const result = await syncSicarDailyIncome({ date: syncDate, companyId: activeCompany?.id });
             const syncedTotal = Number(result?.totalAmount || 0);
             const syncedCount = Number(result?.syncedCount || 0);
             const syncedDate = result?.startDate || syncDate;
@@ -615,17 +630,21 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
     return (
         <div className="space-y-4">
             <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
-                Base: {DEFAULT_BRANCH_NAME}
+                Base: {activeCompany?.branchName || DEFAULT_BRANCH_NAME}
             </div>
 
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                 <div className="mb-3">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-800">Sincronizar desde SICAR</h4>
-                    <p className="text-xs text-emerald-700 mt-0.5">Sincroniza el total diario sin duplicar el ingreso manual del mismo dia.</p>
+                    <p className="text-xs text-emerald-700 mt-0.5">
+                        {canSyncSicar
+                            ? 'Sincroniza el total diario sin duplicar el ingreso manual del mismo dia.'
+                            : 'Disponible cuando configuremos el integrador SICAR propio de esta empresa.'}
+                    </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <Input label="Fecha SICAR" type="date" icon="calendar" value={syncDate} onChange={e => setSyncDate(e.target.value)} />
-                    <Button type="button" variant="success" disabled={syncLoading} className="self-end w-full" onClick={handleSyncIncome}>
+                    <Button type="button" variant="success" disabled={syncLoading || !canSyncSicar} className="self-end w-full" onClick={handleSyncIncome}>
                         {syncLoading ? 'Sincronizando...' : 'Sincronizar SICAR'}
                     </Button>
                 </div>
@@ -643,7 +662,7 @@ const IncomeForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
+const ExpenseForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
@@ -665,11 +684,13 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
 
         setLoading(true);
         try {
-            const expenseRef = doc(collection(db, 'gastos'));
+            const companyBranch = getCompanyBranch(activeCompany);
+            const expenseRef = doc(companyCollection(db, activeCompany, 'gastos'));
             const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod, CASH_PAYMENT_METHOD);
             const batch = writeBatch(db);
             const creditCardMovement = isCreditCardPayment(normalizedPaymentMethod)
                 ? setCreditCardChargeInBatch(batch, {
+                    activeCompany,
                     sourceCollection: 'gastos',
                     sourceId: expenseRef.id,
                     sourceType: 'Gasto',
@@ -689,8 +710,8 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
                 category: classification.category,
                 subcategory: classification.subcategory,
                 categoryKey: `${classification.category} / ${classification.subcategory}`,
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
+                branch: companyBranch.branch,
+                branchName: companyBranch.branchName,
                 paymentMethod: normalizedPaymentMethod,
                 paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
                 linkedCreditCardMovementId: creditCardMovement?.id || null,
@@ -716,6 +737,7 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
             skipEmptyLines: true,
             complete: async ({ data, errors }) => {
                 if (errors.length) return alert("Error en CSV.");
+                const companyBranch = getCompanyBranch(activeCompany);
                 const validData = data.filter(row => row['Monto'] && !isNaN(parseFloat(row['Monto']))).map(row => {
                     const classification = normalizeExpenseClassification({
                         category: row['Categoria'] || 'Otros',
@@ -729,8 +751,8 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
                     category: classification.category,
                     subcategory: classification.subcategory,
                     categoryKey: `${classification.category} / ${classification.subcategory}`,
-                    branch: DEFAULT_BRANCH_ID,
-                    branchName: DEFAULT_BRANCH_NAME,
+                    branch: companyBranch.branch,
+                    branchName: companyBranch.branchName,
                     paymentMethod: CASH_PAYMENT_METHOD,
                     paymentMethodLabel: getPaymentMethodLabel(CASH_PAYMENT_METHOD),
                     timestamp: Timestamp.now(), is_conciled: false
@@ -738,7 +760,7 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
                 });
                 setLoading(true);
                 try {
-                    for (const item of validData) await addDoc(collection(db, 'gastos'), item);
+                    for (const item of validData) await addDoc(companyCollection(db, activeCompany, 'gastos'), item);
                     alert(`Éxito: ${validData.length} gastos importados.`);
                     onSuccess?.();
                 } catch (error) {
@@ -754,7 +776,7 @@ const ExpenseForm = ({ loading, setLoading, onSuccess }) => {
         <div className="space-y-4">
             <form onSubmit={handleSubmit} className="space-y-3">
                 <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
-                    Base: {DEFAULT_BRANCH_NAME}
+                    Base: {activeCompany?.branchName || DEFAULT_BRANCH_NAME}
                 </div>
                 <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
                 <Input label="Descripción" icon="fileText" placeholder="Ej: Pago de servicios..." value={description} onChange={e => setDescription(e.target.value)} required />
@@ -789,7 +811,7 @@ const getCurrentMonth = () => {
     return getLocalMonthString();
 };
 
-const InventoryForm = ({ loading, setLoading, onSuccess }) => {
+const InventoryForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [month, setMonth] = useState(getCurrentMonth());
     const [type, setType] = useState('inicial');
     const [amount, setAmount] = useState('');
@@ -798,12 +820,13 @@ const InventoryForm = ({ loading, setLoading, onSuccess }) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await addDoc(collection(db, 'inventarios'), {
+            const companyBranch = getCompanyBranch(activeCompany);
+            await addDoc(companyCollection(db, activeCompany, 'inventarios'), {
                 month,
                 type,
                 amount: Number(amount) || 0,
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
+                branch: companyBranch.branch,
+                branchName: companyBranch.branchName,
                 timestamp: Timestamp.now()
             });
             setAmount(''); onSuccess?.();
@@ -814,7 +837,7 @@ const InventoryForm = ({ loading, setLoading, onSuccess }) => {
     return (
         <form onSubmit={handleSubmit} className="space-y-3">
             <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
-                Base: {DEFAULT_BRANCH_NAME}
+                Base: {activeCompany?.branchName || DEFAULT_BRANCH_NAME}
             </div>
             <Input label="Mes" type="month" icon="calendar" value={month} onChange={e => setMonth(e.target.value)} required />
             <Select label="Tipo" icon="box" value={type} onChange={e => setType(e.target.value)} options={<><option value="inicial">Inicial</option><option value="final">Final</option></>} />
@@ -824,7 +847,7 @@ const InventoryForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
+const PurchasesForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [date, setDate] = useState(getLocalDateString());
     const [supplier, setSupplier] = useState('');
     const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -846,11 +869,13 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
                 subcategory,
                 supplier,
             });
-            const purchaseRef = doc(collection(db, 'compras'));
+            const companyBranch = getCompanyBranch(activeCompany);
+            const purchaseRef = doc(companyCollection(db, activeCompany, 'compras'));
             const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod, CASH_PAYMENT_METHOD);
             const batch = writeBatch(db);
             const creditCardMovement = isCreditCardPayment(normalizedPaymentMethod)
                 ? setCreditCardChargeInBatch(batch, {
+                    activeCompany,
                     sourceCollection: 'compras',
                     sourceId: purchaseRef.id,
                     sourceType: 'Compra',
@@ -874,8 +899,8 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
                 category: classification.category,
                 subcategory: classification.subcategory,
                 categoryKey: `${classification.category} / ${classification.subcategory}`,
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
+                branch: companyBranch.branch,
+                branchName: companyBranch.branchName,
                 paymentType: 'contado',
                 paymentMethod: normalizedPaymentMethod,
                 paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
@@ -904,7 +929,7 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
                 Compra de contado
             </div>
             <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
-                Base: {DEFAULT_BRANCH_NAME}
+                Base: {activeCompany?.branchName || DEFAULT_BRANCH_NAME}
             </div>
             <Input label="Fecha" type="date" icon="calendar" value={date} onChange={e => setDate(e.target.value)} required />
             <Input label="Proveedor" icon="users" placeholder="Nombre del proveedor" value={supplier} onChange={e => setSupplier(e.target.value)} required />
@@ -925,7 +950,7 @@ const PurchasesForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const DepreciationForm = ({ loading, setLoading, onSuccess }) => {
+const DepreciationForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [depreciationType, setDepreciationType] = useState('');
     const [amount, setAmount] = useState('');
     const [purchaseDate, setPurchaseDate] = useState(getLocalDateString());
@@ -956,15 +981,16 @@ const DepreciationForm = ({ loading, setLoading, onSuccess }) => {
 
         setLoading(true);
         try {
-            await addDoc(collection(db, 'depreciaciones'), {
+            const companyBranch = getCompanyBranch(activeCompany);
+            await addDoc(companyCollection(db, activeCompany, 'depreciaciones'), {
                 depreciationType: depreciationType.trim().toUpperCase(),
                 amount: numAmount,
                 purchaseDate,
                 depreciateFrom,
                 usefulLifeYears: numYears,
                 month: depreciateFrom.substring(0, 7),
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
+                branch: companyBranch.branch,
+                branchName: companyBranch.branchName,
                 timestamp: Timestamp.now(),
             });
             setDepreciationType('');
@@ -987,7 +1013,7 @@ const DepreciationForm = ({ loading, setLoading, onSuccess }) => {
                 Depreciacion lineal mensual
             </div>
             <div className="erp-chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold">
-                Base: {DEFAULT_BRANCH_NAME}
+                Base: {activeCompany?.branchName || DEFAULT_BRANCH_NAME}
             </div>
             <Input
                 label="Tipo de depreciacion"
@@ -1016,7 +1042,7 @@ const DepreciationForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const BudgetForm = ({ loading, setLoading, onSuccess }) => {
+const BudgetForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [month, setMonth] = useState(getCurrentMonth());
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState('');
@@ -1033,7 +1059,7 @@ const BudgetForm = ({ loading, setLoading, onSuccess }) => {
         setLoading(true);
         try {
             const classification = normalizeExpenseClassification({ category, subcategory });
-            await addDoc(collection(db, 'presupuestos'), {
+            await addDoc(companyCollection(db, activeCompany, 'presupuestos'), {
                 month,
                 category: classification.category,
                 subcategory: classification.subcategory,
@@ -1057,7 +1083,7 @@ const BudgetForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const ReceivableForm = ({ loading, setLoading, onSuccess }) => {
+const ReceivableForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
@@ -1066,7 +1092,7 @@ const ReceivableForm = ({ loading, setLoading, onSuccess }) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await addDoc(collection(db, 'cuentasPorCobrar'), { date, description, amount: Number(amount) || 0, timestamp: Timestamp.now() });
+            await addDoc(companyCollection(db, activeCompany, 'cuentasPorCobrar'), { date, description, amount: Number(amount) || 0, timestamp: Timestamp.now() });
             setDescription(''); setAmount(''); onSuccess?.();
         } catch (error) { alert('Error'); }
         finally { setLoading(false); }
@@ -1082,7 +1108,7 @@ const ReceivableForm = ({ loading, setLoading, onSuccess }) => {
     );
 };
 
-const EquityForm = ({ loading, setLoading, onSuccess }) => {
+const EquityForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [date, setDate] = useState(getLocalDateString());
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
@@ -1091,7 +1117,7 @@ const EquityForm = ({ loading, setLoading, onSuccess }) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await addDoc(collection(db, 'patrimonio'), { date, description, amount: Number(amount) || 0, timestamp: Timestamp.now() });
+            await addDoc(companyCollection(db, activeCompany, 'patrimonio'), { date, description, amount: Number(amount) || 0, timestamp: Timestamp.now() });
             setDescription(''); setAmount(''); onSuccess?.();
         } catch (error) { alert('Error'); }
         finally { setLoading(false); }
@@ -1111,7 +1137,7 @@ const EquityForm = ({ loading, setLoading, onSuccess }) => {
 
 const VALID_TABS = ['Ingresos', 'Gastos', 'Inventario', 'Compras', 'Depreciaciones', 'Presupuesto', 'Cuentas por Cobrar', 'Patrimonio'];
 
-export function DataEntry({ categories, data }) {
+export function DataEntry({ categories, data, activeCompany }) {
     const [searchParams] = useSearchParams();
     const urlTab = searchParams.get('tab');
 
@@ -1297,8 +1323,8 @@ export function DataEntry({ categories, data }) {
                 month: item.month || ((item.date || item.fecha) ? (item.date || item.fecha).substring(0, 7) : ''),
                 supplier: item.supplier || item.proveedor || 'REGISTRO LEGACY',
                 invoiceNumber: item.invoiceNumber || item.numero || '',
-                branch: item.branch || DEFAULT_BRANCH_ID,
-                branchName: item.branchName || DEFAULT_BRANCH_NAME,
+                branch: item.branch || activeCompany?.branchId || DEFAULT_BRANCH_ID,
+                branchName: item.branchName || activeCompany?.branchName || DEFAULT_BRANCH_NAME,
                 paymentType: item.paymentType || (item.sourceFacturaId || item.linkedPayableId ? 'credito' : ((item.date || item.fecha) ? 'contado' : 'legacy')),
                 paymentMethod: normalizePaymentMethod(
                     item.paymentMethod,
@@ -1344,6 +1370,7 @@ export function DataEntry({ categories, data }) {
                     category: classification.category,
                     subcategory: classification.subcategory,
                     categoryKey: `${classification.category} / ${classification.subcategory}`,
+                    paymentMethod: normalizePaymentMethod(item.paymentMethod, CASH_PAYMENT_METHOD),
                 };
             });
         }
@@ -1397,7 +1424,7 @@ export function DataEntry({ categories, data }) {
                             {tabsConfig[activeTab].label}
                         </span>
                         <span className="rounded-full border border-[#d7dfe6] bg-white px-3 py-1 text-xs font-semibold text-[#5d7784]">
-                            {DEFAULT_BRANCH_NAME}
+                            {activeCompany?.branchName || DEFAULT_BRANCH_NAME}
                         </span>
                     </div>
                 </div>
@@ -1427,14 +1454,14 @@ export function DataEntry({ categories, data }) {
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[390px_minmax(0,1fr)]">
                 <div className="no-print animate-fade-in">
                     <Card title={`Captura activa · ${tabsConfig[activeTab].label}`} icon={tabsConfig[activeTab].icon} gradient={true}>
-                        {activeTab === 'Ingresos' && <IncomeForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Gastos' && <ExpenseForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Inventario' && <InventoryForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Compras' && <PurchasesForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Depreciaciones' && <DepreciationForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Presupuesto' && <BudgetForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Cuentas por Cobrar' && <ReceivableForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
-                        {activeTab === 'Patrimonio' && <EquityForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} />}
+                        {activeTab === 'Ingresos' && <IncomeForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} activeCompany={activeCompany} />}
+                        {activeTab === 'Gastos' && <ExpenseForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} activeCompany={activeCompany} />}
+                        {activeTab === 'Inventario' && <InventoryForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} activeCompany={activeCompany} />}
+                        {activeTab === 'Compras' && <PurchasesForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} activeCompany={activeCompany} />}
+                        {activeTab === 'Depreciaciones' && <DepreciationForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} activeCompany={activeCompany} />}
+                        {activeTab === 'Presupuesto' && <BudgetForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} activeCompany={activeCompany} />}
+                        {activeTab === 'Cuentas por Cobrar' && <ReceivableForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} activeCompany={activeCompany} />}
+                        {activeTab === 'Patrimonio' && <EquityForm loading={loading} setLoading={setLoading} onSuccess={handleSuccess} activeCompany={activeCompany} />}
                     </Card>
                 </div>
 
@@ -1444,6 +1471,7 @@ export function DataEntry({ categories, data }) {
                             data={getListData()}
                             collectionName={getCollectionName()}
                             fields={fieldsConfig[activeTab]}
+                            activeCompany={activeCompany}
                             filterValue={filterMonth[activeTab]}
                             filterType={filterConfig[activeTab].type}
                             filterLabel={filterConfig[activeTab].label}

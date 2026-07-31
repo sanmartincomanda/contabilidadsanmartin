@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { 
-    collection, query, where, getDocs, doc, 
+    query, where, getDocs,
     updateDoc, writeBatch, addDoc, runTransaction, 
 } from 'firebase/firestore';
 // Asegúrate de que fmt esté definido en tu constants.js
 import { fmt } from '../constants'; 
+import { companyCollection, companyDoc } from '../services/companyFirestore';
 
 // Define las columnas que la app NECESITA para hacer el match
 const REQUIRED_FIELDS = [
@@ -15,7 +16,7 @@ const REQUIRED_FIELDS = [
     { key: 'concept', label: 'Concepto/Referencia' },
 ];
 
-export function BankReconciliation() {
+export function BankReconciliation({ activeCompany }) {
     const [file, setFile] = useState(null);
     const [headers, setHeaders] = useState([]);
     const [mapping, setMapping] = useState({});
@@ -40,7 +41,7 @@ export function BankReconciliation() {
     // ----------------------------------------------------------------------
 
     const getNextReconciliationId = async () => {
-        const counterRef = doc(db, "counters", "reconciliationId");
+        const counterRef = companyDoc(db, activeCompany, "counters", "reconciliationId");
         
         try {
             const resultId = await runTransaction(db, async (transaction) => {
@@ -70,8 +71,8 @@ export function BankReconciliation() {
         setPendingBankTxs(bankTxs);
         
         // 2. Transacciones de la App aún no conciliadas 
-        const qIngresos = query(collection(db, 'ingresos'), where('is_conciled', '==', false));
-        const qGastos = query(collection(db, 'gastos'), where('is_conciled', '==', false));
+        const qIngresos = query(companyCollection(db, activeCompany, 'ingresos'), where('is_conciled', '==', false));
+        const qGastos = query(companyCollection(db, activeCompany, 'gastos'), where('is_conciled', '==', false));
 
         const [snapshotIngresos, snapshotGastos] = await Promise.all([getDocs(qIngresos), getDocs(qGastos)]);
         
@@ -96,7 +97,7 @@ export function BankReconciliation() {
 
             try {
                 // Intenta cargar el estado de conciliación no finalizado
-                const q = query(collection(db, 'bank_statements'), where('is_finalized', '==', false));
+                const q = query(companyCollection(db, activeCompany, 'bank_statements'), where('is_finalized', '==', false));
                 const snapshot = await getDocs(q);
 
                 if (!isMounted) return;
@@ -120,7 +121,7 @@ export function BankReconciliation() {
 
         loadPending();
         return () => { isMounted = false; };
-    }, []);
+    }, [activeCompany]);
 
 
     // ----------------------------------------------------------------------
@@ -216,7 +217,7 @@ export function BankReconciliation() {
                     bankTx.is_conciled = true;
                     bankTx.app_id = matchedAppTx.id;
 
-                    const docRef = doc(db, matchedAppTx.collection, matchedAppTx.id);
+                    const docRef = companyDoc(db, activeCompany, matchedAppTx.collection, matchedAppTx.id);
                     batchApp.update(docRef, { is_conciled: true, conciled_date: new Date(), bank_concept: bankTx.concept });
                     matchedCount++;
                     
@@ -235,7 +236,7 @@ export function BankReconciliation() {
                 transactions: currentBankData,
                 is_finalized: false,
             };
-            const docRef = await addDoc(collection(db, 'bank_statements'), newStatement);
+            const docRef = await addDoc(companyCollection(db, activeCompany, 'bank_statements'), newStatement);
             await batchApp.commit(); 
             
             // 5. Actualizar estados
@@ -302,7 +303,7 @@ export function BankReconciliation() {
             const batch = writeBatch(db);
             
             // 1. Marcar la transacción de la App como conciliada
-            const appDocRef = doc(db, collectionName, appTxId);
+            const appDocRef = companyDoc(db, activeCompany, collectionName, appTxId);
             batch.update(appDocRef, { 
                 is_conciled: true, 
                 conciled_date: new Date(),
@@ -310,7 +311,7 @@ export function BankReconciliation() {
             });
             
             // 2. Marcar las transacciones del Banco como conciliadas y vincularlas
-            const statementDocRef = doc(db, 'bank_statements', statementData.id);
+            const statementDocRef = companyDoc(db, activeCompany, 'bank_statements', statementData.id);
             const updatedBankTxs = statementData.transactions.map(tx => {
                 if (bankTxIds.includes(tx.id)) {
                     return { ...tx, is_conciled: true, app_id: appTxId, multi_match: true };
@@ -344,7 +345,7 @@ export function BankReconciliation() {
             const bankTx = pendingBankTxs.find(tx => tx.id === bankTxId);
 
             // 1. Marcar en la App
-            const appDocRef = doc(db, collectionName, appTxId);
+            const appDocRef = companyDoc(db, activeCompany, collectionName, appTxId);
             batch.update(appDocRef, { 
                 is_conciled: true, 
                 conciled_date: new Date(),
@@ -352,7 +353,7 @@ export function BankReconciliation() {
             });
             
             // 2. Marcar en el Estado de Cuenta Bancario
-            const statementDocRef = doc(db, 'bank_statements', statementData.id);
+            const statementDocRef = companyDoc(db, activeCompany, 'bank_statements', statementData.id);
             const updatedBankTxs = statementData.transactions.map(tx => 
                 tx.id === bankTxId ? { ...tx, is_conciled: true, app_id: appTxId } : tx
             );
@@ -382,7 +383,7 @@ export function BankReconciliation() {
                 tx.id === bankTxId ? { ...tx, is_conciled: true, notes: "Excluded by user" } : tx
             );
 
-            const docRef = doc(db, 'bank_statements', statementData.id);
+            const docRef = companyDoc(db, activeCompany, 'bank_statements', statementData.id);
             await updateDoc(docRef, { transactions: updatedBankTxs });
 
             // Actualizar la UI
@@ -403,7 +404,7 @@ export function BankReconciliation() {
         
         try {
             // 1. Marcar el extracto como finalizado en Firebase
-            const docRef = doc(db, 'bank_statements', statementData.id);
+            const docRef = companyDoc(db, activeCompany, 'bank_statements', statementData.id);
             await updateDoc(docRef, { is_finalized: true, finalized_date: new Date() });
             
             // 2. Limpiar estados para empezar de nuevo

@@ -1,6 +1,4 @@
 import {
-    collection,
-    doc,
     getDoc,
     getDocs,
     query,
@@ -8,6 +6,7 @@ import {
     writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { companyCollection, companyDoc } from './companyFirestore';
 import {
     deleteCreditCardMovementInBatch,
     getCreditCardMovementId,
@@ -22,20 +21,20 @@ const uniqueRefs = (refs) => {
     return Array.from(refMap.values());
 };
 
-const addExistingRef = async (refs, collectionName, id) => {
+const addExistingRef = async (refs, collectionName, id, activeCompany) => {
     if (!id) return;
-    const recordRef = doc(db, collectionName, id);
+    const recordRef = companyDoc(db, activeCompany, collectionName, id);
     const recordSnap = await getDoc(recordRef);
     if (recordSnap.exists()) {
         refs.push(recordRef);
     }
 };
 
-const getBlockingAbonos = async (facturaIds) => {
+const getBlockingAbonos = async (facturaIds, activeCompany) => {
     if (!facturaIds.length) return [];
 
     const facturaIdSet = new Set(facturaIds);
-    const abonosSnap = await getDocs(collection(db, 'abonos_pagar'));
+    const abonosSnap = await getDocs(companyCollection(db, activeCompany, 'abonos_pagar'));
 
     return abonosSnap.docs
         .map((abonoDoc) => ({ id: abonoDoc.id, ...abonoDoc.data() }))
@@ -44,14 +43,14 @@ const getBlockingAbonos = async (facturaIds) => {
         );
 };
 
-const findPurchaseRefsForPayable = async (payableId, mirroredPurchaseId) => {
+const findPurchaseRefsForPayable = async (payableId, mirroredPurchaseId, activeCompany) => {
     const purchaseRefs = [];
 
-    await addExistingRef(purchaseRefs, 'compras', mirroredPurchaseId);
+    await addExistingRef(purchaseRefs, 'compras', mirroredPurchaseId, activeCompany);
 
     const linkedQueries = [
-        query(collection(db, 'compras'), where('linkedPayableId', '==', payableId)),
-        query(collection(db, 'compras'), where('sourceFacturaId', '==', payableId)),
+        query(companyCollection(db, activeCompany, 'compras'), where('linkedPayableId', '==', payableId)),
+        query(companyCollection(db, activeCompany, 'compras'), where('sourceFacturaId', '==', payableId)),
     ];
 
     for (const linkedQuery of linkedQueries) {
@@ -62,14 +61,14 @@ const findPurchaseRefsForPayable = async (payableId, mirroredPurchaseId) => {
     return uniqueRefs(purchaseRefs);
 };
 
-const findPayableRefsForPurchase = async (purchaseId, purchaseData) => {
+const findPayableRefsForPurchase = async (purchaseId, purchaseData, activeCompany) => {
     const payableRefs = [];
 
-    await addExistingRef(payableRefs, 'cuentas_por_pagar', purchaseData?.linkedPayableId);
-    await addExistingRef(payableRefs, 'cuentas_por_pagar', purchaseData?.sourceFacturaId);
+    await addExistingRef(payableRefs, 'cuentas_por_pagar', purchaseData?.linkedPayableId, activeCompany);
+    await addExistingRef(payableRefs, 'cuentas_por_pagar', purchaseData?.sourceFacturaId, activeCompany);
 
     const linkedQueries = [
-        query(collection(db, 'cuentas_por_pagar'), where('mirroredPurchaseId', '==', purchaseId)),
+        query(companyCollection(db, activeCompany, 'cuentas_por_pagar'), where('mirroredPurchaseId', '==', purchaseId)),
     ];
 
     for (const linkedQuery of linkedQueries) {
@@ -80,13 +79,13 @@ const findPayableRefsForPurchase = async (purchaseId, purchaseData) => {
     return uniqueRefs(payableRefs);
 };
 
-const findGastoRefsForPurchase = async (purchaseId, purchaseData) => {
+const findGastoRefsForPurchase = async (purchaseId, purchaseData, activeCompany) => {
     const gastoRefs = [];
 
-    await addExistingRef(gastoRefs, 'gastosDiarios', purchaseData?.sourceGastoDiarioId);
+    await addExistingRef(gastoRefs, 'gastosDiarios', purchaseData?.sourceGastoDiarioId, activeCompany);
 
     const gastosSnap = await getDocs(
-        query(collection(db, 'gastosDiarios'), where('linkedPurchaseId', '==', purchaseId))
+        query(companyCollection(db, activeCompany, 'gastosDiarios'), where('linkedPurchaseId', '==', purchaseId))
     );
     gastosSnap.docs.forEach((gastoDoc) => gastoRefs.push(gastoDoc.ref));
 
@@ -141,8 +140,8 @@ const buildGastoMirrorUpdate = (purchaseData, gastoData) => ({
     linkedCreditCardMovementId: purchaseData.linkedCreditCardMovementId || gastoData?.linkedCreditCardMovementId || null,
 });
 
-export async function deletePayableTransaction(payableId) {
-    const payableRef = doc(db, 'cuentas_por_pagar', payableId);
+export async function deletePayableTransaction(payableId, activeCompany) {
+    const payableRef = companyDoc(db, activeCompany, 'cuentas_por_pagar', payableId);
     const payableSnap = await getDoc(payableRef);
 
     if (!payableSnap.exists()) {
@@ -150,7 +149,7 @@ export async function deletePayableTransaction(payableId) {
     }
 
     const payableData = payableSnap.data();
-    const blockingAbonos = await getBlockingAbonos([payableId]);
+    const blockingAbonos = await getBlockingAbonos([payableId], activeCompany);
 
     if (blockingAbonos.length) {
         return {
@@ -162,14 +161,15 @@ export async function deletePayableTransaction(payableId) {
 
     const purchaseRefs = await findPurchaseRefsForPayable(
         payableId,
-        payableData?.mirroredPurchaseId
+        payableData?.mirroredPurchaseId,
+        activeCompany
     );
 
     const batch = writeBatch(db);
     batch.delete(payableRef);
     purchaseRefs.forEach((purchaseRef) => {
         batch.delete(purchaseRef);
-        deleteCreditCardMovementInBatch(batch, 'compras', purchaseRef.id);
+        deleteCreditCardMovementInBatch(batch, 'compras', purchaseRef.id, activeCompany);
     });
     await batch.commit();
 
@@ -179,8 +179,8 @@ export async function deletePayableTransaction(payableId) {
     };
 }
 
-export async function deletePurchaseTransaction(purchaseId) {
-    const purchaseRef = doc(db, 'compras', purchaseId);
+export async function deletePurchaseTransaction(purchaseId, activeCompany) {
+    const purchaseRef = companyDoc(db, activeCompany, 'compras', purchaseId);
     const purchaseSnap = await getDoc(purchaseRef);
 
     if (!purchaseSnap.exists()) {
@@ -188,8 +188,8 @@ export async function deletePurchaseTransaction(purchaseId) {
     }
 
     const purchaseData = purchaseSnap.data();
-    const payableRefs = await findPayableRefsForPurchase(purchaseId, purchaseData);
-    const blockingAbonos = await getBlockingAbonos(payableRefs.map((payableRef) => payableRef.id));
+    const payableRefs = await findPayableRefsForPurchase(purchaseId, purchaseData, activeCompany);
+    const blockingAbonos = await getBlockingAbonos(payableRefs.map((payableRef) => payableRef.id), activeCompany);
 
     if (blockingAbonos.length) {
         return {
@@ -199,15 +199,15 @@ export async function deletePurchaseTransaction(purchaseId) {
         };
     }
 
-    const gastoRefs = await findGastoRefsForPurchase(purchaseId, purchaseData);
+    const gastoRefs = await findGastoRefsForPurchase(purchaseId, purchaseData, activeCompany);
 
     const batch = writeBatch(db);
     batch.delete(purchaseRef);
-    deleteCreditCardMovementInBatch(batch, 'compras', purchaseId);
+    deleteCreditCardMovementInBatch(batch, 'compras', purchaseId, activeCompany);
     payableRefs.forEach((payableRef) => batch.delete(payableRef));
     gastoRefs.forEach((gastoRef) => {
         batch.delete(gastoRef);
-        deleteCreditCardMovementInBatch(batch, 'gastosDiarios', gastoRef.id);
+        deleteCreditCardMovementInBatch(batch, 'gastosDiarios', gastoRef.id, activeCompany);
     });
     await batch.commit();
 
@@ -218,8 +218,8 @@ export async function deletePurchaseTransaction(purchaseId) {
     };
 }
 
-export async function updatePurchaseTransaction(purchaseId, purchaseUpdates) {
-    const purchaseRef = doc(db, 'compras', purchaseId);
+export async function updatePurchaseTransaction(purchaseId, purchaseUpdates, activeCompany) {
+    const purchaseRef = companyDoc(db, activeCompany, 'compras', purchaseId);
     const purchaseSnap = await getDoc(purchaseRef);
 
     if (!purchaseSnap.exists()) {
@@ -247,12 +247,13 @@ export async function updatePurchaseTransaction(purchaseId, purchaseUpdates) {
         ? getCreditCardMovementId(movementSourceCollection, movementSourceId)
         : null;
 
-    const payableRefs = await findPayableRefsForPurchase(purchaseId, nextPurchase);
-    const gastoRefs = await findGastoRefsForPurchase(purchaseId, nextPurchase);
+    const payableRefs = await findPayableRefsForPurchase(purchaseId, nextPurchase, activeCompany);
+    const gastoRefs = await findGastoRefsForPurchase(purchaseId, nextPurchase, activeCompany);
 
     const batch = writeBatch(db);
     batch.update(purchaseRef, nextPurchase);
     syncCreditCardMovementInBatch(batch, {
+        activeCompany,
         sourceCollection: movementSourceCollection,
         sourceId: movementSourceId,
         sourceType: 'Compra',
@@ -266,7 +267,7 @@ export async function updatePurchaseTransaction(purchaseId, purchaseUpdates) {
         paymentMethod: nextPurchase.paymentMethod,
     });
     if (movementSourceCollection !== 'compras') {
-        deleteCreditCardMovementInBatch(batch, 'compras', purchaseId);
+        deleteCreditCardMovementInBatch(batch, 'compras', purchaseId, activeCompany);
     }
 
     for (const payableRef of payableRefs) {

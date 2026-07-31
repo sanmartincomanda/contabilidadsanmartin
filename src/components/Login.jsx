@@ -58,7 +58,7 @@ export default function Login() {
                         <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-2 backdrop-blur-sm">
                             <img
                                 src={BRAND_LOGO}
-                                alt="Carnes Amparito"
+                                alt="Sistema Contable"
                                 className="h-24 w-24 rounded-[22px] border border-white/10 bg-white p-2 object-cover shadow-[0_18px_35px_-22px_rgba(0,0,0,.85)]"
                             />
                         </div>
@@ -75,14 +75,14 @@ export default function Login() {
                     <div className="mb-8 flex items-center gap-4 lg:hidden">
                         <img
                             src={BRAND_LOGO}
-                            alt="Carnes Amparito"
+                            alt="Sistema Contable"
                             className="h-16 w-16 rounded-[20px] border border-[#d8e0e7] bg-white p-2 object-cover shadow-sm"
                         />
                         <div>
                             <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#60717e]">
                                 Executive ERP
                             </div>
-                            <div className="text-2xl font-extrabold tracking-tight text-[#16222d]">Carnes Amparito</div>
+                            <div className="text-2xl font-extrabold tracking-tight text-[#16222d]">Sistema Contable</div>
                         </div>
                     </div>
 

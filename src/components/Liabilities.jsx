@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { deleteDoc, doc } from 'firebase/firestore';
+import { deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { fmt } from '../constants';
 import { getLocalDateString } from '../utils/localDate';
+import { companyDoc } from '../services/companyFirestore';
 import {
     CASH_PAYMENT_METHOD,
     CREDIT_CARD_ID,
@@ -94,7 +95,7 @@ const Badge = ({ children, tone = 'neutral' }) => {
     );
 };
 
-export default function Liabilities({ data = {} }) {
+export default function Liabilities({ data = {}, activeCompany }) {
     const [paymentDate, setPaymentDate] = useState(getLocalDateString());
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(TRANSFER_PAYMENT_METHOD);
@@ -147,6 +148,7 @@ export default function Liabilities({ data = {} }) {
         setLoading(true);
         try {
             await addCreditCardPayment({
+                activeCompany,
                 date: paymentDate,
                 amount,
                 description,
@@ -168,7 +170,7 @@ export default function Liabilities({ data = {} }) {
 
         setLoading(true);
         try {
-            await deleteDoc(doc(db, CREDIT_CARD_MOVEMENTS_COLLECTION, movement.id));
+            await deleteDoc(companyDoc(db, activeCompany, CREDIT_CARD_MOVEMENTS_COLLECTION, movement.id));
         } catch (error) {
             console.error('Error eliminando abono de tarjeta:', error);
             alert('No se pudo eliminar el abono: ' + error.message);

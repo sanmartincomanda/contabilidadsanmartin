@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { companyCollection, companyDoc } from '../services/companyFirestore';
 import { EXPENSE_CATEGORY_TREE, getLegacyCategoryMappingRows } from '../services/expenseCategories';
 
 const Card = ({ title, eyebrow, children, className = '' }) => (
@@ -13,7 +14,7 @@ const Card = ({ title, eyebrow, children, className = '' }) => (
     </div>
 );
 
-export default function CategoryManager({ categories }) {
+export default function CategoryManager({ categories, activeCompany }) {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -25,7 +26,7 @@ export default function CategoryManager({ categories }) {
         if (!newCategoryName.trim()) return;
         setLoading(true);
         try {
-            await addDoc(collection(db, 'categorias'), {
+            await addDoc(companyCollection(db, activeCompany, 'categorias'), {
                 name: newCategoryName.trim(),
             });
             setNewCategoryName('');
@@ -40,7 +41,7 @@ export default function CategoryManager({ categories }) {
         if (!editingName.trim()) return;
         setLoading(true);
         try {
-            await updateDoc(doc(db, 'categorias', id), { name: editingName.trim() });
+            await updateDoc(companyDoc(db, activeCompany, 'categorias', id), { name: editingName.trim() });
             setEditingId(null);
             setEditingName('');
         } catch (error) {
@@ -54,7 +55,7 @@ export default function CategoryManager({ categories }) {
         if (!window.confirm('Eliminar esta categoria?')) return;
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'categorias', id));
+            await deleteDoc(companyDoc(db, activeCompany, 'categorias', id));
         } catch (error) {
             console.error('Error al eliminar categoria:', error);
         } finally {

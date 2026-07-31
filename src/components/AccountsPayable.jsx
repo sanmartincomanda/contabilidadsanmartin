@@ -2,12 +2,13 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import {
-    collection, addDoc, doc, Timestamp, runTransaction, writeBatch,
+    addDoc, doc, Timestamp, runTransaction, writeBatch,
     query, orderBy, limit, getDocs, deleteDoc
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { deletePayableTransaction } from '../services/linkedTransactions';
 import { getLocalDateString } from '../utils/localDate';
+import { companyCollection, companyDoc } from '../services/companyFirestore';
 import {
     CASH_PAYMENT_METHOD,
     PAYABLE_PAYMENT_METHOD_OPTIONS,
@@ -328,7 +329,7 @@ const toInvoiceView = (factura) => ({
 });
 
 // --- COMPONENTE PRINCIPAL ---
-export function AccountsPayable({ data }) {
+export function AccountsPayable({ data, activeCompany }) {
     const isCompactViewport = useCompactViewport();
     const [activeTab, setActiveTab] = useState('Estado de Cuenta');
     const [loading, setLoading] = useState(false);
@@ -349,11 +350,11 @@ export function AccountsPayable({ data }) {
     const facturas = useMemo(() => {
         return (data.cuentas_por_pagar || []).map((factura) => ({
             ...factura,
-            branch: DEFAULT_BRANCH_ID,
-            branchName: DEFAULT_BRANCH_NAME,
+            branch: factura.branch || activeCompany?.branchId || DEFAULT_BRANCH_ID,
+            branchName: factura.branchName || activeCompany?.branchName || DEFAULT_BRANCH_NAME,
             paymentType: factura.paymentType || 'credito',
         }));
-    }, [data.cuentas_por_pagar]);
+    }, [activeCompany, data.cuentas_por_pagar]);
 
     const abonos = data.abonos_pagar || [];
     const listaProveedores = data.proveedores || [];
@@ -492,17 +493,21 @@ export function AccountsPayable({ data }) {
 
         setLoading(true);
         try {
-            const facturaRef = doc(collection(db, 'cuentas_por_pagar'));
-            const compraRef = doc(collection(db, 'compras'), `credito_${facturaRef.id}`);
+            const companyBranch = {
+                branch: activeCompany?.branchId || DEFAULT_BRANCH_ID,
+                branchName: activeCompany?.branchName || DEFAULT_BRANCH_NAME,
+            };
+            const facturaRef = doc(companyCollection(db, activeCompany, 'cuentas_por_pagar'));
+            const compraRef = doc(companyCollection(db, activeCompany, 'compras'), `credito_${facturaRef.id}`);
             const batch = writeBatch(db);
 
             batch.set(facturaRef, {
                 fecha: facturaForm.fecha,
                 month: facturaForm.fecha.substring(0, 7),
                 proveedor: facturaForm.proveedor,
-                sucursal: DEFAULT_BRANCH_NAME,
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
+                sucursal: companyBranch.branchName,
+                branch: companyBranch.branch,
+                branchName: companyBranch.branchName,
                 numero: facturaForm.numero?.trim() || "S/N",
                 vencimiento: facturaForm.vencimiento || "",
                 monto: montoNum,
@@ -521,8 +526,8 @@ export function AccountsPayable({ data }) {
                 supplier: facturaForm.proveedor,
                 invoiceNumber: facturaForm.numero?.trim() || "S/N",
                 amount: montoNum,
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
+                branch: companyBranch.branch,
+                branchName: companyBranch.branchName,
                 paymentType: 'credito',
                 isInventoryCost: true,
                 sourceCollection: 'cuentas_por_pagar',
@@ -539,7 +544,7 @@ export function AccountsPayable({ data }) {
         } finally {
             setLoading(false);
         }
-    }, [facturaForm]);
+    }, [activeCompany, facturaForm]);
 
     // --- MODAL ABONOS ---
     const [showModalAbono, setShowModalAbono] = useState(false);
@@ -596,13 +601,13 @@ export function AccountsPayable({ data }) {
         setLoading(true);
         try {
             const fechaAbono = getLocalDateString();
-            const q = query(collection(db, 'abonos_pagar'), orderBy('secuencia', 'desc'), limit(1));
+            const q = query(companyCollection(db, activeCompany, 'abonos_pagar'), orderBy('secuencia', 'desc'), limit(1));
             const snap = await getDocs(q);
             const nuevaSecuencia = snap.empty ? 1 : (snap.docs[0].data().secuencia + 1);
-            const abonoRef = doc(collection(db, 'abonos_pagar'));
-            const gastoDiarioRef = paymentMethod === CASH_PAYMENT_METHOD ? doc(collection(db, 'gastosDiarios')) : null;
+            const abonoRef = doc(companyCollection(db, activeCompany, 'abonos_pagar'));
+            const gastoDiarioRef = paymentMethod === CASH_PAYMENT_METHOD ? doc(companyCollection(db, activeCompany, 'gastosDiarios')) : null;
             const creditCardMovementRef = isCreditCardPayment(paymentMethod)
-                ? getCreditCardMovementRef('abonos_pagar', abonoRef.id)
+                ? getCreditCardMovementRef('abonos_pagar', abonoRef.id, activeCompany)
                 : null;
 
             await runTransaction(db, async (transaction) => {
@@ -611,7 +616,7 @@ export function AccountsPayable({ data }) {
                 const refsYDocs = [];
 
                 for (const fId of selectedFacturas) {
-                    const ref = doc(db, 'cuentas_por_pagar', fId);
+                    const ref = companyDoc(db, activeCompany, 'cuentas_por_pagar', fId);
                     const snapshot = await transaction.get(ref);
                     if (!snapshot.exists()) throw new Error('Una factura no existe');
                     refsYDocs.push({ ref, snapshot, data: snapshot.data() });
@@ -659,14 +664,14 @@ export function AccountsPayable({ data }) {
                 if (gastoDiarioRef) {
                     transaction.set(gastoDiarioRef, {
                         fecha: fechaAbono,
-                        caja: 'Caja Carnes Amparito',
+                        caja: activeCompany?.name ? `Caja ${activeCompany.name}` : 'Caja Carnes Amparito',
                         descripcion: `ABONO A PROVEEDOR ${proveedorSeleccionado}`,
                         monto: montoAplicado,
                         tipo: 'ABONO',
                         categoria: 'ABONO',
-                        sucursal: DEFAULT_BRANCH_ID,
-                        branch: DEFAULT_BRANCH_ID,
-                        branchName: DEFAULT_BRANCH_NAME,
+                        sucursal: activeCompany?.branchId || DEFAULT_BRANCH_ID,
+                        branch: activeCompany?.branchId || DEFAULT_BRANCH_ID,
+                        branchName: activeCompany?.branchName || DEFAULT_BRANCH_NAME,
                         origen: 'abonos_pagar',
                         linkedAbonoId: abonoRef.id,
                         paymentMethod,
@@ -676,6 +681,7 @@ export function AccountsPayable({ data }) {
 
                 if (creditCardMovementRef) {
                     transaction.set(creditCardMovementRef, buildCreditCardCharge({
+                        activeCompany,
                         sourceCollection: 'abonos_pagar',
                         sourceId: abonoRef.id,
                         sourceType: 'Abono proveedor',
@@ -697,7 +703,7 @@ export function AccountsPayable({ data }) {
             isProcessingRef.current = false;
             setLoading(false);
         }
-    }, [closeModalAbono, montoAbono, paymentMethod, selectedFacturas, proveedorSeleccionado]);
+    }, [activeCompany, closeModalAbono, montoAbono, paymentMethod, selectedFacturas, proveedorSeleccionado]);
 
     const handleDeleteAbono = useCallback(async (abonoDoc) => {
         if (isProcessingRef.current) return;
@@ -707,7 +713,7 @@ export function AccountsPayable({ data }) {
         setLoading(true);
         try {
             await runTransaction(db, async (transaction) => {
-                const abonoRef = doc(db, 'abonos_pagar', abonoDoc.id);
+                const abonoRef = companyDoc(db, activeCompany, 'abonos_pagar', abonoDoc.id);
                 const abonoSnap = await transaction.get(abonoRef);
                 if (!abonoSnap.exists()) {
                     throw new Error('Este abono ya fue anulado. Actualiza la pantalla.');
@@ -715,7 +721,7 @@ export function AccountsPayable({ data }) {
                 const currentAbono = { id: abonoDoc.id, ...abonoSnap.data() };
                 const facturasParaActualizar = [];
                 for (const item of currentAbono.detalleAfectado || []) {
-                    const fRef = doc(db, 'cuentas_por_pagar', item.id);
+                    const fRef = companyDoc(db, activeCompany, 'cuentas_por_pagar', item.id);
                     const fDoc = await transaction.get(fRef);
                     if (fDoc.exists()) {
                         facturasParaActualizar.push({ ref: fRef, snapshot: fDoc, abonado: item.montoAbonado });
@@ -730,10 +736,10 @@ export function AccountsPayable({ data }) {
                     });
                 }
                 if (currentAbono.paymentMethod === CASH_PAYMENT_METHOD && currentAbono.linkedGastoDiarioId) {
-                    transaction.delete(doc(db, 'gastosDiarios', currentAbono.linkedGastoDiarioId));
+                    transaction.delete(companyDoc(db, activeCompany, 'gastosDiarios', currentAbono.linkedGastoDiarioId));
                 }
                 if (isCreditCardPayment(currentAbono.paymentMethod)) {
-                    transaction.delete(getCreditCardMovementRef('abonos_pagar', currentAbono.id));
+                    transaction.delete(getCreditCardMovementRef('abonos_pagar', currentAbono.id, activeCompany));
                 }
                 transaction.delete(abonoRef);
             });
@@ -743,7 +749,7 @@ export function AccountsPayable({ data }) {
             isProcessingRef.current = false;
             setLoading(false);
         }
-    }, []);
+    }, [activeCompany]);
 
     const handleDeleteFactura = useCallback(async (factura) => {
         if (isProcessingRef.current) return;
@@ -752,7 +758,7 @@ export function AccountsPayable({ data }) {
         isProcessingRef.current = true;
         setLoading(true);
         try {
-            const result = await deletePayableTransaction(factura.id);
+            const result = await deletePayableTransaction(factura.id, activeCompany);
             if (result?.blocked) {
                 const abonosLabel = (result.blockingAbonos || [])
                     .map(a => `#${a.secuencia || a.id}`)
@@ -765,7 +771,7 @@ export function AccountsPayable({ data }) {
             isProcessingRef.current = false;
             setLoading(false);
         }
-    }, []);
+    }, [activeCompany]);
 
     const toggleProviderExpanded = useCallback((providerName) => {
         setExpandedProvider((prev) => prev === providerName ? null : providerName);
@@ -776,14 +782,14 @@ export function AccountsPayable({ data }) {
         if (!nuevoProveedor.trim()) return;
         setLoading(true);
         try {
-            await addDoc(collection(db, 'proveedores'), { nombre: nuevoProveedor.trim().toUpperCase() });
+            await addDoc(companyCollection(db, activeCompany, 'proveedores'), { nombre: nuevoProveedor.trim().toUpperCase() });
             setNuevoProveedor('');
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
-    }, [nuevoProveedor]);
+    }, [activeCompany, nuevoProveedor]);
 
     // --- HELPERS ---
     const getVencimientoInfo = (fechaVenc) => {
@@ -914,7 +920,7 @@ export function AccountsPayable({ data }) {
                             <Card title="Registrar Nueva Factura" icon="fileText">
                                 <form onSubmit={handleSaveFactura} className="space-y-5">
                                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
-                                        Las facturas registradas aquí se contabilizan como costo a crédito en {DEFAULT_BRANCH_NAME}.
+                                        Las facturas registradas aquí se contabilizan como costo a crédito en {activeCompany?.branchName || DEFAULT_BRANCH_NAME}.
                                     </div>
 
                                     <Select
@@ -1648,7 +1654,7 @@ export function AccountsPayable({ data }) {
                                                         <span className="font-semibold text-slate-700 text-sm">{p.nombre}</span>
                                                     </div>
                                                     <button
-                                                        onClick={() => deleteDoc(doc(db, 'proveedores', p.id))}
+                                                        onClick={() => deleteDoc(companyDoc(db, activeCompany, 'proveedores', p.id))}
                                                         className="erp-pressable p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                                     >
                                                         <Icon path={Icons.trash} className="w-3.5 h-3.5" />

@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
 import {
-    collection, Timestamp, getDocs, doc, writeBatch
+    Timestamp, getDocs, doc, writeBatch
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { getLocalDateString } from '../utils/localDate';
+import { companyCollection, companyDoc } from '../services/companyFirestore';
 import {
     EXPENSE_CATEGORY_OPTIONS,
     getDefaultSubcategory,
@@ -130,7 +131,7 @@ const Badge = ({ children, variant = 'default' }) => {
 
 const CAJA = 'Caja Carnes Amparito';
 
-export default function GastosDiarios({ categories = [] }) {
+export default function GastosDiarios({ categories = [], activeCompany }) {
     const [activeTab, setActiveTab] = useState('registro');
     const [loading, setLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -143,6 +144,7 @@ export default function GastosDiarios({ categories = [] }) {
     const [categoria, setCategoria] = useState('');
     const [subcategoria, setSubcategoria] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(CASH_PAYMENT_METHOD);
+    const cajaName = activeCompany?.name ? `Caja ${activeCompany.name}` : CAJA;
     const subcategoryOptions = getExpenseSubcategories(categoria);
 
     const handleCategoriaChange = (value) => {
@@ -157,7 +159,7 @@ export default function GastosDiarios({ categories = [] }) {
     const cargarRegistros = useCallback(async () => {
         setLoading(true);
         try {
-            const snapshot = await getDocs(collection(db, 'gastosDiarios'));
+            const snapshot = await getDocs(companyCollection(db, activeCompany, 'gastosDiarios'));
 
             let docs = snapshot.docs.map(d => {
                 const record = { id: d.id, ...d.data(), timestamp: d.data().timestamp || null };
@@ -194,7 +196,7 @@ export default function GastosDiarios({ categories = [] }) {
         } finally {
             setLoading(false);
         }
-    }, [filtroFecha]);
+    }, [activeCompany, filtroFecha]);
 
     useEffect(() => {
         if (activeTab === 'historial') {
@@ -216,13 +218,18 @@ export default function GastosDiarios({ categories = [] }) {
                 ? normalizeExpenseClassification({ category: categoria, subcategory: subcategoria, description: descripcion })
                 : normalizeExpenseClassification({ category: 'Costos de venta / compras', description: descripcion, type: 'Compra' });
             const categoriaNombre = classification.category;
-            const gastoDiarioRef = doc(collection(db, 'gastosDiarios'));
-            const gastoRef = tipo === 'Gasto' ? doc(collection(db, 'gastos')) : null;
-            const compraRef = tipo === 'Compra' ? doc(collection(db, 'compras')) : null;
+            const companyBranch = {
+                branch: activeCompany?.branchId || DEFAULT_BRANCH_ID,
+                branchName: activeCompany?.branchName || DEFAULT_BRANCH_NAME,
+            };
+            const gastoDiarioRef = doc(companyCollection(db, activeCompany, 'gastosDiarios'));
+            const gastoRef = tipo === 'Gasto' ? doc(companyCollection(db, activeCompany, 'gastos')) : null;
+            const compraRef = tipo === 'Compra' ? doc(companyCollection(db, activeCompany, 'compras')) : null;
             const batch = writeBatch(db);
             const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod, CASH_PAYMENT_METHOD);
             const creditCardMovement = isCreditCardPayment(normalizedPaymentMethod)
                 ? setCreditCardChargeInBatch(batch, {
+                    activeCompany,
                     sourceCollection: 'gastosDiarios',
                     sourceId: gastoDiarioRef.id,
                     sourceType: tipo,
@@ -238,7 +245,7 @@ export default function GastosDiarios({ categories = [] }) {
 
             batch.set(gastoDiarioRef, {
                 fecha,
-                caja: CAJA,
+                caja: cajaName,
                 descripcion,
                 monto: numMonto,
                 tipo,
@@ -247,9 +254,9 @@ export default function GastosDiarios({ categories = [] }) {
                 category: categoriaNombre || null,
                 subcategory: classification.subcategory || null,
                 categoryKey: `${classification.category} / ${classification.subcategory}`,
-                sucursal: DEFAULT_BRANCH_ID,
-                branch: DEFAULT_BRANCH_ID,
-                branchName: DEFAULT_BRANCH_NAME,
+                sucursal: companyBranch.branch,
+                branch: companyBranch.branch,
+                branchName: companyBranch.branchName,
                 linkedExpenseId: gastoRef?.id || null,
                 linkedPurchaseId: compraRef?.id || null,
                 paymentMethod: normalizedPaymentMethod,
@@ -266,8 +273,8 @@ export default function GastosDiarios({ categories = [] }) {
                     category: categoriaNombre,
                     subcategory: classification.subcategory,
                     categoryKey: `${classification.category} / ${classification.subcategory}`,
-                    branch: DEFAULT_BRANCH_ID,
-                    branchName: DEFAULT_BRANCH_NAME,
+                    branch: companyBranch.branch,
+                    branchName: companyBranch.branchName,
                     paymentMethod: normalizedPaymentMethod,
                     paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
                     linkedCreditCardMovementId: creditCardMovement?.id || null,
@@ -288,8 +295,8 @@ export default function GastosDiarios({ categories = [] }) {
                     category: classification.category,
                     subcategory: classification.subcategory,
                     categoryKey: `${classification.category} / ${classification.subcategory}`,
-                    branch: DEFAULT_BRANCH_ID,
-                    branchName: DEFAULT_BRANCH_NAME,
+                    branch: companyBranch.branch,
+                    branchName: companyBranch.branchName,
                     paymentType: 'contado',
                     paymentMethod: normalizedPaymentMethod,
                     paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
@@ -329,33 +336,33 @@ export default function GastosDiarios({ categories = [] }) {
         setLoading(true);
         try {
             const batch = writeBatch(db);
-            batch.delete(doc(db, 'gastosDiarios', registro.id));
-            deleteCreditCardMovementInBatch(batch, 'gastosDiarios', registro.id);
+            batch.delete(companyDoc(db, activeCompany, 'gastosDiarios', registro.id));
+            deleteCreditCardMovementInBatch(batch, 'gastosDiarios', registro.id, activeCompany);
 
             if (registro.tipo === 'Gasto') {
                 if (registro.linkedExpenseId) {
-                    batch.delete(doc(db, 'gastos', registro.linkedExpenseId));
+                    batch.delete(companyDoc(db, activeCompany, 'gastos', registro.linkedExpenseId));
                 } else {
-                    const gastosSnapshot = await getDocs(collection(db, 'gastos'));
+                    const gastosSnapshot = await getDocs(companyCollection(db, activeCompany, 'gastos'));
                     const gastosRelacionados = gastosSnapshot.docs.filter(
                         d => d.data().gastoDiarioId === registro.id
                     );
                     for (const gastoDoc of gastosRelacionados) {
-                        batch.delete(doc(db, 'gastos', gastoDoc.id));
+                        batch.delete(companyDoc(db, activeCompany, 'gastos', gastoDoc.id));
                     }
                 }
             }
 
             if (registro.tipo === 'Compra') {
                 if (registro.linkedPurchaseId) {
-                    batch.delete(doc(db, 'compras', registro.linkedPurchaseId));
+                    batch.delete(companyDoc(db, activeCompany, 'compras', registro.linkedPurchaseId));
                 } else {
-                    const comprasSnapshot = await getDocs(collection(db, 'compras'));
+                    const comprasSnapshot = await getDocs(companyCollection(db, activeCompany, 'compras'));
                     const comprasRelacionadas = comprasSnapshot.docs.filter(
                         item => item.data().sourceGastoDiarioId === registro.id
                     );
                     for (const compraDoc of comprasRelacionadas) {
-                        batch.delete(doc(db, 'compras', compraDoc.id));
+                        batch.delete(companyDoc(db, activeCompany, 'compras', compraDoc.id));
                     }
                 }
             }
@@ -391,7 +398,7 @@ export default function GastosDiarios({ categories = [] }) {
                         <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Caja diaria</h1>
                     </div>
                     <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
-                        {CAJA}
+                        {cajaName}
                     </span>
                 </div>
             </div>

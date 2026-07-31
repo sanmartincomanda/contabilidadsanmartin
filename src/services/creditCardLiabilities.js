@@ -1,5 +1,6 @@
-import { collection, deleteDoc, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { deleteDoc, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { companyCollection, companyDoc } from './companyFirestore';
 
 export const CREDIT_CARD_MOVEMENTS_COLLECTION = 'pasivos_tarjeta_movimientos';
 export const CREDIT_CARD_ID = 'infinite_lafise';
@@ -78,8 +79,8 @@ export const getCreditCardMovementId = (sourceCollection, sourceId) => (
     `${sanitizeSourcePart(sourceCollection)}__${sanitizeSourcePart(sourceId)}`
 );
 
-export const getCreditCardMovementRef = (sourceCollection, sourceId) => (
-    doc(db, CREDIT_CARD_MOVEMENTS_COLLECTION, getCreditCardMovementId(sourceCollection, sourceId))
+export const getCreditCardMovementRef = (sourceCollection, sourceId, activeCompany) => (
+    companyDoc(db, activeCompany, CREDIT_CARD_MOVEMENTS_COLLECTION, getCreditCardMovementId(sourceCollection, sourceId))
 );
 
 export const buildCreditCardCharge = ({
@@ -95,6 +96,7 @@ export const buildCreditCardCharge = ({
     supplier,
     invoiceNumber,
     paymentMethod = CREDIT_CARD_PAYMENT_METHOD,
+    activeCompany,
 }) => {
     const now = Timestamp.now();
     const dateValue = date || '';
@@ -102,6 +104,8 @@ export const buildCreditCardCharge = ({
     return {
         cardId: CREDIT_CARD_ID,
         cardName: CREDIT_CARD_NAME,
+        companyId: activeCompany?.id || null,
+        companyName: activeCompany?.name || null,
         type: 'cargo',
         status: 'activo',
         date: dateValue,
@@ -126,6 +130,7 @@ export const buildCreditCardPayment = ({
     description,
     amount,
     paymentMethod = TRANSFER_PAYMENT_METHOD,
+    activeCompany,
 }) => {
     const now = Timestamp.now();
     const dateValue = date || '';
@@ -133,6 +138,8 @@ export const buildCreditCardPayment = ({
     return {
         cardId: CREDIT_CARD_ID,
         cardName: CREDIT_CARD_NAME,
+        companyId: activeCompany?.id || null,
+        companyName: activeCompany?.name || null,
         type: 'abono',
         status: 'activo',
         date: dateValue,
@@ -148,25 +155,25 @@ export const buildCreditCardPayment = ({
 };
 
 export const setCreditCardChargeInBatch = (batch, payload) => {
-    const movementRef = getCreditCardMovementRef(payload.sourceCollection, payload.sourceId);
+    const movementRef = getCreditCardMovementRef(payload.sourceCollection, payload.sourceId, payload.activeCompany);
     batch.set(movementRef, buildCreditCardCharge(payload), { merge: true });
     return { id: movementRef.id, ref: movementRef };
 };
 
-export const deleteCreditCardMovementInBatch = (batch, sourceCollection, sourceId) => {
-    batch.delete(getCreditCardMovementRef(sourceCollection, sourceId));
+export const deleteCreditCardMovementInBatch = (batch, sourceCollection, sourceId, activeCompany) => {
+    batch.delete(getCreditCardMovementRef(sourceCollection, sourceId, activeCompany));
 };
 
 export const syncCreditCardMovementInBatch = (batch, payload) => {
     if (isCreditCardPayment(payload.paymentMethod)) {
         return setCreditCardChargeInBatch(batch, payload).id;
     }
-    deleteCreditCardMovementInBatch(batch, payload.sourceCollection, payload.sourceId);
+    deleteCreditCardMovementInBatch(batch, payload.sourceCollection, payload.sourceId, payload.activeCompany);
     return null;
 };
 
 export const syncCreditCardMovementForSource = async (payload) => {
-    const movementRef = getCreditCardMovementRef(payload.sourceCollection, payload.sourceId);
+    const movementRef = getCreditCardMovementRef(payload.sourceCollection, payload.sourceId, payload.activeCompany);
     if (isCreditCardPayment(payload.paymentMethod)) {
         await setDoc(movementRef, buildCreditCardCharge(payload), { merge: true });
         return movementRef.id;
@@ -175,12 +182,12 @@ export const syncCreditCardMovementForSource = async (payload) => {
     return null;
 };
 
-export const deleteCreditCardMovementForSource = async (sourceCollection, sourceId) => {
-    await deleteDoc(getCreditCardMovementRef(sourceCollection, sourceId));
+export const deleteCreditCardMovementForSource = async (sourceCollection, sourceId, activeCompany) => {
+    await deleteDoc(getCreditCardMovementRef(sourceCollection, sourceId, activeCompany));
 };
 
 export const addCreditCardPayment = async (payload) => {
-    const paymentRef = doc(collection(db, CREDIT_CARD_MOVEMENTS_COLLECTION));
+    const paymentRef = doc(companyCollection(db, payload.activeCompany, CREDIT_CARD_MOVEMENTS_COLLECTION));
     await setDoc(paymentRef, {
         ...buildCreditCardPayment(payload),
         sourceId: paymentRef.id,

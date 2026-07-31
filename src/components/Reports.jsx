@@ -8,6 +8,7 @@ import DashboardGeneral from './DashboardGeneral';
 import { resolveReportIncomeEntries } from '../services/incomeAggregation';
 import { getExpenseCategoryKey, inferPurchaseSubcategory, normalizeExpenseClassification } from '../services/expenseCategories';
 import { getLocalDateString, getLocalMonthString } from '../utils/localDate';
+import { DEFAULT_COMPANY } from '../services/companies';
 
 // --- ICONOS SVG INLINE ---
 const Icons = {
@@ -632,6 +633,7 @@ const MonthlySalesWeekdayReport = ({ report }) => {
 // --- LÓGICA DE AGREGACIÓN ---
 const FiscalReport = ({
     report,
+    company = DEFAULT_COMPANY,
     mode,
     month,
     startDate,
@@ -642,6 +644,9 @@ const FiscalReport = ({
     onEndDateChange,
     onExportPdf,
 }) => {
+    const companyDisplayName = company?.name || DEFAULT_COMPANY.name;
+    const companyLegalName = company?.legalName || company?.branchName || companyDisplayName;
+    const companyLogo = company?.logo || DEFAULT_COMPANY.logo;
     const margin = (value) => report.totalIncome > 0 ? `${((value / report.totalIncome) * 100).toFixed(1)}%` : '0.0%';
     const expenseCategoryRows = report.groupedExpenses.flatMap((group) => ([
         {
@@ -787,10 +792,10 @@ const FiscalReport = ({
                 <div className="border-b-[5px] border-[#a81d24] bg-white px-5 py-4 text-[#173042]">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-4">
-                            <img src="/amparito-logo.jpeg" alt="Carnes Amparito" className="h-14 w-14 rounded-xl border border-[#d7e2e9] bg-white object-contain p-1 shadow-sm" />
+                            <img src={companyLogo} alt={companyDisplayName} className="h-14 w-14 rounded-xl border border-[#d7e2e9] bg-white object-contain p-1 shadow-sm" />
                             <div>
                                 <div className="text-[9px] font-black uppercase tracking-[0.34em] text-[#7a919d]">Reporte Fiscal</div>
-                                <h2 className="mt-0.5 text-2xl font-black tracking-tight">Carnes Amparito</h2>
+                                <h2 className="mt-0.5 text-2xl font-black tracking-tight">{companyDisplayName}</h2>
                                 <p className="text-xs font-semibold text-[#6d8390]">Estado de Resultado Fiscal y Gerencial</p>
                             </div>
                         </div>
@@ -904,7 +909,7 @@ const FiscalReport = ({
                     <div>
                         <div className="h-12 border-b border-[#9fb7c4]" />
                         <div className="mt-2 font-black uppercase tracking-[0.18em]">Elaborado por</div>
-                        <div className="mt-1 font-semibold">Sistema Contable Carnes Amparito</div>
+                        <div className="mt-1 font-semibold">Sistema Contable {companyLegalName}</div>
                     </div>
                     <div>
                         <div className="h-12 border-b border-[#9fb7c4]" />
@@ -1251,7 +1256,7 @@ const buildFiscalReportData = (data = {}, period = {}) => {
     };
 };
 
-export default function Reports({ data }) {
+export default function Reports({ data, activeCompany = DEFAULT_COMPANY }) {
     const [activeTab, setActiveTab] = useState('Resultados');
     const [selectedMonth, setSelectedMonth] = useState(getLocalMonthString());
     const [modalCategory, setModalCategory] = useState(null);
@@ -1438,13 +1443,14 @@ export default function Reports({ data }) {
     ), [data, fiscalPeriod]);
 
     const handleExportFiscalPdf = useCallback(() => {
+        const companyName = activeCompany?.name || DEFAULT_COMPANY.name;
         const previousTitle = document.title;
-        document.title = `Reporte Fiscal Carnes Amparito ${fiscalReport.periodLabel}`;
+        document.title = `Reporte Fiscal ${companyName} ${fiscalReport.periodLabel}`;
         window.print();
         window.setTimeout(() => {
             document.title = previousTitle;
         }, 500);
-    }, [fiscalReport.periodLabel]);
+    }, [activeCompany, fiscalReport.periodLabel]);
 
     const salesWeekdayReport = useMemo(() => {
         const weekCount = getWeeksInMonth(selectedMonth);
@@ -1587,6 +1593,7 @@ export default function Reports({ data }) {
             {activeTab === 'Reporte Fiscal' && (
                 <FiscalReport
                     report={fiscalReport}
+                    company={activeCompany}
                     mode={fiscalMode}
                     month={fiscalMonth}
                     startDate={fiscalStartDate}

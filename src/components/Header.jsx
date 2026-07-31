@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
@@ -63,6 +64,7 @@ const MobileNavButton = ({ icon, label, active, onClick }) => (
 
 export default function Header() {
     const { user, logout } = useAuth();
+    const { activeCompany, allowedCompanies, canSwitchCompany, setActiveCompanyId } = useCompany();
     const navigate = useNavigate();
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -73,6 +75,16 @@ export default function Header() {
         () => new URLSearchParams(location.search).get('tab') || 'Ingresos',
         [location.search]
     );
+    const nextCompany = useMemo(() => (
+        allowedCompanies.find((company) => company.id !== activeCompany.id) || allowedCompanies[0]
+    ), [activeCompany.id, allowedCompanies]);
+
+    const handleSwitchCompany = () => {
+        if (!canSwitchCompany || !nextCompany) return;
+        setActiveCompanyId(nextCompany.id);
+        navigate('/');
+        setMobileOpen(false);
+    };
 
     const pageTitle = useMemo(() => {
         if (location.pathname === '/ingresar') return `Captura · ${currentDataTab}`;
@@ -178,15 +190,15 @@ export default function Header() {
                 <div className="border-b border-[#243443] px-5 py-5">
                     <div className="flex items-center gap-3">
                         <img
-                            src={BRAND_LOGO}
-                            alt="Carnes Amparito"
+                            src={activeCompany.logo || BRAND_LOGO}
+                            alt={activeCompany.name}
                             className="h-14 w-14 rounded-2xl border border-white/12 bg-white p-1.5 object-cover shadow-[0_16px_30px_-20px_rgba(0,0,0,.7)]"
                         />
                         <div className="min-w-0">
                             <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#6ea8bf]">
                                 Executive ERP
                             </div>
-                            <div className="truncate text-lg font-bold tracking-tight text-[#f7fbfd]">Carnes Amparito</div>
+                            <div className="truncate text-lg font-bold tracking-tight text-[#f7fbfd]">{activeCompany.name}</div>
                             <div className="mt-1 text-[11px] text-[#7f92a3]">Operacion financiera diaria</div>
                         </div>
                     </div>
@@ -240,6 +252,19 @@ export default function Header() {
 
                 <div className="border-t border-[#243443] px-4 py-4">
                     <div className="rounded-2xl border border-[#22313f] bg-[#101c28] px-3.5 py-3">
+                        <div className="mb-3 rounded-2xl border border-[#22313f] bg-[#0d1823] px-3 py-2.5">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.24em] text-[#6ea8bf]">Empresa activa</div>
+                            <div className="mt-1 truncate text-sm font-black text-white">{activeCompany.name}</div>
+                            {canSwitchCompany && (
+                                <button
+                                    type="button"
+                                    onClick={handleSwitchCompany}
+                                    className="erp-pressable mt-2 w-full rounded-xl border border-[#294154] bg-[#152533] px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#dbe8ee] hover:border-[#365a71] hover:bg-[#1a2b3a]"
+                                >
+                                    Cambiar empresa
+                                </button>
+                            )}
+                        </div>
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#173042] text-[#83bdd5]">
                                 <Icon path={Icons.user} className="h-5 w-5" />
@@ -285,8 +310,17 @@ export default function Header() {
                     <div className="hidden items-center gap-3 lg:flex">
                         <div className="erp-command-strip flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm text-[#4f6270]">
                             <Icon path={Icons.mail} className="h-4 w-4 text-[#6c8190]" />
-                            <span className="text-sm font-medium">Carnes Amparito</span>
+                            <span className="text-sm font-medium">{activeCompany.name}</span>
                         </div>
+                        {canSwitchCompany && (
+                            <button
+                                type="button"
+                                onClick={handleSwitchCompany}
+                                className="erp-pressable rounded-2xl border border-[#d7dfe6] bg-white px-3.5 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#304553] shadow-[0_10px_18px_-16px_rgba(15,23,42,.5)] hover:bg-[#f5f8fb]"
+                            >
+                                Cambiar empresa
+                            </button>
+                        )}
                         <div className="flex items-center gap-2 rounded-2xl border border-[#d7dfe6] bg-white px-3.5 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,.5)]">
                             <Icon path={Icons.user} className="h-4 w-4 text-[#6c8190]" />
                             <span className="text-sm font-semibold text-[#304553]">{user.email.split('@')[0]}</span>
@@ -327,15 +361,15 @@ export default function Header() {
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     <img
-                                        src={BRAND_LOGO}
-                                        alt="Carnes Amparito"
+                                        src={activeCompany.logo || BRAND_LOGO}
+                                        alt={activeCompany.name}
                                         className="h-12 w-12 rounded-2xl border border-white/12 bg-white p-1.5 object-cover"
                                     />
                                     <div>
                                         <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#6ea8bf]">
                                             Mobile suite
                                         </div>
-                                        <div className="text-base font-bold text-[#f7fbfd]">Carnes Amparito</div>
+                                        <div className="text-base font-bold text-[#f7fbfd]">{activeCompany.name}</div>
                                         <div className="mt-1 text-[11px] text-[#7f92a3]">Accesos completos</div>
                                     </div>
                                 </div>
@@ -398,6 +432,15 @@ export default function Header() {
                         </div>
 
                         <div className="border-t border-[#243443] px-4 py-4">
+                            {canSwitchCompany && (
+                                <button
+                                    type="button"
+                                    onClick={handleSwitchCompany}
+                                    className="erp-pressable mb-3 flex w-full items-center justify-center rounded-xl border border-[#294154] bg-[#152533] px-3 py-3 text-xs font-black uppercase tracking-[0.16em] text-[#dbe8ee]"
+                                >
+                                    Cambiar empresa
+                                </button>
+                            )}
                             <div className="mb-3 flex items-center gap-3 rounded-2xl border border-[#22313f] bg-[#101c28] px-3.5 py-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#173042] text-[#83bdd5]">
                                     <Icon path={Icons.user} className="h-5 w-5" />

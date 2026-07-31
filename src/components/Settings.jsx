@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import CategoryManager from './CategoryManager';
+import { companyConfigDoc } from '../services/companyFirestore';
 
-const CONFIG_REF = doc(db, 'configuracion', 'reportesAutomaticos');
 const DEFAULT_RECIPIENT = 'carnessanmartingranada@gmail.com';
 
 const DEFAULT_AUTOMATIC_REPORTS = [
@@ -107,7 +107,7 @@ const UsersPlaceholder = () => (
     </div>
 );
 
-const AutomaticReportsSettings = () => {
+const AutomaticReportsSettings = ({ activeCompany }) => {
     const [reports, setReports] = useState(DEFAULT_AUTOMATIC_REPORTS);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -118,7 +118,8 @@ const AutomaticReportsSettings = () => {
         const loadConfig = async () => {
             setLoading(true);
             try {
-                const snap = await getDoc(CONFIG_REF);
+                const configRef = companyConfigDoc(db, activeCompany, 'reportesAutomaticos');
+                const snap = await getDoc(configRef);
                 if (!mounted) return;
                 setReports(normalizeReports(snap.exists() ? snap.data().reports : DEFAULT_AUTOMATIC_REPORTS));
             } catch (error) {
@@ -131,7 +132,7 @@ const AutomaticReportsSettings = () => {
 
         loadConfig();
         return () => { mounted = false; };
-    }, []);
+    }, [activeCompany]);
 
     const activeCount = useMemo(() => reports.filter((report) => report.active).length, [reports]);
 
@@ -176,7 +177,8 @@ const AutomaticReportsSettings = () => {
 
         setSaving(true);
         try {
-            await setDoc(CONFIG_REF, {
+            const configRef = companyConfigDoc(db, activeCompany, 'reportesAutomaticos');
+            await setDoc(configRef, {
                 reports: normalized,
                 updatedAt: serverTimestamp(),
             }, { merge: true });
@@ -353,14 +355,14 @@ const AutomaticReportsSettings = () => {
     );
 };
 
-export default function Settings({ categories }) {
+export default function Settings({ categories, activeCompany }) {
     const [activeTab, setActiveTab] = useState('reportes');
 
     return (
         <SettingsShell activeTab={activeTab} onTabChange={setActiveTab}>
             {activeTab === 'usuarios' && <UsersPlaceholder />}
-            {activeTab === 'categorias' && <CategoryManager categories={categories} />}
-            {activeTab === 'reportes' && <AutomaticReportsSettings />}
+            {activeTab === 'categorias' && <CategoryManager categories={categories} activeCompany={activeCompany} />}
+            {activeTab === 'reportes' && <AutomaticReportsSettings activeCompany={activeCompany} />}
         </SettingsShell>
     );
 }

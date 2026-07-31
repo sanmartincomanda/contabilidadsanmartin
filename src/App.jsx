@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from './firebase';
-import { collection, query, onSnapshot, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { query, onSnapshot, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -16,6 +16,8 @@ import Settings from './components/Settings';
 import { AccountsPayable } from './components/AccountsPayable';
 import Liabilities from './components/Liabilities';
 import { fmt } from './constants';
+import { CompanyProvider, useCompany } from './context/CompanyContext';
+import { companyCollection, companyConfigDoc } from './services/companyFirestore';
 import { resolveReportIncomeEntries } from './services/incomeAggregation';
 import { getLocalDateString, getLocalMonthString } from './utils/localDate';
 
@@ -39,8 +41,6 @@ const DEFAULT_REMINDERS = [
     { id: 'r8', texto: 'CLARO INTERNET', diaDelMes: 7, activo: true },
     { id: 'r9', texto: 'GASTOS MITRA HIGIENE Y SEGURIDAD', diaDelMes: 7, activo: true },
 ];
-
-const CONFIG_DOC_PATH = 'configuracion/dashboard';
 
 const DASHBOARD_STYLES = `
 @keyframes dash-slide-up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
@@ -245,6 +245,7 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
 
 const Dashboard = ({ data = {} }) => {
     const { user } = useAuth();
+    const { activeCompany } = useCompany();
     const navigate = useNavigate();
     const [config, setConfig] = useState(null);
     const [configLoading, setConfigLoading] = useState(true);
@@ -255,7 +256,7 @@ const Dashboard = ({ data = {} }) => {
     const isAdmin = !isLimitedUser;
 
     useEffect(() => {
-        const docRef = doc(db, CONFIG_DOC_PATH);
+        const docRef = companyConfigDoc(db, activeCompany, 'dashboard');
         const unsub = onSnapshot(docRef, async (snap) => {
             if (snap.exists()) {
                 setConfig(snap.data());
@@ -268,7 +269,7 @@ const Dashboard = ({ data = {} }) => {
             setConfigLoading(false);
         });
         return unsub;
-    }, []);
+    }, [activeCompany]);
 
     // --- KPI calculations ---
     const now = new Date();
@@ -312,7 +313,7 @@ const Dashboard = ({ data = {} }) => {
         setJustCompleted(reminderId);
 
         try {
-            const docRef = doc(db, CONFIG_DOC_PATH);
+            const docRef = companyConfigDoc(db, activeCompany, 'dashboard');
             const updatedCompleted = { ...config.completados, [monthKey]: [...completedIds, reminderId] };
             await updateDoc(docRef, { completados: updatedCompleted });
         } catch (e) {
@@ -321,12 +322,12 @@ const Dashboard = ({ data = {} }) => {
             processingRef.current = false;
             setTimeout(() => setJustCompleted(null), 500);
         }
-    }, [config, completedIds, monthKey]);
+    }, [activeCompany, config, completedIds, monthKey]);
 
     const saveSettings = useCallback(async (newReminders) => {
-        const docRef = doc(db, CONFIG_DOC_PATH);
+        const docRef = companyConfigDoc(db, activeCompany, 'dashboard');
         await updateDoc(docRef, { recordatorios: newReminders });
-    }, []);
+    }, [activeCompany]);
 
     // Dynamic insight
     const insight = vencidas.length > 0
@@ -666,13 +667,19 @@ const hasCollectionData = (currentData, collections = []) => (
     collections.every((c) => Array.isArray(currentData?.[c]))
 );
 
-const useFirestoreCollections = (collections = [], enabled = true, live = true) => {
+const useFirestoreCollections = (collections = [], enabled = true, live = true, activeCompany) => {
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(enabled);
     const [error, setError] = useState(null);
     const dataRef = useRef(data);
+    const companyId = activeCompany?.id || '';
 
     useEffect(() => { dataRef.current = data; }, [data]);
+
+    useEffect(() => {
+        dataRef.current = {};
+        setData({});
+    }, [companyId]);
 
     useEffect(() => {
         if (!enabled || !db || collections.length === 0) {
@@ -697,7 +704,7 @@ const useFirestoreCollections = (collections = [], enabled = true, live = true) 
 
         const loadOnce = async (name) => {
             try {
-                const snapshot = await getDocs(query(collection(db, name)));
+                const snapshot = await getDocs(query(companyCollection(db, activeCompany, name)));
                 if (!mounted) return;
                 setData(prev => ({ ...prev, [name]: snapshot.docs.map(d => ({ id: d.id, ...d.data() })) }));
             } catch (e) {
@@ -712,7 +719,7 @@ const useFirestoreCollections = (collections = [], enabled = true, live = true) 
         collections.forEach((name) => {
             if (!live) { loadOnce(name); return; }
 
-            const q = query(collection(db, name));
+            const q = query(companyCollection(db, activeCompany, name));
             unsubscribes.push(
                 onSnapshot(q,
                     (snap) => {
@@ -726,7 +733,7 @@ const useFirestoreCollections = (collections = [], enabled = true, live = true) 
         });
 
         return () => { mounted = false; unsubscribes.forEach(u => u()); };
-    }, [collections, enabled, live]);
+    }, [activeCompany, collections, enabled, live]);
 
     return { data, loading, error };
 };
@@ -735,6 +742,7 @@ const useFirestoreCollections = (collections = [], enabled = true, live = true) 
 
 function AppContent() {
     const { user } = useAuth();
+    const { activeCompany } = useCompany();
     const location = useLocation();
 
     const isLimitedUser = user?.email === 'adriandiazc95@gmail.com';
@@ -742,12 +750,12 @@ function AppContent() {
     const currentPath = location.pathname;
     const needsCategories = currentPath.startsWith('/maestros/categorias') || currentPath.startsWith('/configuraciones');
 
-    const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, !!user && needsCategories, true);
-    const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(DATA_ENTRY_COLLECTIONS, !!user && isAdmin && currentPath === '/ingresar', true);
-    const { data: accountsPayableData, loading: accountsPayableLoading, error: accountsPayableError } = useFirestoreCollections(ACCOUNTS_PAYABLE_COLLECTIONS, !!user && currentPath === '/cuentas-pagar', true);
-    const { data: liabilitiesData, loading: liabilitiesLoading, error: liabilitiesError } = useFirestoreCollections(LIABILITIES_COLLECTIONS, !!user && isAdmin && currentPath === '/pasivos', true);
-    const { data: reportsData, loading: reportsLoading, error: reportsError } = useFirestoreCollections(REPORT_COLLECTIONS, !!user && isAdmin && currentPath === '/reportes', false);
-    const { data: dashboardData, loading: dashboardLoading } = useFirestoreCollections(DASHBOARD_COLLECTIONS, !!user && isAdmin && currentPath === '/', false);
+    const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, !!user && needsCategories, true, activeCompany);
+    const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(DATA_ENTRY_COLLECTIONS, !!user && isAdmin && currentPath === '/ingresar', true, activeCompany);
+    const { data: accountsPayableData, loading: accountsPayableLoading, error: accountsPayableError } = useFirestoreCollections(ACCOUNTS_PAYABLE_COLLECTIONS, !!user && currentPath === '/cuentas-pagar', true, activeCompany);
+    const { data: liabilitiesData, loading: liabilitiesLoading, error: liabilitiesError } = useFirestoreCollections(LIABILITIES_COLLECTIONS, !!user && isAdmin && currentPath === '/pasivos', true, activeCompany);
+    const { data: reportsData, loading: reportsLoading, error: reportsError } = useFirestoreCollections(REPORT_COLLECTIONS, !!user && isAdmin && currentPath === '/reportes', false, activeCompany);
+    const { data: dashboardData, loading: dashboardLoading } = useFirestoreCollections(DASHBOARD_COLLECTIONS, !!user && isAdmin && currentPath === '/', false, activeCompany);
 
     const categoriesList = categoriesData.categorias || [];
 
@@ -772,14 +780,14 @@ function AppContent() {
                     <Routes>
                         <Route path="/login" element={<Navigate to="/" replace />} />
                         <Route path="/" element={<PrivateRoute element={isAdmin ? (dashboardLoading ? <AppLoadingState /> : <Dashboard data={dashboardData} />) : <Navigate to="/cuentas-pagar" />} />} />
-                        <Route path="/ingresar" element={<PrivateRoute element={isAdmin ? (dataEntryLoading ? <AppLoadingState /> : dataEntryError ? <AppErrorState /> : <DataEntry data={dataEntryData} categories={categoriesList} />) : <Navigate to="/cuentas-pagar" />} />} />
-                        <Route path="/gastos-diarios" element={<PrivateRoute element={<GastosDiarios categories={categoriesList} />} />} />
-                        <Route path="/conciliacion" element={<PrivateRoute element={isAdmin ? <BankReconciliation /> : <Navigate to="/cuentas-pagar" />} />} />
-                        <Route path="/cuentas-pagar" element={<PrivateRoute element={accountsPayableLoading ? <AppLoadingState /> : accountsPayableError ? <AppErrorState /> : <AccountsPayable data={accountsPayableData} />} />} />
-                        <Route path="/pasivos" element={<PrivateRoute element={isAdmin ? (liabilitiesLoading ? <AppLoadingState /> : liabilitiesError ? <AppErrorState /> : <Liabilities data={liabilitiesData} />) : <Navigate to="/cuentas-pagar" />} />} />
-                        <Route path="/reportes" element={<PrivateRoute element={isAdmin ? (reportsLoading ? <AppLoadingState /> : reportsError ? <AppErrorState /> : <Reports data={reportsData} />) : <Navigate to="/cuentas-pagar" />} />} />
-                        <Route path="/configuraciones" element={<PrivateRoute element={isAdmin ? <Settings categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} />} />
-                        <Route path="/maestros/categorias" element={<PrivateRoute element={isAdmin ? <CategoryManager categories={categoriesList} /> : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/ingresar" element={<PrivateRoute element={isAdmin ? (dataEntryLoading ? <AppLoadingState /> : dataEntryError ? <AppErrorState /> : <DataEntry data={dataEntryData} categories={categoriesList} activeCompany={activeCompany} />) : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/gastos-diarios" element={<PrivateRoute element={<GastosDiarios categories={categoriesList} activeCompany={activeCompany} />} />} />
+                        <Route path="/conciliacion" element={<PrivateRoute element={isAdmin ? <BankReconciliation activeCompany={activeCompany} /> : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/cuentas-pagar" element={<PrivateRoute element={accountsPayableLoading ? <AppLoadingState /> : accountsPayableError ? <AppErrorState /> : <AccountsPayable data={accountsPayableData} activeCompany={activeCompany} />} />} />
+                        <Route path="/pasivos" element={<PrivateRoute element={isAdmin ? (liabilitiesLoading ? <AppLoadingState /> : liabilitiesError ? <AppErrorState /> : <Liabilities data={liabilitiesData} activeCompany={activeCompany} />) : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/reportes" element={<PrivateRoute element={isAdmin ? (reportsLoading ? <AppLoadingState /> : reportsError ? <AppErrorState /> : <Reports data={reportsData} activeCompany={activeCompany} />) : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/configuraciones" element={<PrivateRoute element={isAdmin ? <Settings categories={categoriesList} activeCompany={activeCompany} /> : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/maestros/categorias" element={<PrivateRoute element={isAdmin ? <CategoryManager categories={categoriesList} activeCompany={activeCompany} /> : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
                 </div>
@@ -792,7 +800,9 @@ function App() {
     return (
         <Router>
             <AuthProvider>
-                <AppContent />
+                <CompanyProvider>
+                    <AppContent />
+                </CompanyProvider>
             </AuthProvider>
         </Router>
     );
