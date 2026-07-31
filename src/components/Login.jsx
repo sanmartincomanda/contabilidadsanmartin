@@ -22,13 +22,21 @@ export default function Login() {
         setError('');
         setIsLoggingIn(true);
         try {
-            await login(email, password);
+            await login(email.trim().toLowerCase(), password);
         } catch (e) {
             let errorMessage = 'No fue posible iniciar sesion.';
-            if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
-                errorMessage = 'Credenciales invalidas.';
+            if (['auth/user-not-found', 'auth/wrong-password', 'auth/invalid-credential'].includes(e.code)) {
+                errorMessage = 'Credenciales invalidas o usuario no creado.';
             } else if (e.code === 'auth/invalid-email') {
                 errorMessage = 'Correo invalido.';
+            } else if (e.code === 'auth/user-disabled') {
+                errorMessage = 'Este usuario esta deshabilitado en Firebase.';
+            } else if (e.code === 'auth/operation-not-allowed') {
+                errorMessage = 'El acceso con correo y contrasena no esta habilitado en Firebase.';
+            } else if (e.code === 'auth/too-many-requests') {
+                errorMessage = 'Demasiados intentos. Espera unos minutos e intenta de nuevo.';
+            } else if (e.code === 'auth/network-request-failed') {
+                errorMessage = 'No hay conexion con Firebase. Revisa internet e intenta de nuevo.';
             }
             setError(errorMessage);
             console.error('Error de Login:', e);
