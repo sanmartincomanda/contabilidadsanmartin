@@ -17,7 +17,7 @@ export const COMPANIES = [
         legalName: 'CARNES SAN MARTIN MASAYA',
         branchId: 'san_martin_masaya',
         branchName: 'CARNES SAN MARTIN MASAYA',
-        logo: '/amparito-logo.jpeg',
+        logo: '/logo.png',
         dataMode: 'scoped',
     },
 ];
