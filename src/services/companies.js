@@ -26,6 +26,10 @@ const MULTI_COMPANY_EMAILS = new Set([
     'luis.s.97@hotmail.com',
 ]);
 
+const MASAYA_ONLY_EMAILS = new Set([
+    'bryansaenz9@hotmail.com',
+]);
+
 export const DEFAULT_COMPANY = COMPANIES[0];
 
 export const normalizeEmail = (email = '') => String(email || '').trim().toLowerCase();
@@ -37,6 +41,7 @@ export const getCompanyById = (companyId) => (
 export const getAllowedCompaniesForEmail = (email) => {
     const normalizedEmail = normalizeEmail(email);
     if (MULTI_COMPANY_EMAILS.has(normalizedEmail)) return COMPANIES;
+    if (MASAYA_ONLY_EMAILS.has(normalizedEmail)) return [getCompanyById(MASAYA_COMPANY_ID)];
     return [DEFAULT_COMPANY];
 };
 
