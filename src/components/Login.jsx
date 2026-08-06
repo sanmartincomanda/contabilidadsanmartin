@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-
-const BRAND_LOGO = '/amparito-logo.jpeg';
+import { DEFAULT_COMPANY, getAllowedCompaniesForEmail } from '../services/companies';
 
 const Metric = ({ label, value }) => (
     <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
@@ -16,6 +15,9 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
+    const loginCompany = getAllowedCompaniesForEmail(email)[0] || DEFAULT_COMPANY;
+    const loginLogo = loginCompany.logo || DEFAULT_COMPANY.logo;
+    const loginCompanyName = loginCompany.name || 'Sistema Contable';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -65,8 +67,8 @@ export default function Login() {
 
                         <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-2 backdrop-blur-sm">
                             <img
-                                src={BRAND_LOGO}
-                                alt="Sistema Contable"
+                                src={loginLogo}
+                                alt={loginCompanyName}
                                 className="h-24 w-24 rounded-[22px] border border-white/10 bg-white p-2 object-cover shadow-[0_18px_35px_-22px_rgba(0,0,0,.85)]"
                             />
                         </div>
@@ -82,8 +84,8 @@ export default function Login() {
                 <section className="flex flex-col justify-center bg-[linear-gradient(180deg,#fdfefe_0%,#f3f7fa_100%)] px-6 py-8 sm:px-10 lg:px-12">
                     <div className="mb-8 flex items-center gap-4 lg:hidden">
                         <img
-                            src={BRAND_LOGO}
-                            alt="Sistema Contable"
+                            src={loginLogo}
+                            alt={loginCompanyName}
                             className="h-16 w-16 rounded-[20px] border border-[#d8e0e7] bg-white p-2 object-cover shadow-sm"
                         />
                         <div>

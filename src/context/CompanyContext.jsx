@@ -3,7 +3,6 @@ import { useAuth } from './AuthContext';
 import {
     DEFAULT_COMPANY,
     getAllowedCompaniesForEmail,
-    getCompanyById,
 } from '../services/companies';
 
 const CompanyContext = createContext();
@@ -35,10 +34,12 @@ export const CompanyProvider = ({ children }) => {
     }, [activeCompanyId, allowedCompanies]);
 
     const value = useMemo(() => {
-        const activeCompany = getCompanyById(activeCompanyId);
+        const activeCompany = allowedCompanies.find((company) => company.id === activeCompanyId)
+            || allowedCompanies[0]
+            || DEFAULT_COMPANY;
         return {
             activeCompany,
-            activeCompanyId,
+            activeCompanyId: activeCompany.id,
             allowedCompanies,
             canSwitchCompany: allowedCompanies.length > 1,
             setActiveCompanyId,

@@ -277,6 +277,8 @@ const Dashboard = ({ data = {} }) => {
     const today = getLocalDateString(now);
     const dayOfMonth = now.getDate();
     const hour = now.getHours();
+    const companyLogo = activeCompany?.logo || BRAND_LOGO;
+    const companyName = activeCompany?.name || 'Sistema Contable';
 
     const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
     const greetingIcon = hour < 12 ? ICON.sun : hour < 18 ? ICON.sun : ICON.moon;
@@ -395,7 +397,7 @@ const Dashboard = ({ data = {} }) => {
                 <div className="dash-mesh relative overflow-hidden px-6 py-6 md:px-8 md:py-7">
                     <div className="relative flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 flex-1">
-                            <img src={BRAND_LOGO} alt="Logo" className="hidden sm:block h-11 w-11 rounded-xl border border-white/10 bg-white object-cover flex-shrink-0" />
+                            <img src={companyLogo} alt={companyName} className="hidden sm:block h-11 w-11 rounded-xl border border-white/10 bg-white object-cover flex-shrink-0" />
                             <div>
                                 <div className="text-[10px] font-semibold uppercase tracking-[0.34em] text-[#79a7bc] mb-0.5">Executive cockpit</div>
                                 <div className="text-lg font-extrabold tracking-tight text-white">{greeting}</div>
@@ -639,27 +641,39 @@ const Dashboard = ({ data = {} }) => {
 
 // --- LOADING / ERROR ---
 
-const AppLoadingState = () => (
-    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
-        <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
-            <img src={BRAND_LOGO} alt="Carnes Amparito" className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
-            <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#60717e]">Executive ERP</div>
-            <div className="mt-2 text-2xl font-extrabold text-[#16222d]">Cargando modulo</div>
-            <div className="mt-2 text-sm text-[#6c8794]">Sincronizando informacion.</div>
-        </div>
-    </div>
-);
+const AppLoadingState = () => {
+    const { activeCompany } = useCompany();
+    const companyLogo = activeCompany?.logo || BRAND_LOGO;
+    const companyName = activeCompany?.name || 'Sistema Contable';
 
-const AppErrorState = () => (
-    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
-        <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
-            <img src={BRAND_LOGO} alt="Carnes Amparito" className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
-            <h1 className="mt-5 text-2xl font-semibold text-[#173545]">Sin conexion</h1>
-            <p className="mt-2 text-sm text-[#6c8794]">No logramos cargar la informacion.</p>
-            <button onClick={() => window.location.reload()} className="mt-5 rounded-2xl bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-[0_18px_28px_-20px_rgba(12,97,143,.9)] transition hover:opacity-95">Reintentar</button>
+    return (
+        <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
+            <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
+                <img src={companyLogo} alt={companyName} className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
+                <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#60717e]">Executive ERP</div>
+                <div className="mt-2 text-2xl font-extrabold text-[#16222d]">Cargando modulo</div>
+                <div className="mt-2 text-sm text-[#6c8794]">Sincronizando informacion.</div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
+
+const AppErrorState = () => {
+    const { activeCompany } = useCompany();
+    const companyLogo = activeCompany?.logo || BRAND_LOGO;
+    const companyName = activeCompany?.name || 'Sistema Contable';
+
+    return (
+        <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
+            <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
+                <img src={companyLogo} alt={companyName} className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
+                <h1 className="mt-5 text-2xl font-semibold text-[#173545]">Sin conexion</h1>
+                <p className="mt-2 text-sm text-[#6c8794]">No logramos cargar la informacion.</p>
+                <button onClick={() => window.location.reload()} className="mt-5 rounded-2xl bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-[0_18px_28px_-20px_rgba(12,97,143,.9)] transition hover:opacity-95">Reintentar</button>
+            </div>
+        </div>
+    );
+};
 
 // --- FIRESTORE HOOK ---
 
