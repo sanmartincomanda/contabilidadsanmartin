@@ -68,7 +68,7 @@ export default function CategoryManager({ categories, activeCompany }) {
             <div className="erp-panel overflow-hidden rounded-[24px]">
                 <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
                     <div>
-                        <div className="erp-page-title">Master data</div>
+                        <div className="erp-page-title">Maestros contables</div>
                         <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Categorias</h1>
                     </div>
                     <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
@@ -137,7 +137,7 @@ export default function CategoryManager({ categories, activeCompany }) {
                         <button
                             onClick={handleAddCategory}
                             disabled={loading || !newCategoryName.trim()}
-                            className="erp-pressable flex h-12 w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] px-4 text-sm font-extrabold uppercase tracking-[0.18em] text-white shadow-[0_18px_32px_-18px_rgba(14,23,34,.72)] disabled:cursor-not-allowed disabled:opacity-55"
+                            className="erp-pressable flex h-10 w-full items-center justify-center rounded-sm bg-[#075ea8] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55 hover:bg-[#064f8c]"
                         >
                             {loading ? 'Guardando' : 'Agregar'}
                         </button>

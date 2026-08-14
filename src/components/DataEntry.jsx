@@ -79,7 +79,7 @@ const Icon = ({ path, className = "w-5 h-5" }) => (
 
 const Card = ({ title, children, className = "", right, icon, gradient = false }) => (
     <div className={`erp-panel erp-panel-hover rounded-[24px] overflow-hidden ${className}`}>
-        <div className={`flex justify-between items-center px-5 py-3.5 border-b ${gradient ? 'bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] border-[#203446]' : 'erp-panel-header border-[#c5dce7]'}`}>
+        <div className={`erp-panel-header flex justify-between items-center px-5 py-3.5 border-b ${gradient ? 'erp-panel-header-accent border-[#253957]' : 'border-[#c5dce7]'}`}>
             <div className="flex items-center gap-3">
                 {icon && (
                     <div className={`p-2 rounded-xl ${gradient ? 'bg-white/12' : 'bg-[#eaf7fc]'}`}>
@@ -97,7 +97,7 @@ const Card = ({ title, children, className = "", right, icon, gradient = false }
 const Button = ({ children, variant = 'primary', className = '', disabled, size = 'md', ...props }) => {
     const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5 text-sm' };
     const variants = {
-        primary: 'bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,.78)] hover:brightness-[1.04]',
+        primary: 'bg-[#075ea8] text-white hover:bg-[#064f8c]',
         success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
         danger: 'bg-red-600 hover:bg-red-700 text-white',
         warning: 'bg-[#a81d24] hover:bg-[#7f1218] text-white',
@@ -1416,8 +1416,8 @@ export function DataEntry({ categories, data, activeCompany }) {
             <div className="erp-panel overflow-hidden rounded-[24px] no-print">
                 <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
                     <div>
-                        <div className="erp-page-title">Manual capture</div>
-                        <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Data entry</h1>
+                        <div className="erp-page-title">Registro contable</div>
+                        <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Captura y movimientos</h1>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">

@@ -2,7 +2,7 @@ import React from 'react';
 
 const PlaceholderCard = ({ title, value, subtitle }) => (
     <div className="erp-panel erp-panel-hover overflow-hidden rounded-[24px]">
-        <div className="h-[3px] bg-[linear-gradient(90deg,#173042_0%,#1a6f93_100%)]" />
+        <div className="h-[3px] bg-[#075ea8]" />
         <div className="p-5">
             <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#60717e]">{title}</div>
             <div className="mt-3 text-3xl font-black tracking-tight text-[#16222d]">{value}</div>

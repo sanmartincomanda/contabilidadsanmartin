@@ -676,16 +676,24 @@ export function BankReconciliation({ activeCompany }) {
     );
 
     return (
-        <div className="p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Conciliación Bancaria</h2>
+        <div className="space-y-3">
+            <section className="erp-panel overflow-hidden">
+                <div className="erp-panel-header flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                    <div>
+                        <div className="erp-page-title">Control bancario</div>
+                        <h1 className="mt-0.5 text-xl font-bold text-[#172033]">Conciliación bancaria</h1>
+                    </div>
+                    <span className="erp-chip">Movimientos pendientes</span>
+                </div>
+            </section>
             
             {/* Mensaje de Carga (Con botón de escape) */}
             {loading && (
-                <div className="p-4 border rounded-lg bg-blue-50 text-blue-800 font-semibold mb-6 flex justify-between items-center">
-                    Cargando información pendiente... por favor espere.
+                <div className="erp-panel flex items-center justify-between gap-3 border-l-[3px] border-l-[#075ea8] p-3 text-sm text-[#344054]">
+                    <span>Cargando información pendiente...</span>
                     <button 
                         onClick={() => setLoading(false)} 
-                        className='ml-4 px-3 py-1 bg-blue-700 text-white rounded text-xs hover:bg-blue-800'
+                        className="erp-pressable rounded-sm bg-[#075ea8] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#064f8c]"
                     >
                         Forzar Inicio
                     </button>
@@ -698,15 +706,19 @@ export function BankReconciliation({ activeCompany }) {
             {/* 2. Carga de archivo si NO hay datos pendientes */}
             {!statementData && !loading && (
                 <>
-                    <div className="mb-6 p-4 border rounded-lg bg-white">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Cargar Nuevo Extracto Bancario (.csv):
+                    <div className="erp-panel p-4">
+                        <div className="mb-3 border-b border-[#e5e9ef] pb-3">
+                            <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#667085]">Importación bancaria</div>
+                            <div className="mt-1 text-sm font-semibold text-[#172033]">Cargar nuevo extracto</div>
+                        </div>
+                        <label className="mb-2 block text-xs font-semibold text-[#475467]">
+                            Archivo CSV
                         </label>
                         <input 
                             type="file" 
                             accept=".csv" 
                             onChange={handleFileChange} 
-                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            className="block w-full rounded-sm border border-[#d3d9e1] bg-white p-1 text-xs text-[#667085] file:mr-3 file:rounded-sm file:border-0 file:bg-[#dbeefe] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#075ea8] hover:file:bg-[#c8e4fb]"
                             disabled={loading}
                         />
                     </div>

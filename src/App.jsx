@@ -6,7 +6,8 @@ import { query, onSnapshot, getDocs, setDoc, updateDoc } from 'firebase/firestor
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './components/Login';
-import Header from './components/Header';
+import AppShell from './components/erp/AppShell';
+import { ErrorState } from './components/erp/ERPComponents';
 import GastosDiarios from './components/GastosDiarios';
 import { DataEntry } from './components/DataEntry';
 import { BankReconciliation } from './components/BankReconciliation';
@@ -55,9 +56,9 @@ const DASHBOARD_STYLES = `
 .dash-fade{animation:dash-fade .2s ease both}
 .dash-check{animation:dash-check .2s ease both}
 .dash-pulse{animation:dash-pulse 2s ease-in-out infinite}
-.dash-mesh{background:linear-gradient(135deg,#0d1622 0%,#13212d 42%,#173042 74%,#1a6f93 100%);background-size:240% 240%;animation:dash-gradient 18s ease infinite}
+.dash-mesh{background:#10233f}
 .dash-panel{animation:dash-slide-right .22s ease-out both}
-.dash-glass{background:rgba(255,255,255,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.dash-glass{background:#fff}
 .dash-kpi:hover{transform:translateY(-1px);box-shadow:0 16px 26px -18px rgba(15,23,42,.24)}
 .dash-kpi{transition:transform .18s ease-out,box-shadow .18s ease-out,border-color .18s ease-out}
 @media print{.no-print{display:none!important}}
@@ -134,15 +135,15 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
-            <div className="absolute inset-0 bg-[#08121b]/58 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-[#08121b]/58" />
             <div
                 className="erp-panel relative flex w-full max-w-md flex-col overflow-hidden rounded-[28px] shadow-2xl shadow-[rgba(12,20,29,.26)]"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="bg-[linear-gradient(135deg,#101c27_0%,#173042_64%,#1a6f93_100%)] px-6 py-5 flex items-center justify-between flex-shrink-0">
+                <div className="bg-[#10233f] px-6 py-5 flex items-center justify-between flex-shrink-0">
                     <div>
-                        <div className="text-[10px] font-bold uppercase tracking-[0.36em] text-[#8db2c4] mb-1">Workspace setup</div>
+                        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#aebed1] mb-1">Configuracion</div>
                         <h2 className="text-lg font-black text-white">Configuración de Inicio</h2>
                     </div>
                     <button onClick={onClose} className="erp-pressable p-2 rounded-xl bg-white/10 text-white/80 hover:bg-white/18 hover:text-white transition">
@@ -215,7 +216,7 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
                                 <button
                                 onClick={addReminder}
                                 disabled={!newText.trim()}
-                                className="ml-auto flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40 transition-colors hover:opacity-95"
+                                className="ml-auto flex items-center gap-2 rounded-sm bg-[#075ea8] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40 transition-colors hover:bg-[#064f8c]"
                             >
                                 <Icon d={ICON.plus} className="w-3.5 h-3.5" /> Agregar
                             </button>
@@ -231,7 +232,7 @@ const SettingsPanel = ({ config, onClose, onSave }) => {
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="rounded-lg bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] px-6 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50 transition-colors hover:opacity-95"
+                        className="rounded-sm bg-[#075ea8] px-6 py-2.5 text-xs font-semibold text-white disabled:opacity-50 transition-colors hover:bg-[#064f8c]"
                     >
                         {saving ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
@@ -393,21 +394,21 @@ const Dashboard = ({ data = {} }) => {
             {showSettings && <SettingsPanel config={config} onClose={() => setShowSettings(false)} onSave={saveSettings} />}
 
             {/* ========= HERO HEADER ========= */}
-            <div className="dash-up overflow-hidden rounded-[24px] border border-[#1e2e3d] shadow-[0_24px_48px_-34px_rgba(9,18,27,.45)]">
-                <div className="dash-mesh relative overflow-hidden px-6 py-6 md:px-8 md:py-7">
+            <div className="dash-up erp-panel erp-dashboard-header-legacy">
+                <div className="erp-dashboard-header-inner">
                     <div className="relative flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 flex-1">
                             <img src={companyLogo} alt={companyName} className="hidden sm:block h-11 w-11 rounded-xl border border-white/10 bg-white object-cover flex-shrink-0" />
                             <div>
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.34em] text-[#79a7bc] mb-0.5">Executive cockpit</div>
-                                <div className="text-lg font-extrabold tracking-tight text-white">{greeting}</div>
-                                <div className="mt-0.5 text-xs text-white/44 capitalize">{mesLabel}</div>
+                                <div className="erp-page-title">Centro de trabajo</div>
+                                <div className="text-lg font-semibold tracking-tight text-[#172033]">{greeting}</div>
+                                <div className="mt-0.5 text-xs text-[#667085] capitalize">{companyName} / {mesLabel}</div>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="hidden md:block border-l border-white/10 pl-4">
-                                <p className="max-w-[220px] text-xs leading-relaxed text-white/54">{insight}</p>
+                                <p className="max-w-[320px] text-xs leading-relaxed text-[#667085]">{insight}</p>
                             </div>
                             <button
                                 onClick={() => setShowSettings(true)}
@@ -424,24 +425,17 @@ const Dashboard = ({ data = {} }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 lg:hidden">
+            <div className="erp-quick-actions">
                 {quickActions.map((item) => (
                     <button
                         key={item.id}
                         onClick={item.action}
-                        className={`erp-pressable erp-panel erp-soft-glow overflow-hidden rounded-[22px] border border-[#d9e3ea] bg-gradient-to-br ${item.accent} p-4 text-left`}
+                        className="erp-quick-action"
                     >
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7f8d]">
-                                    Acceso rapido
-                                </div>
-                                <div className="mt-2 text-sm font-extrabold tracking-tight text-[#16222d]">{item.label}</div>
-                                <div className="mt-1 text-xs text-[#5f7380]">{item.hint}</div>
-                            </div>
-                            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-white/80 shadow-[0_14px_24px_-20px_rgba(15,23,42,.45)]">
-                                <Icon d={item.icon} className="h-5 w-5 text-[#173042]" />
-                            </div>
+                        <span><Icon d={item.icon} className="h-4 w-4" /></span>
+                        <div>
+                            <strong>{item.label}</strong>
+                            <small>{item.hint}</small>
                         </div>
                     </button>
                 ))}
@@ -460,11 +454,11 @@ const Dashboard = ({ data = {} }) => {
                             </div>
                         )}
                         <div className={`h-[3px] ${kpi.stripe}`} />
-                        <div className="p-4 md:p-5">
-                            <div className={`p-2 rounded-lg ${kpi.iconBg} w-fit mb-3`}>
+                        <div className="p-3">
+                            <div className={`p-1.5 rounded-lg ${kpi.iconBg} w-fit mb-2`}>
                                 <Icon d={kpi.icon} className={`w-4 h-4 ${kpi.iconColor}`} />
                             </div>
-                            <div className={`text-xl md:text-2xl font-black ${kpi.numColor} font-mono tracking-tight`}>
+                            <div className={`text-lg font-black ${kpi.numColor} font-mono tracking-tight`}>
                                 {fmt(kpi.value)}
                             </div>
                             <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mt-1">{kpi.label}</div>
@@ -650,7 +644,7 @@ const AppLoadingState = () => {
         <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
             <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
                 <img src={companyLogo} alt={companyName} className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
-                <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#60717e]">Executive ERP</div>
+                <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#60717e]">CSM Contabilidad</div>
                 <div className="mt-2 text-2xl font-extrabold text-[#16222d]">Cargando modulo</div>
                 <div className="mt-2 text-sm text-[#6c8794]">Sincronizando informacion.</div>
             </div>
@@ -660,17 +654,16 @@ const AppLoadingState = () => {
 
 const AppErrorState = () => {
     const { activeCompany } = useCompany();
-    const companyLogo = activeCompany?.logo || BRAND_LOGO;
     const companyName = activeCompany?.name || 'Sistema Contable';
 
     return (
-        <div className="flex min-h-[60vh] items-center justify-center px-4 py-10">
-            <div className="erp-panel w-full max-w-md rounded-[26px] px-8 py-10 text-center">
-                <img src={companyLogo} alt={companyName} className="mx-auto h-20 w-20 rounded-[22px] border border-[#d7e8f1] bg-white p-2 shadow-sm" />
-                <h1 className="mt-5 text-2xl font-semibold text-[#173545]">Sin conexion</h1>
-                <p className="mt-2 text-sm text-[#6c8794]">No logramos cargar la informacion.</p>
-                <button onClick={() => window.location.reload()} className="mt-5 rounded-2xl bg-gradient-to-r from-[#0a628f] via-[#1176a8] to-[#4ca9c5] px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-[0_18px_28px_-20px_rgba(12,97,143,.9)] transition hover:opacity-95">Reintentar</button>
-            </div>
+        <div className="flex min-h-[45vh] items-center justify-center py-8">
+            <ErrorState
+                className="w-full max-w-xl"
+                title={`No se pudo cargar ${companyName}`}
+                description="Revise la conexion e intente nuevamente."
+                action={<button onClick={() => window.location.reload()} className="erp-button erp-button--primary">Reintentar</button>}
+            />
         </div>
     );
 };
@@ -787,10 +780,8 @@ function AppContent() {
     }
 
     return (
-        <>
-            <Header />
-            <main className="erp-shell-enter min-h-screen px-3 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] pt-[84px] md:pb-6 lg:pl-[298px] lg:pr-6 lg:pt-[92px] lg:pb-6">
-                <div key={`${location.pathname}${location.search}`} className="erp-route-enter mx-auto max-w-[1580px]">
+        <AppShell>
+                <div className="erp-route-enter">
                     <Routes>
                         <Route path="/login" element={<Navigate to="/" replace />} />
                         <Route path="/" element={<PrivateRoute element={isAdmin ? (dashboardLoading ? <AppLoadingState /> : <Dashboard data={dashboardData} />) : <Navigate to="/cuentas-pagar" />} />} />
@@ -805,8 +796,7 @@ function AppContent() {
                         <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
                 </div>
-            </main>
-        </>
+        </AppShell>
     );
 }
 

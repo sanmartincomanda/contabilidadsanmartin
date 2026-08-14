@@ -77,32 +77,29 @@ const Select = ({ label, icon, value, onChange, options = [] }) => (
 
 const StatCard = ({ title, value, subtitle, icon, variant = 'default', trend }) => {
     const variants = {
-        default: 'bg-white border-[#d7dfe6]',
-        wine: 'bg-[#152533] text-white border-[#152533]',
-        success: 'bg-[#1e7a4f] text-white border-[#1e7a4f]',
-        danger: 'bg-[#b1393e] text-white border-[#b1393e]',
-        warning: 'bg-[#1a6f93] text-white border-[#1a6f93]',
-        dark: 'bg-[#152533] text-white border-[#152533]'
+        default: { border: 'border-l-[#8490a2]', value: 'text-[#172033]' },
+        wine: { border: 'border-l-[#10233f]', value: 'text-[#10233f]' },
+        success: { border: 'border-l-[#087c79]', value: 'text-[#087c79]' },
+        danger: { border: 'border-l-[#b42318]', value: 'text-[#b42318]' },
+        warning: { border: 'border-l-[#075ea8]', value: 'text-[#075ea8]' },
+        dark: { border: 'border-l-[#344054]', value: 'text-[#344054]' }
     };
 
-    const isColored = variant !== 'default';
+    const tone = variants[variant] || variants.default;
 
     return (
-        <div className={`erp-panel-hover rounded-[22px] border p-5 shadow-[0_14px_28px_-24px_rgba(15,23,42,.42)] ${variants[variant]}`}>
-            <div className="flex items-start justify-between mb-3">
-                <div className={`p-2.5 rounded-xl ${isColored ? 'bg-white/15' : 'bg-[#edf4f8]'}`}>
-                    <Icon path={Icons[icon]} className={`w-5 h-5 ${isColored ? 'text-white' : 'text-[#1a6f93]'}`} />
+        <div className={`erp-metric-card border-l-[3px] p-3 ${tone.border}`}>
+            <div className="flex items-start gap-3">
+                <div className="rounded-sm bg-[#dbeefe] p-2 text-[#075ea8]">
+                    <Icon path={Icons[icon]} className="h-4 w-4" />
                 </div>
-                {trend !== undefined && (
-                    <div className={`flex items-center gap-1 text-xs font-bold ${isColored ? 'text-white/70' : (parseFloat(trend) >= 0 ? 'text-emerald-600' : 'text-rose-600')}`}>
-                        <Icon path={parseFloat(trend) >= 0 ? Icons.trendingUp : Icons.trendingDown} className="w-3.5 h-3.5" />
-                        {Math.abs(parseFloat(trend))}%
-                    </div>
-                )}
+                <div className="min-w-0 flex-1">
+                    <div className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#667085]">{title}</div>
+                    <div className={`mt-1 text-lg font-black ${tone.value}`}>{value}</div>
+                    {subtitle && <div className="mt-0.5 truncate text-[10px] text-[#667085]">{subtitle}</div>}
+                </div>
+                {trend !== undefined && <div className={`flex items-center gap-1 text-[10px] font-bold ${parseFloat(trend) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><Icon path={parseFloat(trend) >= 0 ? Icons.trendingUp : Icons.trendingDown} className="h-3 w-3" />{Math.abs(parseFloat(trend))}%</div>}
             </div>
-            <div className={`text-2xl font-black mb-0.5 ${isColored ? 'text-white' : 'text-[#16222d]'}`}>{value}</div>
-            <div className={`text-xs font-bold uppercase tracking-wider ${isColored ? 'text-white/70' : 'text-[#5f7280]'}`}>{title}</div>
-            {subtitle && <div className={`text-xs mt-1 ${isColored ? 'text-white/50' : 'text-[#81929d]'}`}>{subtitle}</div>}
         </div>
     );
 };
@@ -300,7 +297,7 @@ const FinancialFlowChart = ({
 
     return (
         <div className="overflow-x-auto">
-            <div className="flex min-w-[1360px] justify-center rounded-[26px] border border-[#d7e2e9] bg-[linear-gradient(180deg,#fbfdff_0%,#f2f8fb_100%)] p-5">
+            <div className="flex min-w-[1360px] justify-center rounded-sm border border-[#d7e2e9] bg-[#f4f6f8] p-5">
                 <div className="w-full max-w-[1380px]">
                 <div className="mb-3 flex items-center justify-between">
                     <div>
@@ -395,7 +392,7 @@ const ExpenseDetailModal = ({ category, expenses, onClose }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-[#2b1113]/40 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-[#2b1113]/40" />
             <div
                 className="relative w-full max-w-lg rounded-2xl border border-[#e6c9b8] bg-white shadow-2xl shadow-[#7f1218]/20 overflow-hidden"
                 onClick={e => e.stopPropagation()}
@@ -1548,7 +1545,7 @@ export default function Reports({ data, activeCompany = DEFAULT_COMPANY }) {
             <div className="erp-panel overflow-hidden rounded-[24px]">
                 <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
                     <div>
-                        <div className="erp-page-title">Finance desk</div>
+                        <div className="erp-page-title">Analisis financiero</div>
                         <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Reportes</h1>
                     </div>
                     <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">

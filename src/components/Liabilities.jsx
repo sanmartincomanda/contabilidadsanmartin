@@ -34,7 +34,7 @@ const Icon = ({ path, className = 'h-5 w-5' }) => (
 
 const Button = ({ children, variant = 'primary', disabled, className = '', ...props }) => {
     const variants = {
-        primary: 'bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] text-white hover:brightness-[1.04]',
+        primary: 'bg-[#075ea8] text-white hover:bg-[#064f8c]',
         success: 'bg-emerald-600 text-white hover:bg-emerald-700',
         ghost: 'border border-[#c5dce7] bg-white text-[#45606d] hover:bg-[#f3f9fc]',
         danger: 'bg-red-50 text-red-700 hover:bg-red-100',
@@ -184,7 +184,7 @@ export default function Liabilities({ data = {}, activeCompany }) {
             <div className="erp-panel overflow-hidden rounded-[24px]">
                 <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
                     <div>
-                        <div className="erp-page-title">Liabilities</div>
+                        <div className="erp-page-title">Obligaciones</div>
                         <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Pasivos</h1>
                     </div>
                     <Badge tone="card">Tarjetas de credito</Badge>
@@ -193,7 +193,7 @@ export default function Liabilities({ data = {}, activeCompany }) {
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_.85fr]">
                 <section className="erp-panel overflow-hidden rounded-[28px]">
-                    <div className="border-b border-[#c5dce7] bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] px-5 py-5 text-white">
+                    <div className="border-b border-[#253957] bg-[#10233f] px-5 py-4 text-white">
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
                                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/12">

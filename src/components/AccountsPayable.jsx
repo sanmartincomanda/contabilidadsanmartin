@@ -84,7 +84,7 @@ const Card = ({ title, children, className = "", right, icon, onHeaderDoubleClic
 
 const Button = ({ children, variant = 'primary', className = '', disabled, ...props }) => {
     const variants = {
-        primary:   'bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,.78)] hover:brightness-[1.04]',
+        primary:   'bg-[#075ea8] text-white hover:bg-[#064f8c]',
         danger:    'bg-red-600 hover:bg-red-700 text-white',
         success:   'bg-emerald-600 hover:bg-emerald-700 text-white',
         ghost:     'bg-white hover:bg-[#f3f9fc] text-[#45606d] border border-[#c5dce7]',
@@ -813,7 +813,7 @@ export function AccountsPayable({ data, activeCompany }) {
     ];
 
     return (
-        <div className="min-h-screen p-4 md:p-8">
+        <div className="min-h-[70vh] p-4 md:p-8">
             <style>{`
                 @keyframes fade-in {
                     from { opacity: 0; transform: translateY(14px); }
@@ -837,7 +837,7 @@ export function AccountsPayable({ data, activeCompany }) {
                     <div className="erp-panel overflow-hidden rounded-[24px]">
                         <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-6 py-4">
                             <div>
-                                <div className="erp-page-title">Payables desk</div>
+                                <div className="erp-page-title">Obligaciones</div>
                                 <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Cuentas por pagar</h1>
                             </div>
                             <div className="flex items-center gap-3">
@@ -855,15 +855,15 @@ export function AccountsPayable({ data, activeCompany }) {
 
                 {/* ── TARJETAS DE RESUMEN ── */}
                 <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    <FadeIn delay={60} className="rounded-[24px] bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] p-5 text-white shadow-[0_22px_36px_-24px_rgba(15,23,42,.78)]">
+                    <FadeIn delay={60} className="erp-metric-card p-4">
                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-[#9ec9da] text-[10px] font-bold uppercase tracking-widest">Saldo total</span>
-                            <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center">
-                                <Icon path={Icons.trendingDown} className="w-4 h-4 text-white" />
+                            <span className="text-[#667085] text-[10px] font-bold uppercase tracking-widest">Saldo total</span>
+                            <div className="w-8 h-8 bg-[#dbeefe] rounded-lg flex items-center justify-center">
+                                <Icon path={Icons.trendingDown} className="w-4 h-4 text-[#075ea8]" />
                             </div>
                         </div>
                         <div className="text-2xl font-bold">{fmt(saldoTotalGeneral)}</div>
-                        <div className="text-[#b3cfdb] text-xs mt-1.5">
+                        <div className="text-[#667085] text-xs mt-1.5">
                             {stats.count} {stats.count === 1 ? 'factura pendiente' : 'facturas pendientes'}
                         </div>
                     </FadeIn>
@@ -1082,7 +1082,7 @@ export function AccountsPayable({ data, activeCompany }) {
                                         ) : null}
                                     >
                                         {isCompactViewport && (
-                                            <div className="mb-4 rounded-[22px] border border-[#f3d8ca] bg-[linear-gradient(180deg,#fffdfb_0%,#fff6f1_100%)] p-4">
+                                            <div className="mb-4 rounded-sm border border-[#f3d8ca] bg-[#fffdfb] p-4">
                                                 <div className="flex flex-col gap-3">
                                                     <div>
                                                         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
@@ -1120,7 +1120,7 @@ export function AccountsPayable({ data, activeCompany }) {
                                             type="button"
                                             onClick={() => toggleProviderExpanded(prov)}
                                             onDoubleClick={() => toggleProviderExpanded(prov)}
-                                            className="erp-pressable mb-4 flex w-full items-center justify-between rounded-[20px] border border-[#d7e2e9] bg-[linear-gradient(180deg,#f9fbfd_0%,#f2f7fa_100%)] px-4 py-3 text-left"
+                                            className="erp-pressable mb-4 flex w-full items-center justify-between rounded-sm border border-[#d7e2e9] bg-[#f4f6f8] px-4 py-3 text-left"
                                         >
                                             <div>
                                                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
@@ -1672,7 +1672,7 @@ export function AccountsPayable({ data, activeCompany }) {
                 {/* ── MODAL ABONO ── */}
                 {showModalAbono && (
                     <div
-                        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in"
+                        className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 animate-fade-in"
                         onClick={closeModalAbono}
                     >
                         <div
@@ -1680,7 +1680,7 @@ export function AccountsPayable({ data, activeCompany }) {
                             onClick={e => e.stopPropagation()}
                         >
                             {/* Modal header con franja de color */}
-                            <div className="h-1 bg-gradient-to-r from-[#a81d24] via-[#f2b635] to-[#a81d24]" />
+                            <div className="h-1 bg-[#075ea8]" />
                             <div className="px-6 py-5">
                                 <div className="flex items-start justify-between mb-5">
                                     <div>

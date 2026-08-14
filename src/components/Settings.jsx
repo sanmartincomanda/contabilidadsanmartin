@@ -60,7 +60,7 @@ const SettingsShell = ({ activeTab, onTabChange, children }) => (
         <div className="erp-panel overflow-hidden rounded-[24px]">
             <div className="erp-panel-header flex flex-wrap items-end justify-between gap-4 px-5 py-4">
                 <div>
-                    <div className="erp-page-title">Workspace settings</div>
+                    <div className="erp-page-title">Administracion</div>
                     <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#16222d]">Configuraciones</h1>
                 </div>
                 <span className="erp-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
@@ -83,7 +83,7 @@ const SettingsShell = ({ activeTab, onTabChange, children }) => (
                         }`}
                     >
                         <span className="text-xs font-black uppercase tracking-[0.18em]">{tab.label}</span>
-                        <span className={`mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${activeTab === tab.id ? 'text-white/60' : 'text-[#8a9ba6]'}`}>
+                        <span className={`mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${activeTab === tab.id ? 'text-[#075ea8]/70' : 'text-[#8a9ba6]'}`}>
                             {tab.eyebrow}
                         </span>
                     </button>
@@ -345,7 +345,7 @@ const AutomaticReportsSettings = ({ activeCompany }) => {
                         type="button"
                         onClick={handleSave}
                         disabled={saving}
-                        className="erp-pressable flex h-12 w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#112131_0%,#173042_68%,#1a6f93_100%)] px-4 text-sm font-extrabold uppercase tracking-[0.16em] text-white shadow-[0_18px_32px_-18px_rgba(14,23,34,.72)] disabled:opacity-50"
+                        className="erp-pressable flex h-10 w-full items-center justify-center rounded-sm bg-[#075ea8] px-4 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#064f8c]"
                     >
                         {saving ? 'Guardando...' : 'Guardar configuracion'}
                     </button>
