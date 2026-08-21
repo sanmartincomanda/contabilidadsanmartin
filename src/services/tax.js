@@ -28,6 +28,7 @@ export const calculateFixedQuotaTaxes = (
     const safeDepreciation = Math.max(Number(depreciation) || 0, 0);
     const coveredMonths = Math.max(Math.trunc(Number(monthCount) || 1), 1);
     const monthlyQuota = getFixedMonthlyTax(company);
+    const imi = 0;
     const totalTax = monthlyQuota * coveredMonths;
     const netProfit = safeOperatingProfit - safeDepreciation - totalTax;
 
@@ -35,6 +36,7 @@ export const calculateFixedQuotaTaxes = (
         regime: 'fixed_quota',
         monthlyQuota,
         coveredMonths,
+        imi,
         totalTax,
         netProfit,
     };
