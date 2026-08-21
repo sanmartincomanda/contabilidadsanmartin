@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { fmt, peso, branchName, resolveBranchId } from '../constants';
 import { calculateDepreciationExpenseForMonth, getDepreciationActiveMonths } from '../services/depreciation';
-import { calculateGeneralRegimeTaxes } from '../services/tax';
+import { calculateFixedQuotaTaxes } from '../services/tax';
 import BalanceSheet from './BalanceSheet';
 import DashboardGeneral from './DashboardGeneral';
 import { resolveReportIncomeEntries } from '../services/incomeAggregation';
@@ -223,8 +223,7 @@ const FinancialFlowChart = ({
     totalNetProfit,
     totalTax,
     totalDepreciation,
-    totalIMI,
-    totalIR,
+    monthlyTaxQuota,
     selectedMonth,
 }) => {
     const income = clampFlow(totalIncome);
@@ -245,7 +244,6 @@ const FinancialFlowChart = ({
         );
     }
 
-    const totalDeductions = depreciation + tax;
     const availableHeight = 230;
     const minVisible = 8;
     const scale = availableHeight / Math.max(income, 1);
@@ -375,7 +373,7 @@ const FinancialFlowChart = ({
                     <text x="1340" y="415" fontSize="14" fontWeight="800" fill="#cc3127">IMPUESTO</text>
                     <text x="1340" y="440" fontSize="20" fontWeight="900" fill="#c62e24">{formatValue(totalTax)}</text>
                     <text x="1340" y="463" fontSize="12" fontWeight="700" fill="#d66d65">{formatShare(totalTax)}</text>
-                    <text x="1340" y="484" fontSize="11" fontWeight="700" fill="#cc6e66">IMI {formatValue(totalIMI)} | IR {formatValue(totalIR)}</text>
+                    <text x="1340" y="484" fontSize="11" fontWeight="700" fill="#cc6e66">CUOTA FIJA MENSUAL {formatValue(monthlyTaxQuota)}</text>
 
                     <text x={chartWidth / 2} y="40" textAnchor="middle" fontSize="12" fontWeight="800" fill="#6b7f8c">DE DONDE VIENEN Y PARA QUE SE UTILIZAN LOS INGRESOS</text>
                 </svg>
@@ -698,13 +696,18 @@ const FiscalReport = ({
         },
         ...(report.depreciation > 0 ? [{ label: 'Depreciaciones', value: report.depreciation, tone: 'cost', margin: margin(report.depreciation) }] : []),
         {
-            label: 'Impuesto',
+            label: 'Impuesto - cuota fija',
             value: report.totalTax,
             tone: 'cost',
             margin: margin(report.totalTax),
             children: [
-                { label: 'IMI 1% sobre ingresos', value: report.imi, margin: margin(report.imi) },
-                { label: 'IR 30% sobre base imponible', value: report.ir, margin: margin(report.ir) },
+                {
+                    label: report.taxMonths === 1
+                        ? 'Cuota fija mensual'
+                        : `${report.taxMonths} cuotas mensuales`,
+                    value: report.totalTax,
+                    margin: margin(report.totalTax),
+                },
             ],
         },
         { label: 'Utilidad neta fiscal', value: report.netProfit, tone: 'net', margin: margin(report.netProfit) },
@@ -877,12 +880,12 @@ const FiscalReport = ({
 
                     <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.2fr]">
                         <div className="rounded-2xl border border-[#d7e2e9] bg-[#fbfdfe] p-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Base fiscal</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Regimen tributario</div>
                             <div className="mt-3 grid gap-2 text-[12px]">
-                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">Base IR</span><span className="font-black text-[#173042]">{fmt(report.irBase)}</span></div>
                                 <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">EBITDA</span><span className="font-black text-[#173042]">{fmt(report.ebitda)}</span></div>
-                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">IMI 1%</span><span className="font-black text-[#a81d24]">{fmt(report.imi)}</span></div>
-                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">IR 30%</span><span className="font-black text-[#a81d24]">{fmt(report.ir)}</span></div>
+                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">Regimen</span><span className="font-black text-[#173042]">Cuota fija</span></div>
+                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">Cuota mensual</span><span className="font-black text-[#a81d24]">{fmt(report.monthlyTaxQuota)}</span></div>
+                                <div className="flex justify-between gap-4"><span className="font-semibold text-[#5d7784]">Meses incluidos</span><span className="font-black text-[#173042]">{report.taxMonths}</span></div>
                                 <div className="border-t border-[#d7e2e9] pt-2">
                                     <div className="flex justify-between gap-4"><span className="font-black uppercase text-[#173042]">Total impuesto</span><span className="font-black text-[#a81d24]">{fmt(report.totalTax)}</span></div>
                                 </div>
@@ -893,7 +896,7 @@ const FiscalReport = ({
                             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5d7784]">Notas del reporte</div>
                             <div className="mt-2 space-y-1 text-[10px] font-semibold leading-snug text-[#667b87]">
                                 <p>Moneda expresada en cordobas nicaraguenses (C$).</p>
-                                <p>EBITDA representa la utilidad antes de impuestos, depreciacion y amortizaciones. IMI calculado automaticamente al 1% de ingresos. IR calculado al 30% sobre EBITDA menos IMI y depreciacion.</p>
+                                <p>EBITDA representa la utilidad antes de impuestos, depreciacion y amortizaciones. El impuesto corresponde a una cuota fija de {fmt(report.monthlyTaxQuota)} por cada mes calendario incluido.</p>
                                 {!report.usesInventoryAdjustment && (
                                     <p>Para intervalos, el costo de venta se basa en compras del periodo; el ajuste de inventario aplica en reporte mensual completo.</p>
                                 )}
@@ -1126,7 +1129,7 @@ const buildGroupedExpenseBreakdown = (expenseDetails = {}) => (
         }, new Map())
 );
 
-const buildFiscalReportData = (data = {}, period = {}) => {
+const buildFiscalReportData = (data = {}, period = {}, company = DEFAULT_COMPANY) => {
     const { ingresos = [], gastos = [], compras = [], cuentas_por_pagar: facturasCredito = [], inventarios = [], depreciaciones = [] } = data;
     const { mode = 'monthly', month = getLocalMonthString(), startDate, endDate } = period;
     const safeStartDate = mode === 'monthly' ? getMonthStartDate(month) : startDate;
@@ -1198,7 +1201,8 @@ const buildFiscalReportData = (data = {}, period = {}) => {
     const operatingGrossProfit = grossProfit - totalExpenses;
     const ebitda = operatingGrossProfit;
     const depreciation = calculateDepreciationExpenseForRange(depreciaciones, safeStartDate, safeEndDate);
-    const taxBreakdown = calculateGeneralRegimeTaxes(totalIncome, ebitda, depreciation);
+    const taxMonths = Math.max(getMonthsBetweenDates(safeStartDate, safeEndDate).length, 1);
+    const taxBreakdown = calculateFixedQuotaTaxes(ebitda, depreciation, company, taxMonths);
     const purchaseBreakdown = Object.entries(costDetails)
         .map(([subcategory, amount]) => ({
             key: subcategory,
@@ -1243,9 +1247,9 @@ const buildFiscalReportData = (data = {}, period = {}) => {
         operatingGrossProfit,
         ebitda,
         depreciation,
-        imi: taxBreakdown.imi,
-        irBase: taxBreakdown.irBase,
-        ir: taxBreakdown.ir,
+        taxRegime: taxBreakdown.regime,
+        monthlyTaxQuota: taxBreakdown.monthlyQuota,
+        taxMonths: taxBreakdown.coveredMonths,
         totalTax: taxBreakdown.totalTax,
         netProfit: taxBreakdown.netProfit,
         groupedExpenses,
@@ -1283,8 +1287,7 @@ export default function Reports({ data, activeCompany = DEFAULT_COMPANY }) {
     let totalGrossProfit = 0;
     let totalOperatingGrossProfit = 0;
     let totalDepreciation = 0;
-    let totalIMI = 0;
-    let totalIR = 0;
+    let monthlyTaxQuota = 0;
     let totalTax = 0;
     let totalNetProfit = 0;
     let currentBudgets = {};
@@ -1323,9 +1326,12 @@ export default function Reports({ data, activeCompany = DEFAULT_COMPANY }) {
     totalGrossProfit = totalIncome - totalCOGS;
     totalOperatingGrossProfit = totalGrossProfit - totalExpenses;
     totalDepreciation = calculateDepreciationExpenseForMonth(data.depreciaciones || [], selectedMonth);
-    const taxBreakdown = calculateGeneralRegimeTaxes(totalIncome, totalOperatingGrossProfit, totalDepreciation);
-    totalIMI = taxBreakdown.imi;
-    totalIR = taxBreakdown.ir;
+    const taxBreakdown = calculateFixedQuotaTaxes(
+        totalOperatingGrossProfit,
+        totalDepreciation,
+        activeCompany,
+    );
+    monthlyTaxQuota = taxBreakdown.monthlyQuota;
     totalTax = taxBreakdown.totalTax;
     totalNetProfit = taxBreakdown.netProfit;
 
@@ -1436,8 +1442,8 @@ export default function Reports({ data, activeCompany = DEFAULT_COMPANY }) {
     }, [fiscalMode, fiscalMonth, fiscalStartDate, fiscalEndDate]);
 
     const fiscalReport = useMemo(() => (
-        buildFiscalReportData(data, fiscalPeriod)
-    ), [data, fiscalPeriod]);
+        buildFiscalReportData(data, fiscalPeriod, activeCompany)
+    ), [activeCompany, data, fiscalPeriod]);
 
     const handleExportFiscalPdf = useCallback(() => {
         const companyName = activeCompany?.name || DEFAULT_COMPANY.name;
@@ -1577,7 +1583,7 @@ export default function Reports({ data, activeCompany = DEFAULT_COMPANY }) {
             {/* Content */}
             {activeTab === 'Balance' && (
                 <div className="animate-fade-in">
-                    <BalanceSheet data={data} />
+                    <BalanceSheet data={data} activeCompany={activeCompany} />
                 </div>
             )}
 
@@ -1724,8 +1730,7 @@ export default function Reports({ data, activeCompany = DEFAULT_COMPANY }) {
                             totalNetProfit={totalNetProfit}
                             totalTax={totalTax}
                             totalDepreciation={totalDepreciation}
-                            totalIMI={totalIMI}
-                            totalIR={totalIR}
+                            monthlyTaxQuota={monthlyTaxQuota}
                             selectedMonth={selectedMonth}
                         />
                     </Card>
@@ -1848,7 +1853,7 @@ export default function Reports({ data, activeCompany = DEFAULT_COMPANY }) {
                                             </div>
                                             <div>
                                                 <div className="text-xs font-bold uppercase tracking-wide text-stone-500">Impuesto</div>
-                                                <div className="text-xs font-medium text-stone-500">IMI {fmt(totalIMI)} + IR {fmt(totalIR)}</div>
+                                                <div className="text-xs font-medium text-stone-500">Cuota fija mensual {fmt(monthlyTaxQuota)}</div>
                                             </div>
                                         </div>
                                         <div className="text-base font-black text-stone-700">{fmt(totalTax)}</div>

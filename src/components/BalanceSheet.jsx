@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { fmt, peso } from '../constants';
 import { calculateDepreciationExpenseForMonth } from '../services/depreciation';
 import { sumIncomeForMonth } from '../services/incomeAggregation';
-import { calculateGeneralRegimeTaxes } from '../services/tax';
+import { calculateFixedQuotaTaxes } from '../services/tax';
 import { getLocalMonthString } from '../utils/localDate';
 
 const StatCard = ({ title, total, children, accentColor }) => (
@@ -28,7 +28,7 @@ const Row = ({ label, value, isBold }) => (
     </div>
 );
 
-export default function BalanceSheet({ data }) {
+export default function BalanceSheet({ data, activeCompany }) {
     const totales = useMemo(() => {
         // 1. Definir Mes Pasado (Sincronizado con Estado de Resultados)
         const ahora = new Date();
@@ -84,8 +84,11 @@ export default function BalanceSheet({ data }) {
         const utilidadBruta = ingresosMes - costoDeVenta;
         const utilidadOperativaBruta = utilidadBruta - gastosMes;
         const depreciacionesMes = calculateDepreciationExpenseForMonth(depreciaciones, mesPasadoStr);
-        const taxBreakdown = calculateGeneralRegimeTaxes(ingresosMes, utilidadOperativaBruta, depreciacionesMes);
-        const impuestoMes = taxBreakdown.totalTax;
+        const taxBreakdown = calculateFixedQuotaTaxes(
+            utilidadOperativaBruta,
+            depreciacionesMes,
+            activeCompany,
+        );
         const utilidadNeta = taxBreakdown.netProfit;
 
         // --- CÁLCULOS DEL BALANCE (Lado Activo y Pasivo) ---
@@ -116,7 +119,7 @@ export default function BalanceSheet({ data }) {
             nombreMes: mesPasado.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase(),
             descuadre: totalActivos - (totalPasivos + totalPatrimonio)
         };
-    }, [data]);
+    }, [activeCompany, data]);
 
     return (
         <div className="max-w-7xl mx-auto p-6 bg-slate-50 min-h-screen">

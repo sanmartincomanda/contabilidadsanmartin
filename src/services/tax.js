@@ -1,18 +1,40 @@
-export const calculateGeneralRegimeTaxes = (totalIncome = 0, operatingProfit = 0, depreciation = 0) => {
-    const safeIncome = Math.max(Number(totalIncome) || 0, 0);
+import {
+    AMPARITO_COMPANY_ID,
+    DEFAULT_COMPANY,
+    MASAYA_COMPANY_ID,
+} from './companies';
+
+const FIXED_MONTHLY_TAX_BY_COMPANY = Object.freeze({
+    [AMPARITO_COMPANY_ID]: 3000,
+    [MASAYA_COMPANY_ID]: 500,
+});
+
+const resolveCompanyId = (company) => (
+    typeof company === 'string' ? company : company?.id
+);
+
+export const getFixedMonthlyTax = (company = DEFAULT_COMPANY) => (
+    FIXED_MONTHLY_TAX_BY_COMPANY[resolveCompanyId(company)]
+    ?? FIXED_MONTHLY_TAX_BY_COMPANY[DEFAULT_COMPANY.id]
+);
+
+export const calculateFixedQuotaTaxes = (
+    operatingProfit = 0,
+    depreciation = 0,
+    company = DEFAULT_COMPANY,
+    monthCount = 1,
+) => {
     const safeOperatingProfit = Number(operatingProfit) || 0;
     const safeDepreciation = Math.max(Number(depreciation) || 0, 0);
-
-    const imi = safeIncome * 0.01;
-    const irBase = Math.max(safeOperatingProfit - imi - safeDepreciation, 0);
-    const ir = irBase * 0.30;
-    const totalTax = imi + ir;
+    const coveredMonths = Math.max(Math.trunc(Number(monthCount) || 1), 1);
+    const monthlyQuota = getFixedMonthlyTax(company);
+    const totalTax = monthlyQuota * coveredMonths;
     const netProfit = safeOperatingProfit - safeDepreciation - totalTax;
 
     return {
-        imi,
-        ir,
-        irBase,
+        regime: 'fixed_quota',
+        monthlyQuota,
+        coveredMonths,
         totalTax,
         netProfit,
     };
