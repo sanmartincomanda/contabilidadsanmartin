@@ -86,6 +86,18 @@ function normalizeComparable(value) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
+function normalizeDate(value) {
+  if (!value) return '';
+  if (typeof value?.toDate === 'function') return value.toDate().toISOString().slice(0, 10);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function normalizeMoney(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : null;
+}
+
 function isPathInside(rootDirectory, candidatePath) {
   const relative = path.relative(path.resolve(rootDirectory), path.resolve(candidatePath || ''));
   return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -145,6 +157,33 @@ function matchesBranch(data, config) {
     .map(normalizeComparable)
     .filter(Boolean);
   return candidates.some((candidate) => expected.has(candidate));
+}
+
+function matchesBusinessIdentity(data, metadata, config) {
+  if (!matchesBranch(data, config)) return false;
+
+  const existingSourceRecordId = String(data?.sourceRecordId || '').trim();
+  const expectedSourceRecordId = String(metadata?.sourceRecordId || metadata?.purchaseId || '').trim();
+  if (existingSourceRecordId && existingSourceRecordId !== expectedSourceRecordId) return false;
+
+  const invoiceNumber = data?.invoiceNumber ?? data?.numero ?? data?.factura;
+  const supplier = data?.supplier ?? data?.proveedor;
+  const date = data?.date ?? data?.fecha;
+  const total = data?.total ?? data?.amount ?? data?.monto;
+  const expectedTotal = normalizeMoney(metadata?.total);
+  const actualTotal = normalizeMoney(total);
+
+  return Boolean(
+    normalizeComparable(invoiceNumber)
+    && normalizeComparable(invoiceNumber) === normalizeComparable(metadata?.invoiceNumber)
+    && normalizeComparable(supplier)
+    && normalizeComparable(supplier) === normalizeComparable(metadata?.supplier)
+    && normalizeDate(date)
+    && normalizeDate(date) === normalizeDate(metadata?.date)
+    && actualTotal !== null
+    && expectedTotal !== null
+    && actualTotal === expectedTotal
+  );
 }
 
 function mergeEvidenceAttachment(existingAttachments, attachment) {
@@ -272,6 +311,32 @@ async function querySourceRecord(collection, sourceRecordId, config) {
   return [...matches.values()];
 }
 
+async function queryBusinessIdentity(collection, metadata, config, fieldNames) {
+  const invoiceNumber = String(metadata.invoiceNumber || '').trim();
+  const date = normalizeDate(metadata.date);
+  if (!invoiceNumber || !date) return [];
+
+  const snapshots = await Promise.all([
+    collection.where(fieldNames.invoice, '==', invoiceNumber).limit(50).get(),
+    collection.where(fieldNames.date, '==', date).limit(200).get(),
+  ]);
+  const matches = new Map();
+  snapshots.forEach((snapshot) => snapshot.docs.forEach((doc) => {
+    if (matchesBusinessIdentity(doc.data(), metadata, config)) {
+      matches.set(doc.ref.path, { ref: doc.ref, data: doc.data(), matchMode: 'business-identity' });
+    }
+  }));
+  return [...matches.values()];
+}
+
+async function queryLinkedDocuments(collection, fieldName, documentId, config) {
+  if (!documentId) return [];
+  const snapshot = await collection.where(fieldName, '==', String(documentId)).limit(20).get();
+  return snapshot.docs
+    .filter((doc) => matchesBranch(doc.data(), config))
+    .map((doc) => ({ ref: doc.ref, data: doc.data(), matchMode: 'linked-document' }));
+}
+
 async function findAccountingTargets(db, config, metadata) {
   const targets = new Map();
   const sourceRecordId = String(metadata.sourceRecordId || metadata.purchaseId || '').trim();
@@ -310,6 +375,25 @@ async function findAccountingTargets(db, config, metadata) {
   ]);
   queried.flat().forEach((entry) => targets.set(entry.ref.path, entry));
 
+  const hasPurchase = [...targets.values()].some((entry) => entry.ref.parent.id === 'compras');
+  const hasPayable = [...targets.values()].some((entry) => entry.ref.parent.id === 'cuentas_por_pagar');
+  if (!hasPurchase || !hasPayable) {
+    const [purchaseMatches, payableMatches] = await Promise.all([
+      hasPurchase ? [] : queryBusinessIdentity(collections.purchases, metadata, config, {
+        invoice: 'invoiceNumber',
+        date: 'date',
+      }),
+      hasPayable ? [] : queryBusinessIdentity(collections.payables, metadata, config, {
+        invoice: 'numero',
+        date: 'fecha',
+      }),
+    ]);
+    if (purchaseMatches.length > 1 || payableMatches.length > 1) {
+      throw new Error(`La factura ${metadata.invoiceNumber} tiene mas de una coincidencia contable; no se adjunto la foto.`);
+    }
+    [...purchaseMatches, ...payableMatches].forEach((entry) => targets.set(entry.ref.path, entry));
+  }
+
   const purchaseEntries = [...targets.values()].filter((entry) => entry.ref.parent.id === 'compras');
   for (const purchase of purchaseEntries) {
     const ids = [
@@ -321,6 +405,11 @@ async function findAccountingTargets(db, config, metadata) {
       const linked = await getVerifiedDocument(collection, documentId, config);
       if (linked) targets.set(linked.ref.path, linked);
     }
+    const linkedByPurchase = await Promise.all([
+      queryLinkedDocuments(collections.payables, 'mirroredPurchaseId', purchase.ref.id, config),
+      queryLinkedDocuments(collections.dailyExpenses, 'linkedPurchaseId', purchase.ref.id, config),
+    ]);
+    linkedByPurchase.flat().forEach((entry) => targets.set(entry.ref.path, entry));
   }
 
   return [...targets.values()];
@@ -349,6 +438,7 @@ async function attachEvidence(db, targets, attachment, preview) {
       fotoFacturaPath: attachment.path,
       support,
       supportFiles: [support],
+      ...(!data.sourceRecordId ? { sourceRecordId: attachment.sourceRecordId } : {}),
       accountingEvidenceSource: 'csm-operaciones',
       accountingEvidenceSyncedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
@@ -476,7 +566,10 @@ module.exports = {
   buildObjectPath,
   isPathInside,
   matchesBranch,
+  matchesBusinessIdentity,
   mergeEvidenceAttachment,
+  normalizeDate,
+  normalizeMoney,
   normalizeComparable,
   safePart,
 };
