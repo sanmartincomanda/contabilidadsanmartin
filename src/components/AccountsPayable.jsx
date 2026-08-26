@@ -7,6 +7,13 @@ import {
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { deletePayableTransaction } from '../services/linkedTransactions';
+import { isExpensePayable } from '../services/expenseTransactions';
+import {
+    deleteExpenseAttachments,
+    normalizeExpenseAttachments,
+    uploadExpenseAttachments,
+} from '../services/expenseAttachments';
+import ReceiptPhotoPicker from './ReceiptPhotoPicker';
 import { getLocalDateString } from '../utils/localDate';
 import { companyCollection, companyDoc } from '../services/companyFirestore';
 import {
@@ -143,6 +150,28 @@ const Badge = ({ children, variant = 'default' }) => {
         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${variants[variant]}`}>
             {children}
         </span>
+    );
+};
+
+const PayableAttachments = ({ item, compact = false }) => {
+    const attachments = normalizeExpenseAttachments(item);
+    if (!attachments.length) return null;
+
+    return (
+        <div className={`flex flex-wrap gap-1.5 ${compact ? 'mt-2' : 'mt-1.5'}`}>
+            {attachments.map((attachment, index) => (
+                <a
+                    key={attachment.id || attachment.path || attachment.url || index}
+                    href={attachment.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${compact ? 'h-12 w-12' : 'h-9 w-9'} block overflow-hidden rounded border border-sky-200 bg-sky-50`}
+                    title={`Abrir comprobante ${index + 1}`}
+                >
+                    <img src={attachment.url} alt={`Comprobante ${index + 1}`} className="h-full w-full object-cover" />
+                </a>
+            ))}
+        </div>
     );
 };
 
@@ -366,6 +395,8 @@ export function AccountsPayable({ data, activeCompany }) {
         vencimiento: '',
         monto: ''
     });
+    const [facturaPhotoFiles, setFacturaPhotoFiles] = useState([]);
+    const [facturaUploadProgress, setFacturaUploadProgress] = useState(0);
 
     // --- CÁLCULOS MEMOIZADOS ---
     const { facturasPorProveedor, saldoTotalGeneral, stats } = useMemo(() => {
@@ -492,6 +523,7 @@ export function AccountsPayable({ data, activeCompany }) {
         }
 
         setLoading(true);
+        setFacturaUploadProgress(0);
         try {
             const companyBranch = {
                 branch: activeCompany?.branchId || DEFAULT_BRANCH_ID,
@@ -500,6 +532,13 @@ export function AccountsPayable({ data, activeCompany }) {
             const facturaRef = doc(companyCollection(db, activeCompany, 'cuentas_por_pagar'));
             const compraRef = doc(companyCollection(db, activeCompany, 'compras'), `credito_${facturaRef.id}`);
             const batch = writeBatch(db);
+            const attachments = await uploadExpenseAttachments({
+                activeCompany,
+                expenseId: compraRef.id,
+                recordType: 'compra_credito',
+                files: facturaPhotoFiles,
+                onProgress: setFacturaUploadProgress,
+            });
 
             batch.set(facturaRef, {
                 fecha: facturaForm.fecha,
@@ -517,6 +556,8 @@ export function AccountsPayable({ data, activeCompany }) {
                 isInventoryCost: true,
                 mirroredToCompras: true,
                 mirroredPurchaseId: compraRef.id,
+                attachments,
+                attachmentCount: attachments.length,
                 timestamp: Timestamp.now()
             });
 
@@ -533,18 +574,27 @@ export function AccountsPayable({ data, activeCompany }) {
                 sourceCollection: 'cuentas_por_pagar',
                 sourceFacturaId: facturaRef.id,
                 linkedPayableId: facturaRef.id,
+                attachments,
+                attachmentCount: attachments.length,
                 timestamp: Timestamp.now()
             });
 
-            await batch.commit();
+            try {
+                await batch.commit();
+            } catch (error) {
+                await deleteExpenseAttachments(attachments);
+                throw error;
+            }
             setFacturaForm(prev => ({ ...prev, numero: '', monto: '', vencimiento: '' }));
+            setFacturaPhotoFiles([]);
+            setFacturaUploadProgress(0);
         } catch (error) {
             console.error(error);
-            alert("Error al guardar");
+            alert(error?.message || "Error al guardar");
         } finally {
             setLoading(false);
         }
-    }, [activeCompany, facturaForm]);
+    }, [activeCompany, facturaForm, facturaPhotoFiles]);
 
     // --- MODAL ABONOS ---
     const [showModalAbono, setShowModalAbono] = useState(false);
@@ -753,7 +803,8 @@ export function AccountsPayable({ data, activeCompany }) {
 
     const handleDeleteFactura = useCallback(async (factura) => {
         if (isProcessingRef.current) return;
-        if (!window.confirm('¿Eliminar esta factura y su compra vinculada?')) return;
+        const linkedRecordLabel = isExpensePayable(factura) ? 'gasto' : 'compra';
+        if (!window.confirm(`¿Eliminar esta cuenta por pagar y su ${linkedRecordLabel} vinculado?`)) return;
 
         isProcessingRef.current = true;
         setLoading(true);
@@ -977,8 +1028,24 @@ export function AccountsPayable({ data, activeCompany }) {
                                         />
                                     </div>
 
+                                    <div className="rounded-lg border border-sky-200 bg-white p-3">
+                                        <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Fotos del comprobante</div>
+                                        <ReceiptPhotoPicker
+                                            files={facturaPhotoFiles}
+                                            onChange={setFacturaPhotoFiles}
+                                            disabled={loading}
+                                        />
+                                    </div>
+
                                     <Button type="submit" disabled={loading} className="w-full py-3">
-                                        {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Guardando...</span> : 'Guardar Factura'}
+                                        {loading ? (
+                                            <span className="flex items-center justify-center gap-2">
+                                                <Spinner />
+                                                {facturaPhotoFiles.length > 0 && facturaUploadProgress < 1
+                                                    ? `Subiendo fotos ${Math.round(facturaUploadProgress * 100)}%`
+                                                    : 'Guardando...'}
+                                            </span>
+                                        ) : 'Guardar Factura'}
                                     </Button>
                                 </form>
                             </Card>
@@ -1149,6 +1216,8 @@ export function AccountsPayable({ data, activeCompany }) {
                                                             <div className="min-w-0">
                                                                 <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Factura</div>
                                                                 <div className="mt-1 break-all text-sm font-black text-slate-800">{f.numero}</div>
+                                                                {isExpensePayable(f) && <Badge variant="info">Gasto</Badge>}
+                                                                <PayableAttachments item={f} compact />
                                                             </div>
                                                             <Badge variant={f.estado === 'parcial' ? 'warning' : 'danger'}>
                                                                 {f.estado === 'parcial' ? 'Parcial' : 'Pendiente'}
@@ -1211,7 +1280,11 @@ export function AccountsPayable({ data, activeCompany }) {
                                                         const vencInfo = getVencimientoInfo(f.vencimiento);
                                                         return (
                                                             <tr key={f.id} className="group transition-colors">
-                                                                <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">{f.numero}</td>
+                                                                <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">
+                                                                    <div>{f.numero}</div>
+                                                                    {isExpensePayable(f) && <Badge variant="info">Gasto</Badge>}
+                                                                    <PayableAttachments item={f} />
+                                                                </td>
                                                                 <td className="px-4 py-3 text-xs text-slate-500">{f.fecha}</td>
                                                                 <td className="px-4 py-3">
                                                                     <Badge variant={vencInfo.variant}>{vencInfo.text}</Badge>
@@ -1550,6 +1623,8 @@ export function AccountsPayable({ data, activeCompany }) {
                                                             <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Factura</div>
                                                             <div className="mt-1 break-all text-sm font-black text-slate-800">{factura.numero}</div>
                                                             <div className="mt-1 text-xs font-semibold text-[#607888]">{factura.proveedor}</div>
+                                                            {isExpensePayable(factura) && <Badge variant="info">Gasto</Badge>}
+                                                            <PayableAttachments item={factura} compact />
                                                         </div>
                                                         <Badge variant={factura.statusInfo.variant}>{factura.statusInfo.label}</Badge>
                                                     </div>
@@ -1596,7 +1671,11 @@ export function AccountsPayable({ data, activeCompany }) {
                                                     const vencInfo = getVencimientoInfo(factura.vencimiento);
                                                     return (
                                                         <tr key={factura.id} className="hover:bg-stone-50 transition-colors">
-                                                            <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">{factura.numero}</td>
+                                                            <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">
+                                                                <div>{factura.numero}</div>
+                                                                {isExpensePayable(factura) && <Badge variant="info">Gasto</Badge>}
+                                                                <PayableAttachments item={factura} />
+                                                            </td>
                                                             <td className="px-4 py-3 text-xs text-slate-500">{factura.fecha}</td>
                                                             <td className="px-4 py-3 text-xs font-semibold text-slate-800">{factura.proveedor}</td>
                                                             <td className="px-4 py-3">

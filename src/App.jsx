@@ -6,6 +6,8 @@ import { query, onSnapshot, getDocs, setDoc, updateDoc } from 'firebase/firestor
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './components/Login';
+import MobileExpenseLogin from './components/MobileExpenseLogin';
+import MobileExpenseCapture from './components/MobileExpenseCapture';
 import AppShell from './components/erp/AppShell';
 import { ErrorState } from './components/erp/ERPComponents';
 import GastosDiarios from './components/GastosDiarios';
@@ -21,6 +23,7 @@ import { CompanyProvider, useCompany } from './context/CompanyContext';
 import { companyCollection, companyConfigDoc } from './services/companyFirestore';
 import { resolveReportIncomeEntries } from './services/incomeAggregation';
 import { getLocalDateString, getLocalMonthString } from './utils/localDate';
+import { isExpenseCaptureEmail } from './services/companies';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
@@ -752,9 +755,15 @@ function AppContent() {
     const { activeCompany } = useCompany();
     const location = useLocation();
 
-    const isLimitedUser = user?.email === 'adriandiazc95@gmail.com';
+    const isExpenseCaptureUser = isExpenseCaptureEmail(user?.email);
+    const isLimitedUser = user?.email === 'adriandiazc95@gmail.com' || isExpenseCaptureUser;
     const isAdmin = !isLimitedUser;
     const currentPath = location.pathname;
+    const currentHostname = window.location.hostname.toLowerCase();
+    const isExpenseCaptureHost = currentHostname === 'formgasto.sanmartinsr.com'
+        || currentHostname === 'formgasto-sanmartinsr.netlify.app'
+        || currentHostname.endsWith('--formgasto-sanmartinsr.netlify.app');
+    const isExpenseCaptureExperience = isExpenseCaptureHost || currentPath === '/captura-gastos';
     const needsCategories = currentPath.startsWith('/maestros/categorias') || currentPath.startsWith('/configuraciones');
 
     const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, !!user && needsCategories, true, activeCompany);
@@ -771,11 +780,24 @@ function AppContent() {
             <main className="erp-shell-enter">
                 <div key={`${location.pathname}${location.search}`} className="erp-route-enter">
                     <Routes>
-                        <Route path="/login" element={<Login />} />
+                        <Route path="/login" element={isExpenseCaptureExperience ? <MobileExpenseLogin /> : <Login />} />
+                        <Route path="/captura-gastos" element={<MobileExpenseLogin />} />
                         <Route path="*" element={<Navigate to="/login" replace />} />
                     </Routes>
                 </div>
             </main>
+        );
+    }
+
+    if (isExpenseCaptureUser || isExpenseCaptureExperience) {
+        return (
+            <div className="erp-route-enter">
+                <Routes>
+                    <Route path="/captura-gastos" element={<PrivateRoute element={<MobileExpenseCapture />} />} />
+                    <Route path="/login" element={<Navigate to="/captura-gastos" replace />} />
+                    <Route path="*" element={<Navigate to="/captura-gastos" replace />} />
+                </Routes>
+            </div>
         );
     }
 

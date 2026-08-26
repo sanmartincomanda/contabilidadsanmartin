@@ -1,0 +1,8 @@
+# Local Netlify folder
+.netlify
+
+# Generated build and local QA artifacts
+node_modules
+dist
+.playwright-cli
+output

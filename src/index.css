@@ -2149,3 +2149,599 @@ table {
     margin: 0;
   }
 }
+
+/* Captura movil independiente de gastos */
+
+.mobile-expense-page {
+  min-height: 100vh;
+  padding: 12px;
+  background: #eef2f6;
+  color: #152238;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.mobile-expense-app,
+.mobile-expense-login-card {
+  width: min(100%, 480px);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 35, 63, 0.1);
+}
+
+.mobile-expense-header {
+  display: grid;
+  min-height: 68px;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #102847;
+  color: #ffffff;
+}
+
+.mobile-expense-header-mark,
+.mobile-expense-header > button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 7px;
+  background: rgba(255,255,255,.06);
+  color: #ffffff;
+}
+
+.mobile-expense-header > button:hover {
+  background: rgba(255,255,255,.13);
+}
+
+.mobile-expense-header-title > div,
+.mobile-expense-eyebrow {
+  color: #9fb5cf;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.mobile-expense-header-title strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 720;
+}
+
+.mobile-expense-company-strip {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #dbe3ec;
+  background: #f8fafc;
+}
+
+.mobile-expense-company-strip img {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #d4dde8;
+  border-radius: 5px;
+  background: #ffffff;
+  object-fit: contain;
+}
+
+.mobile-expense-company-strip span,
+.mobile-expense-company-strip strong {
+  display: block;
+}
+
+.mobile-expense-company-strip span {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.mobile-expense-company-strip strong {
+  overflow: hidden;
+  margin-top: 1px;
+  color: #17345a;
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-expense-company-strip b {
+  padding: 4px 7px;
+  border: 1px solid #b9d8f2;
+  border-radius: 4px;
+  background: #eaf4fc;
+  color: #07619f;
+  font-size: 9px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.mobile-expense-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px 16px 20px;
+}
+
+.mobile-expense-field {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.mobile-expense-field > span {
+  color: #56657a;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.mobile-expense-field > small {
+  color: #7b8ba0;
+  font-size: 10px;
+}
+
+.mobile-expense-control {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.mobile-expense-control > svg {
+  position: absolute;
+  top: 13px;
+  left: 12px;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  color: #1775b8;
+  pointer-events: none;
+}
+
+.mobile-expense-control input,
+.mobile-expense-control select,
+.mobile-expense-control textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 36px 10px 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.mobile-expense-control textarea {
+  min-height: 70px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.mobile-expense-control select {
+  appearance: auto;
+}
+
+.mobile-expense-control input:focus,
+.mobile-expense-control select:focus,
+.mobile-expense-control textarea:focus {
+  border-color: #1675b9;
+  box-shadow: 0 0 0 3px rgba(22, 117, 185, .12);
+}
+
+.mobile-expense-control input::placeholder,
+.mobile-expense-control textarea::placeholder {
+  color: #9aa8b8;
+}
+
+.mobile-expense-control select:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.mobile-expense-two-columns {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+
+.mobile-expense-two-columns input,
+.mobile-expense-two-columns select {
+  padding-right: 8px;
+}
+
+.mobile-expense-credit-box {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #f2c66d;
+  border-radius: 7px;
+  background: #fff9e9;
+}
+
+.mobile-expense-transfer-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid #b8d9ef;
+  border-radius: 6px;
+  background: #f0f9ff;
+  color: #16648f;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.mobile-expense-transfer-note svg {
+  flex: 0 0 auto;
+}
+
+.mobile-expense-credit-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #935b07;
+}
+
+.mobile-expense-credit-heading > svg {
+  flex: 0 0 auto;
+}
+
+.mobile-expense-credit-heading strong,
+.mobile-expense-credit-heading span {
+  display: block;
+}
+
+.mobile-expense-photo-box {
+  display: grid;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid #b8d9ef;
+  border-radius: 7px;
+  background: #f4faff;
+}
+
+.mobile-expense-photo-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #116ba6;
+}
+
+.mobile-expense-photo-heading > svg {
+  flex: 0 0 auto;
+}
+
+.mobile-expense-photo-heading strong,
+.mobile-expense-photo-heading span {
+  display: block;
+}
+
+.mobile-expense-photo-heading strong {
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.mobile-expense-photo-heading span {
+  margin-top: 1px;
+  color: #6688a0;
+  font-size: 9px;
+}
+
+.mobile-expense-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.mobile-expense-photo-preview {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  border: 1px solid #9bc7e5;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.mobile-expense-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mobile-expense-photo-preview button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  width: 21px;
+  height: 21px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(185, 28, 37, .92);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mobile-expense-photo-button {
+  display: flex;
+  min-height: 42px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed #62a9d7;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0d6da9;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mobile-expense-photo-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-expense-photo-button:hover {
+  background: #eaf6fd;
+}
+
+.mobile-expense-photo-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.mobile-expense-credit-heading strong {
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.mobile-expense-credit-heading span {
+  margin-top: 1px;
+  color: #9a6b21;
+  font-size: 10px;
+}
+
+.mobile-expense-primary-button {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #b91c25;
+  border-radius: 6px;
+  background: #d62029;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: .01em;
+  transition: background 120ms ease, transform 80ms ease;
+}
+
+.mobile-expense-primary-button:hover {
+  background: #b91c25;
+}
+
+.mobile-expense-primary-button:active {
+  transform: translateY(1px);
+}
+
+.mobile-expense-primary-button:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
+.mobile-expense-form-footnote {
+  margin: -6px 0 0;
+  color: #718096;
+  font-size: 10px;
+  text-align: center;
+}
+
+.mobile-expense-feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.mobile-expense-feedback svg {
+  flex: 0 0 auto;
+}
+
+.mobile-expense-feedback.is-success {
+  border-color: #a8e1c4;
+  background: #ecfdf3;
+  color: #18724a;
+}
+
+.mobile-expense-feedback.is-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #a61b26;
+}
+
+.mobile-expense-login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: max(18px, 5vh);
+  padding-bottom: max(18px, 5vh);
+}
+
+.mobile-expense-login-card {
+  max-width: 410px;
+}
+
+.mobile-expense-login-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 23px 20px;
+  background: #102847;
+  color: #ffffff;
+}
+
+.mobile-expense-login-logo-wrap {
+  display: flex;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.mobile-expense-login-logo-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mobile-expense-login-brand h1 {
+  margin: 2px 0 1px;
+  font-size: 19px;
+  font-weight: 740;
+}
+
+.mobile-expense-login-brand p {
+  margin: 0;
+  color: #b7c6d8;
+  font-size: 11px;
+}
+
+.mobile-expense-login-body {
+  padding: 20px;
+}
+
+.mobile-expense-security-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid #bfdcf1;
+  border-radius: 5px;
+  background: #eef7fd;
+  color: #155f91;
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.mobile-expense-login-form {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.mobile-expense-login-form > label {
+  margin-top: 7px;
+  color: #56657a;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.mobile-expense-input-shell {
+  position: relative;
+}
+
+.mobile-expense-input-shell svg {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  color: #1775b8;
+}
+
+.mobile-expense-input-shell input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  color: #172033;
+  font-size: 13px;
+}
+
+.mobile-expense-input-shell input:focus {
+  border-color: #1675b9;
+  box-shadow: 0 0 0 3px rgba(22, 117, 185, .12);
+}
+
+.mobile-expense-login-form .mobile-expense-primary-button {
+  margin-top: 12px;
+}
+
+.mobile-expense-login-error {
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid #fecaca;
+  border-radius: 5px;
+  background: #fef2f2;
+  color: #a61b26;
+  font-size: 11px;
+  font-weight: 620;
+}
+
+@media (max-width: 520px) {
+  .mobile-expense-page {
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .mobile-expense-app,
+  .mobile-expense-login-card {
+    min-height: 100vh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .mobile-expense-login-page {
+    display: block;
+  }
+}
+
+@media (max-width: 360px) {
+  .mobile-expense-two-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mobile-expense-company-strip b {
+    display: none;
+  }
+}

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
+import { isExpenseCaptureEmail } from '../../services/companies';
 import { ContextStrip, ERPIcon, StatusBadge } from './ERPComponents';
 
 const SIDEBAR_STORAGE_KEY = 'csm-erp-sidebar-collapsed';
@@ -132,7 +133,7 @@ export default function AppShell({ children }) {
     const [profileOpen, setProfileOpen] = useState(false);
     const [query, setQuery] = useState('');
 
-    const isAdmin = user?.email !== 'adriandiazc95@gmail.com';
+    const isAdmin = user?.email !== 'adriandiazc95@gmail.com' && !isExpenseCaptureEmail(user?.email);
     const hasDailyExpensesAccess = user?.email === 'adriandiazc95@gmail.com' || isAdmin;
     const dataTab = useMemo(() => new URLSearchParams(location.search).get('tab') || 'Ingresos', [location.search]);
     const page = useMemo(() => routeMeta(location.pathname, dataTab), [dataTab, location.pathname]);

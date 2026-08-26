@@ -7,6 +7,13 @@ import {
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { getLocalDateString } from '../utils/localDate';
 import { companyCollection, companyDoc } from '../services/companyFirestore';
+import ReceiptPhotoPicker from './ReceiptPhotoPicker';
+import TransactionDetailModal from './TransactionDetailModal';
+import {
+    deleteExpenseAttachments,
+    normalizeExpenseAttachments,
+    uploadExpenseAttachments,
+} from '../services/expenseAttachments';
 import {
     EXPENSE_CATEGORY_OPTIONS,
     getDefaultSubcategory,
@@ -16,6 +23,7 @@ import {
 import {
     CASH_PAYMENT_METHOD,
     ENTRY_PAYMENT_METHOD_OPTIONS,
+    TRANSFER_PAYMENT_METHOD,
     getPaymentMethodLabel,
     isCreditCardPayment,
     normalizePaymentMethod,
@@ -127,9 +135,36 @@ const Badge = ({ children, variant = 'default' }) => {
     return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${variants[variant]}`}>{children}</span>;
 };
 
+const ReceiptThumbnails = ({ item }) => {
+    const attachments = normalizeExpenseAttachments(item);
+    if (!attachments.length) return <span className="text-xs text-slate-400">Sin foto</span>;
+
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {attachments.map((attachment, index) => (
+                <a
+                    key={attachment.id || attachment.path || attachment.url || index}
+                    href={attachment.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block h-11 w-11 overflow-hidden rounded border border-sky-200 bg-sky-50"
+                    title={`Abrir comprobante ${index + 1}`}
+                >
+                    <img src={attachment.url} alt={`Comprobante ${index + 1}`} className="h-full w-full object-cover" />
+                </a>
+            ))}
+        </div>
+    );
+};
+
 // --- COMPONENTE PRINCIPAL ---
 
 const CAJA = 'Caja Carnes Amparito';
+const DAILY_EXPENSE_PAYMENT_METHOD_OPTIONS = [
+    ENTRY_PAYMENT_METHOD_OPTIONS[0],
+    { value: TRANSFER_PAYMENT_METHOD, label: 'Transferencia' },
+    ...ENTRY_PAYMENT_METHOD_OPTIONS.slice(1),
+];
 
 export default function GastosDiarios({ categories = [], activeCompany }) {
     const [activeTab, setActiveTab] = useState('registro');
@@ -144,6 +179,8 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
     const [categoria, setCategoria] = useState('');
     const [subcategoria, setSubcategoria] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(CASH_PAYMENT_METHOD);
+    const [photoFiles, setPhotoFiles] = useState([]);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const cajaName = activeCompany?.name ? `Caja ${activeCompany.name}` : CAJA;
     const subcategoryOptions = getExpenseSubcategories(categoria);
 
@@ -155,6 +192,25 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
     // Historial
     const [filtroFecha, setFiltroFecha] = useState(getLocalDateString());
     const [registros, setRegistros] = useState([]);
+    const [detailItem, setDetailItem] = useState(null);
+
+    const detailFields = {
+        fecha: { label: 'Fecha', type: 'date' },
+        descripcion: { label: 'Descripción', type: 'text' },
+        tipo: { label: 'Tipo', type: 'text' },
+        categoria: { label: 'Categoría', type: 'text' },
+        subcategoria: { label: 'Subcategoría', type: 'text' },
+        paymentMethod: { label: 'Método de pago', type: 'text' },
+        monto: { label: 'Monto', type: 'currency' },
+    };
+
+    const canShowTransactionDetail = (record) => ['Gasto', 'Compra'].includes(record?.tipo);
+
+    const handleDetailDoubleClick = (event, record) => {
+        if (!canShowTransactionDetail(record)) return;
+        if (event.target.closest('button, a, input, select, label')) return;
+        setDetailItem(record);
+    };
 
     const cargarRegistros = useCallback(async () => {
         setLoading(true);
@@ -212,6 +268,7 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
         if (tipo === 'Gasto' && (!categoria || !subcategoria)) return alert('Categoria y subcategoria requeridas para gastos.');
 
         setLoading(true);
+        setUploadProgress(0);
         try {
             const timestamp = Timestamp.now();
             const classification = tipo === 'Gasto'
@@ -242,6 +299,13 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                     paymentMethod: normalizedPaymentMethod,
                 })
                 : null;
+            const attachments = await uploadExpenseAttachments({
+                activeCompany,
+                expenseId: gastoDiarioRef.id,
+                recordType: tipo === 'Compra' ? 'compra_caja' : 'gasto_caja',
+                files: photoFiles,
+                onProgress: setUploadProgress,
+            });
 
             batch.set(gastoDiarioRef, {
                 fecha,
@@ -262,6 +326,8 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                 paymentMethod: normalizedPaymentMethod,
                 paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
                 linkedCreditCardMovementId: creditCardMovement?.id || null,
+                attachments,
+                attachmentCount: attachments.length,
                 timestamp
             });
 
@@ -281,7 +347,9 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                     timestamp,
                     is_conciled: false,
                     origen: 'gastosDiarios',
-                    gastoDiarioId: gastoDiarioRef.id
+                    gastoDiarioId: gastoDiarioRef.id,
+                    attachments,
+                    attachmentCount: attachments.length,
                 });
             }
 
@@ -305,17 +373,26 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                     description: descripcion,
                     sourceCollection: 'gastosDiarios',
                     sourceGastoDiarioId: gastoDiarioRef.id,
+                    attachments,
+                    attachmentCount: attachments.length,
                     timestamp
                 });
             }
 
-            await batch.commit();
+            try {
+                await batch.commit();
+            } catch (error) {
+                await deleteExpenseAttachments(attachments);
+                throw error;
+            }
 
             setDescripcion('');
             setMonto('');
             setCategoria('');
             setSubcategoria('');
             setPaymentMethod(CASH_PAYMENT_METHOD);
+            setPhotoFiles([]);
+            setUploadProgress(0);
             alert(`${tipo} registrado correctamente`);
             setRefreshKey(prev => prev + 1);
 
@@ -368,6 +445,7 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
             }
 
             await batch.commit();
+            await deleteExpenseAttachments(normalizeExpenseAttachments(registro));
             cargarRegistros();
         } catch (error) {
             console.error('Error al eliminar:', error);
@@ -450,10 +528,12 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                     icon="receipt"
                                     value={tipo}
                                     onChange={e => {
-                                        setTipo(e.target.value);
-                                        if (e.target.value !== 'Gasto') {
+                                        const nextType = e.target.value;
+                                        setTipo(nextType);
+                                        if (nextType !== 'Gasto') {
                                             setCategoria('');
                                             setSubcategoria('');
+                                            if (paymentMethod === TRANSFER_PAYMENT_METHOD) setPaymentMethod(CASH_PAYMENT_METHOD);
                                         }
                                     }}
                                     options={
@@ -493,12 +573,18 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                 onChange={e => setPaymentMethod(e.target.value)}
                                 options={
                                     <>
-                                        {ENTRY_PAYMENT_METHOD_OPTIONS.map(option => (
+                                        {(tipo === 'Gasto' ? DAILY_EXPENSE_PAYMENT_METHOD_OPTIONS : ENTRY_PAYMENT_METHOD_OPTIONS).map(option => (
                                             <option key={option.value} value={option.value}>{option.label}</option>
                                         ))}
                                     </>
                                 }
                             />
+
+                            {tipo === 'Gasto' && paymentMethod === TRANSFER_PAYMENT_METHOD && (
+                                <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] font-semibold text-sky-800">
+                                    Transferencia es solo informativa. No genera movimientos bancarios, cuentas por pagar ni otros asientos adicionales.
+                                </div>
+                            )}
 
                             {tipo === 'Gasto' && (
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -532,13 +618,20 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                 </div>
                             )}
 
+                            <div className="rounded-lg border border-sky-200 bg-white p-3">
+                                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Fotos del comprobante</div>
+                                <ReceiptPhotoPicker files={photoFiles} onChange={setPhotoFiles} disabled={loading} />
+                            </div>
+
                             <Button
                                 type="submit"
                                 variant="primary"
                                 disabled={loading}
                                 className="w-full"
                             >
-                                {loading ? 'Guardando...' : `Registrar ${tipo}`}
+                                {loading && photoFiles.length > 0 && uploadProgress < 1
+                                    ? `Subiendo fotos ${Math.round(uploadProgress * 100)}%`
+                                    : loading ? 'Guardando...' : `Registrar ${tipo}`}
                             </Button>
                         </form>
                     </Card>
@@ -618,7 +711,12 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                     </div>
                                 ) : (
                                     registros.map((reg) => (
-                                        <div key={reg.id} className="erp-mobile-record p-4">
+                                        <div
+                                            key={reg.id}
+                                            className={`erp-mobile-record p-4 ${canShowTransactionDetail(reg) ? 'cursor-zoom-in' : ''}`}
+                                            onDoubleClick={(event) => handleDetailDoubleClick(event, reg)}
+                                            title={canShowTransactionDetail(reg) ? 'Doble clic para ver detalle y comprobante' : undefined}
+                                        >
                                             <div className="mb-3 flex items-start justify-between gap-3">
                                                 <div>
                                                     <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -648,6 +746,10 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                                     <span className="erp-mono font-extrabold text-[#16222d]">{fmt(reg.monto)}</span>
                                                 </div>
                                             </div>
+                                            <div className="mt-3">
+                                                <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Comprobante</div>
+                                                <ReceiptThumbnails item={reg} />
+                                            </div>
                                             <button
                                                 onClick={() => handleEliminar(reg)}
                                                 className="erp-pressable mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-[#a81d24]"
@@ -671,6 +773,7 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Categoría</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Subcategoria</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Metodo</th>
+                                            <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400">Comprobante</th>
                                             <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Monto</th>
                                             <th className="px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-slate-400 no-print">Acción</th>
                                         </tr>
@@ -678,14 +781,19 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                     <tbody className="divide-y divide-slate-100">
                                         {registros.length === 0 ? (
                                             <tr>
-                                                <td colSpan="8" className="px-4 py-10 text-center text-slate-400">
+                                                <td colSpan="9" className="px-4 py-10 text-center text-slate-400">
                                                     <Icon path={Icons.alertCircle} className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                                                     <p className="text-sm">No hay registros para esta fecha</p>
                                                 </td>
                                             </tr>
                                         ) : (
                                             registros.map(reg => (
-                                                <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
+                                                <tr
+                                                    key={reg.id}
+                                                    className={`transition-colors ${canShowTransactionDetail(reg) ? 'cursor-zoom-in hover:bg-sky-50/70' : 'hover:bg-slate-50'}`}
+                                                    onDoubleClick={(event) => handleDetailDoubleClick(event, reg)}
+                                                    title={canShowTransactionDetail(reg) ? 'Doble clic para ver detalle y comprobante' : undefined}
+                                                >
                                                     <td className="px-4 py-3 text-xs text-slate-400">
                                                         {reg.timestamp?.toDate?.().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) || '--:--'}
                                                     </td>
@@ -698,6 +806,7 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                                     <td className="px-4 py-3 text-sm text-slate-400">{reg.categoria || '—'}</td>
                                                     <td className="px-4 py-3 text-sm text-slate-400">{reg.subcategoria || reg.subcategory || '—'}</td>
                                                     <td className="px-4 py-3 text-sm font-semibold text-slate-500">{getPaymentMethodLabel(reg.paymentMethod)}</td>
+                                                    <td className="px-4 py-3"><ReceiptThumbnails item={reg} /></td>
                                                     <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">{fmt(reg.monto)}</td>
                                                     <td className="px-4 py-3 text-center no-print">
                                                         <button
@@ -714,7 +823,7 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                     </tbody>
                                     <tfoot className="border-t-2 border-slate-200 bg-slate-50">
                                         <tr>
-                                            <td colSpan="6" className="px-4 py-3 font-semibold text-slate-700 uppercase text-xs tracking-widest">Total del Día</td>
+                                            <td colSpan="7" className="px-4 py-3 font-semibold text-slate-700 uppercase text-xs tracking-widest">Total del Día</td>
                                             <td className="px-4 py-3 text-right font-black text-lg text-[#7f1218] font-mono">{fmt(totalGeneral)}</td>
                                             <td className="no-print"></td>
                                         </tr>
@@ -725,6 +834,12 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                     </Card>
                 </div>
             )}
+            <TransactionDetailModal
+                item={detailItem}
+                type={`Detalle de ${String(detailItem?.tipo || 'movimiento').toLowerCase()}`}
+                fields={detailFields}
+                onClose={() => setDetailItem(null)}
+            />
         </div>
     );
 }

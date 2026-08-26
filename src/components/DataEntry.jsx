@@ -11,7 +11,20 @@ import { companyCollection, companyDoc } from '../services/companyFirestore';
 import { getDepreciationEndMonth, getMonthlyDepreciationAmount } from '../services/depreciation';
 import { resolveIncomeEntries } from '../services/incomeAggregation';
 import { syncSicarDailyIncome } from '../services/sicarIncomeSync';
-import { deletePurchaseTransaction, updatePurchaseTransaction } from '../services/linkedTransactions';
+import {
+    deleteExpenseTransaction,
+    deletePurchaseTransaction,
+    updateExpenseTransaction,
+    updatePurchaseTransaction,
+} from '../services/linkedTransactions';
+import { createExpenseTransaction, isProviderCreditPayment } from '../services/expenseTransactions';
+import {
+    deleteExpenseAttachments,
+    normalizeExpenseAttachments,
+    uploadExpenseAttachments,
+} from '../services/expenseAttachments';
+import ReceiptPhotoPicker from './ReceiptPhotoPicker';
+import TransactionDetailModal from './TransactionDetailModal';
 import {
     EXPENSE_CATEGORY_OPTIONS,
     PURCHASE_CATEGORY,
@@ -23,13 +36,13 @@ import { getLocalDateString, getLocalMonthString } from '../utils/localDate';
 import {
     CASH_PAYMENT_METHOD,
     ENTRY_PAYMENT_METHOD_OPTIONS,
+    EXPENSE_PAYMENT_METHOD_OPTIONS,
     HISTORY_PAYMENT_METHOD_OPTIONS,
+    TRANSFER_PAYMENT_METHOD,
     getPaymentMethodLabel,
     isCreditCardPayment,
     normalizePaymentMethod,
     setCreditCardChargeInBatch,
-    syncCreditCardMovementForSource,
-    deleteCreditCardMovementForSource,
 } from '../services/creditCardLiabilities';
 
 const getCompanyBranch = (activeCompany) => ({
@@ -170,14 +183,15 @@ const normalizeFilterText = (value) => (
 
 // --- COMPONENTE: EDITABLE LIST ---
 
-const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeCompany }) => {
+const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, onOpenDetail, activeCompany }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState(item);
     const [loading, setLoading] = useState(false);
+    const [newAttachmentFiles, setNewAttachmentFiles] = useState([]);
 
     const buildBlockingMessage = (blockingAbonos = []) => {
         const abonosLabel = blockingAbonos.map((abono) => `#${abono.secuencia || abono.id}`).join(', ');
-        return `No se puede eliminar esta compra porque la factura asociada ya tiene abono(s) ${abonosLabel}. Anulalos primero desde Cuentas por Pagar.`;
+        return `No se puede modificar este registro porque la cuenta por pagar asociada ya tiene abono(s) ${abonosLabel}. Anulalos primero desde Cuentas por Pagar.`;
     };
 
     const handleSave = async () => {
@@ -187,6 +201,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeC
             for (const key in editData) {
                 if (key === 'id') continue;
                 if (fields[key]?.readonly) continue;
+                if (fields[key]?.type === 'attachments') continue;
                 if (fields[key]?.type === 'number' || fields[key]?.type === 'currency') {
                     dataToSave[key] = parseFloat(editData[key]) || 0;
                 } else if (key === 'timestamp') {
@@ -209,42 +224,29 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeC
 
             let savedData = dataToSave;
             if (collectionName === 'compras') {
-                const result = await updatePurchaseTransaction(item.id, dataToSave, activeCompany);
+                const result = await updatePurchaseTransaction(item.id, dataToSave, activeCompany, {
+                    newFiles: newAttachmentFiles,
+                });
                 if (result?.missing) {
                     throw new Error('La compra ya no existe.');
                 }
                 savedData = result?.purchase || dataToSave;
+            } else if (collectionName === 'gastos') {
+                const result = await updateExpenseTransaction(item.id, dataToSave, activeCompany, {
+                    newFiles: newAttachmentFiles,
+                });
+                if (result?.missing) throw new Error('El gasto ya no existe.');
+                if (result?.blocked) {
+                    alert(buildBlockingMessage(result.blockingAbonos));
+                    return;
+                }
+                savedData = result?.expense || dataToSave;
             } else {
                 await updateDoc(companyDoc(db, activeCompany, collectionName, item.id), dataToSave);
             }
 
-            if (collectionName === 'gastos') {
-                const mergedExpense = { ...item, ...editData, ...savedData };
-                const normalizedPaymentMethod = normalizePaymentMethod(mergedExpense.paymentMethod, CASH_PAYMENT_METHOD);
-                const movementId = await syncCreditCardMovementForSource({
-                    activeCompany,
-                    sourceCollection: 'gastos',
-                    sourceId: item.id,
-                    sourceType: 'Gasto',
-                    date: mergedExpense.date,
-                    description: mergedExpense.description,
-                    amount: mergedExpense.amount,
-                    category: mergedExpense.category,
-                    subcategory: mergedExpense.subcategory,
-                    paymentMethod: normalizedPaymentMethod,
-                });
-                await updateDoc(companyDoc(db, activeCompany, collectionName, item.id), {
-                    paymentMethod: normalizedPaymentMethod,
-                    linkedCreditCardMovementId: movementId,
-                });
-                savedData = {
-                    ...savedData,
-                    paymentMethod: normalizedPaymentMethod,
-                    linkedCreditCardMovementId: movementId,
-                };
-            }
-
             setIsEditing(false);
+            setNewAttachmentFiles([]);
             onUpdate(item.id, savedData);
         } catch (error) {
             console.error("Error al actualizar:", error);
@@ -264,11 +266,14 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeC
                     alert(buildBlockingMessage(result.blockingAbonos));
                     return;
                 }
+            } else if (collectionName === 'gastos') {
+                const result = await deleteExpenseTransaction(item.id, activeCompany);
+                if (result?.blocked) {
+                    alert(buildBlockingMessage(result.blockingAbonos));
+                    return;
+                }
             } else {
                 await deleteDoc(companyDoc(db, activeCompany, collectionName, item.id));
-                if (collectionName === 'gastos') {
-                    await deleteCreditCardMovementForSource('gastos', item.id, activeCompany);
-                }
             }
             onDelete(item.id);
         } catch (error) {
@@ -281,6 +286,26 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeC
 
     const renderValue = (key, value) => {
         const field = fields[key];
+        if (field?.type === 'attachments') {
+            const attachments = normalizeExpenseAttachments(item);
+            if (!attachments.length) return <span className="text-xs text-slate-400">Sin foto</span>;
+            return (
+                <div className="flex min-w-[72px] flex-wrap gap-1.5">
+                    {attachments.map((attachment, index) => (
+                        <a
+                            key={attachment.id || attachment.path || attachment.url || index}
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block h-11 w-11 overflow-hidden rounded border border-slate-200 bg-slate-50"
+                            title="Abrir comprobante"
+                        >
+                            <img src={attachment.url} alt={`Comprobante ${index + 1}`} className="h-full w-full object-cover" />
+                        </a>
+                    ))}
+                </div>
+            );
+        }
         if (value === null || value === undefined) return '—';
         if (typeof value === 'object' && value instanceof Timestamp) {
             try { return value.toDate().toLocaleString('es-ES'); } catch (e) { return '—'; }
@@ -295,6 +320,18 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeC
         const field = fields[key];
         if (key === 'timestamp') return <span className='text-stone-400 text-xs'>No editable</span>;
         if (field?.readonly) return <span className='text-stone-400 text-xs'>No editable</span>;
+
+        if (field?.type === 'attachments') {
+            return (
+                <ReceiptPhotoPicker
+                    files={newAttachmentFiles}
+                    onChange={setNewAttachmentFiles}
+                    existing={normalizeExpenseAttachments(item)}
+                    compact
+                    disabled={loading}
+                />
+            );
+        }
 
         if (field?.type === 'select') {
             const options = typeof field.options === 'function' ? field.options(editData) : (field.options || []);
@@ -366,8 +403,24 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeC
         );
     };
 
+    const canOpenDetail = ['compras', 'gastos'].includes(collectionName) && !isEditing;
+
+    const handleOpenDetail = (event) => {
+        if (!canOpenDetail) return;
+        if (event.target.closest('button, a, input, select, label')) return;
+        onOpenDetail?.(item);
+    };
+
     return (
-        <tr className="border-b border-slate-100 transition-colors">
+        <tr
+            className={`border-b border-slate-100 transition-colors ${canOpenDetail ? 'cursor-zoom-in hover:bg-sky-50/60' : ''}`}
+            onDoubleClick={handleOpenDetail}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' && event.target === event.currentTarget) handleOpenDetail(event);
+            }}
+            tabIndex={canOpenDetail ? 0 : undefined}
+            title={canOpenDetail ? 'Doble clic para ver el detalle y el comprobante' : undefined}
+        >
             {Object.keys(fields).map(key => (
                 <td key={key} className="py-2.5 px-3 text-sm">
                     {isEditing ? renderInput(key, editData[key]) : renderValue(key, item[key])}
@@ -379,7 +432,7 @@ const EditableRow = ({ item, collectionName, fields, onUpdate, onDelete, activeC
                         <Button onClick={handleSave} disabled={loading || !item.id} variant="success" size="sm" className="flex items-center gap-1">
                             <Icon path={Icons.save} className="w-3 h-3" /> Guardar
                         </Button>
-                        <Button onClick={() => setIsEditing(false)} disabled={loading} variant="ghost" size="sm">Cancelar</Button>
+                        <Button onClick={() => { setIsEditing(false); setNewAttachmentFiles([]); }} disabled={loading} variant="ghost" size="sm">Cancelar</Button>
                     </div>
                 ) : (
                     <div className='flex gap-1'>
@@ -410,10 +463,15 @@ const EditableList = ({
     onAdvancedFiltersChange,
 }) => {
     const [localData, setLocalData] = useState(data);
+    const [detailItem, setDetailItem] = useState(null);
 
     useEffect(() => {
         setLocalData(data);
     }, [data]);
+
+    useEffect(() => {
+        setDetailItem(null);
+    }, [collectionName]);
 
     const handleUpdate = (id, newData) => {
         setLocalData(prev => prev.map(item => item.id === id ? { ...item, ...newData } : item));
@@ -523,6 +581,13 @@ const EditableList = ({
                 </div>
             )}
 
+            {['compras', 'gastos'].includes(collectionName) && hasData && (
+                <div className="mb-3 flex items-center gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
+                    <Icon path={Icons.fileText} className="h-4 w-4" />
+                    Doble clic en una fila para ver el detalle y las fotos del comprobante.
+                </div>
+            )}
+
             {!hasData ? (
                 <div className="erp-empty-state p-8 text-center">
                     <Icon path={Icons.alertCircle} className="w-10 h-10 mx-auto mb-3 text-slate-300" />
@@ -551,12 +616,19 @@ const EditableList = ({
                                     activeCompany={activeCompany}
                                     onUpdate={handleUpdate}
                                     onDelete={handleDelete}
+                                    onOpenDetail={setDetailItem}
                                 />
                             ))}
                         </tbody>
                     </table>
                 </div>
             )}
+            <TransactionDetailModal
+                item={detailItem}
+                type={collectionName === 'compras' ? 'Detalle de compra' : 'Detalle de gasto'}
+                fields={fields}
+                onClose={() => setDetailItem(null)}
+            />
         </div>
     );
 };
@@ -669,7 +741,13 @@ const ExpenseForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [category, setCategory] = useState('');
     const [subcategory, setSubcategory] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(CASH_PAYMENT_METHOD);
+    const [supplier, setSupplier] = useState('');
+    const [invoiceNumber, setInvoiceNumber] = useState('');
+    const [dueDate, setDueDate] = useState('');
+    const [photoFiles, setPhotoFiles] = useState([]);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const subcategoryOptions = getExpenseSubcategories(category);
+    const isProviderCredit = isProviderCreditPayment(paymentMethod);
 
     const handleCategoryChange = (value) => {
         setCategory(value);
@@ -680,50 +758,38 @@ const ExpenseForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
         e.preventDefault();
         const numAmount = Number(amount);
         if (!description || isNaN(numAmount) || numAmount <= 0 || !category || !subcategory) return alert('Complete todos los campos.');
-        const classification = normalizeExpenseClassification({ category, subcategory, description });
-
         setLoading(true);
+        setUploadProgress(0);
         try {
-            const companyBranch = getCompanyBranch(activeCompany);
-            const expenseRef = doc(companyCollection(db, activeCompany, 'gastos'));
-            const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod, CASH_PAYMENT_METHOD);
-            const batch = writeBatch(db);
-            const creditCardMovement = isCreditCardPayment(normalizedPaymentMethod)
-                ? setCreditCardChargeInBatch(batch, {
-                    activeCompany,
-                    sourceCollection: 'gastos',
-                    sourceId: expenseRef.id,
-                    sourceType: 'Gasto',
-                    date,
-                    description,
-                    amount: numAmount,
-                    category: classification.category,
-                    subcategory: classification.subcategory,
-                    paymentMethod: normalizedPaymentMethod,
-                })
-                : null;
-
-            batch.set(expenseRef, {
+            await createExpenseTransaction({
+                activeCompany,
                 date,
                 description,
                 amount: numAmount,
-                category: classification.category,
-                subcategory: classification.subcategory,
-                categoryKey: `${classification.category} / ${classification.subcategory}`,
-                branch: companyBranch.branch,
-                branchName: companyBranch.branchName,
-                paymentMethod: normalizedPaymentMethod,
-                paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
-                linkedCreditCardMovementId: creditCardMovement?.id || null,
-                timestamp: Timestamp.now(),
-                is_conciled: false,
+                category,
+                subcategory,
+                paymentMethod,
+                supplier,
+                invoiceNumber,
+                dueDate,
+                captureSource: 'sistema_principal',
+                photoFiles,
+                onUploadProgress: setUploadProgress,
             });
-            await batch.commit();
-            setDescription(''); setAmount(''); setCategory(''); setSubcategory(''); setPaymentMethod(CASH_PAYMENT_METHOD);
+            setDescription('');
+            setAmount('');
+            setCategory('');
+            setSubcategory('');
+            setPaymentMethod(CASH_PAYMENT_METHOD);
+            setSupplier('');
+            setInvoiceNumber('');
+            setDueDate('');
+            setPhotoFiles([]);
+            setUploadProgress(0);
             onSuccess?.();
         } catch (error) {
             console.error('Error:', error);
-            alert('Error al guardar');
+            alert(error?.message || 'Error al guardar');
         } finally {
             setLoading(false);
         }
@@ -790,9 +856,36 @@ const ExpenseForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
                     icon="cash"
                     value={paymentMethod}
                     onChange={e => setPaymentMethod(e.target.value)}
-                    options={<>{ENTRY_PAYMENT_METHOD_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</>}
+                    options={<>{EXPENSE_PAYMENT_METHOD_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</>}
                 />
-                <Button type="submit" variant="danger" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Gasto'}</Button>
+                {paymentMethod === TRANSFER_PAYMENT_METHOD && (
+                    <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] font-semibold text-sky-800">
+                        Transferencia es solo informativa. No genera movimientos bancarios, cuentas por pagar ni otros asientos adicionales.
+                    </div>
+                )}
+                {isProviderCredit && (
+                    <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <div className="text-[11px] font-semibold text-amber-800">
+                            Se creara una cuenta por pagar vinculada. Este movimiento seguira siendo un gasto, no una compra.
+                        </div>
+                        <Input label="Proveedor" icon="users" placeholder="Nombre del proveedor" value={supplier} onChange={e => setSupplier(e.target.value)} required />
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Input label="No. factura / referencia" icon="receipt" placeholder="S/N" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} />
+                            <Input label="Fecha de vencimiento" type="date" icon="calendar" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                        </div>
+                    </div>
+                )}
+                <div className="rounded-lg border border-sky-200 bg-white p-3">
+                    <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Fotos del comprobante</div>
+                    <ReceiptPhotoPicker files={photoFiles} onChange={setPhotoFiles} disabled={loading} />
+                </div>
+                <Button type="submit" variant="danger" disabled={loading} className="w-full">
+                    {loading
+                        ? uploadProgress > 0 && uploadProgress < 1
+                            ? `Subiendo fotos ${Math.round(uploadProgress * 100)}%`
+                            : 'Guardando...'
+                        : 'Registrar Gasto'}
+                </Button>
             </form>
             <div className="border-t border-stone-200 pt-4">
                 <div className="bg-amber-50 border border-dashed border-amber-300 rounded-xl p-4 text-center">
@@ -854,6 +947,8 @@ const PurchasesForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
     const [amount, setAmount] = useState('');
     const [subcategory, setSubcategory] = useState(getDefaultSubcategory(PURCHASE_CATEGORY));
     const [paymentMethod, setPaymentMethod] = useState(CASH_PAYMENT_METHOD);
+    const [photoFiles, setPhotoFiles] = useState([]);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const purchaseSubcategories = getExpenseSubcategories(PURCHASE_CATEGORY);
 
     const handleSubmit = async (e) => {
@@ -863,6 +958,7 @@ const PurchasesForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
             return alert('Complete proveedor y monto.');
         }
         setLoading(true);
+        setUploadProgress(0);
         try {
             const classification = normalizeExpenseClassification({
                 category: PURCHASE_CATEGORY,
@@ -890,6 +986,14 @@ const PurchasesForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
                 })
                 : null;
 
+            const attachments = await uploadExpenseAttachments({
+                activeCompany,
+                expenseId: purchaseRef.id,
+                recordType: 'compra',
+                files: photoFiles,
+                onProgress: setUploadProgress,
+            });
+
             batch.set(purchaseRef, {
                 date,
                 month: date.substring(0, 7),
@@ -906,18 +1010,27 @@ const PurchasesForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
                 paymentMethodLabel: getPaymentMethodLabel(normalizedPaymentMethod),
                 linkedCreditCardMovementId: creditCardMovement?.id || null,
                 isInventoryCost: true,
+                attachments,
+                attachmentCount: attachments.length,
                 timestamp: Timestamp.now(),
             });
-            await batch.commit();
+            try {
+                await batch.commit();
+            } catch (error) {
+                await deleteExpenseAttachments(attachments);
+                throw error;
+            }
             setSupplier('');
             setInvoiceNumber('');
             setAmount('');
             setSubcategory(getDefaultSubcategory(PURCHASE_CATEGORY));
             setPaymentMethod(CASH_PAYMENT_METHOD);
+            setPhotoFiles([]);
+            setUploadProgress(0);
             onSuccess?.();
         } catch (error) {
             console.error('Error:', error);
-            alert('Error al guardar');
+            alert(error?.message || 'Error al guardar');
         } finally {
             setLoading(false);
         }
@@ -945,7 +1058,15 @@ const PurchasesForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
                 onChange={e => setPaymentMethod(e.target.value)}
                 options={<>{ENTRY_PAYMENT_METHOD_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</>}
             />
-            <Button type="submit" variant="purple" disabled={loading} className="w-full">{loading ? 'Guardando...' : 'Registrar Compra de Contado'}</Button>
+            <div className="rounded-lg border border-sky-200 bg-white p-3">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Fotos del comprobante</div>
+                <ReceiptPhotoPicker files={photoFiles} onChange={setPhotoFiles} disabled={loading} />
+            </div>
+            <Button type="submit" variant="purple" disabled={loading} className="w-full">
+                {loading && photoFiles.length > 0 && uploadProgress < 1
+                    ? `Subiendo fotos ${Math.round(uploadProgress * 100)}%`
+                    : loading ? 'Guardando...' : 'Registrar Compra de Contado'}
+            </Button>
         </form>
     );
 };
@@ -1224,6 +1345,10 @@ export function DataEntry({ categories, data, activeCompany }) {
             category: { label: 'Categoria', type: 'select', options: EXPENSE_CATEGORY_OPTIONS },
             subcategory: { label: 'Subcategoria', type: 'select', options: (item) => getExpenseSubcategories(item.category) },
             paymentMethod: { label: 'Metodo', type: 'select', options: HISTORY_PAYMENT_METHOD_OPTIONS },
+            supplier: { label: 'Proveedor', type: 'text' },
+            invoiceNumber: { label: 'Factura', type: 'text' },
+            dueDate: { label: 'Vencimiento', type: 'date' },
+            attachments: { label: 'Comprobantes', type: 'attachments' },
             amount: { label: 'Monto', type: 'currency' }
         },
         Inventario: {
@@ -1240,6 +1365,7 @@ export function DataEntry({ categories, data, activeCompany }) {
             subcategory: { label: 'Subcategoria', type: 'select', options: (item) => getExpenseSubcategories(item.category) },
             paymentType: { label: 'Tipo', type: 'text' },
             paymentMethod: { label: 'Metodo', type: 'select', options: HISTORY_PAYMENT_METHOD_OPTIONS },
+            attachments: { label: 'Comprobantes', type: 'attachments' },
             amount: { label: 'Monto', type: 'currency' }
         },
         Depreciaciones: {

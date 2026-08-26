@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth } from '../firebase'; 
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { resolveLoginEmail } from '../services/companies';
 
 const AuthContext = createContext();
 
@@ -24,8 +25,8 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     // Funciones de Autenticación
-    const login = (email, password) => {
-        return signInWithEmailAndPassword(auth, email, password);
+    const login = (identifier, password) => {
+        return signInWithEmailAndPassword(auth, resolveLoginEmail(identifier), password);
     };
 
     const logout = () => {

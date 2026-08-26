@@ -5,6 +5,7 @@ import { calculateDepreciationExpenseForMonth } from '../services/depreciation';
 import { sumIncomeForMonth } from '../services/incomeAggregation';
 import { calculateFixedQuotaTaxes } from '../services/tax';
 import { getLocalMonthString } from '../utils/localDate';
+import { isExpensePayable } from '../services/expenseTransactions';
 
 const StatCard = ({ title, total, children, accentColor }) => (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:shadow-md">
@@ -69,6 +70,7 @@ export default function BalanceSheet({ data, activeCompany }) {
             .reduce((acc, c) => acc + (peso(c.amount) || 0), 0);
 
         const comprasCreditoMes = facturasPagar
+            .filter((factura) => !isExpensePayable(factura))
             .filter(f => !f.id || !mirroredFacturaIds.has(f.id))
             .filter(f => (f.month && f.month === mesPasadoStr) || (f.fecha && f.fecha.startsWith(mesPasadoStr)))
             .reduce((acc, f) => acc + (peso(f.monto) || 0), 0);

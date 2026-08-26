@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { DEFAULT_COMPANY, getAllowedCompaniesForEmail } from '../services/companies';
+import { DEFAULT_COMPANY, getAllowedCompaniesForEmail, resolveLoginEmail } from '../services/companies';
 
 export default function Login() {
     const { login } = useAuth();
@@ -8,7 +8,7 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
-    const loginCompany = getAllowedCompaniesForEmail(email)[0] || DEFAULT_COMPANY;
+    const loginCompany = getAllowedCompaniesForEmail(resolveLoginEmail(email))[0] || DEFAULT_COMPANY;
     const loginLogo = loginCompany.logo || DEFAULT_COMPANY.logo;
     const loginCompanyName = loginCompany.name || 'Sistema Contable';
 
@@ -17,7 +17,7 @@ export default function Login() {
         setError('');
         setIsLoggingIn(true);
         try {
-            await login(email.trim().toLowerCase(), password);
+            await login(email, password);
         } catch (e) {
             let errorMessage = 'No fue posible iniciar sesion.';
             if (['auth/user-not-found', 'auth/wrong-password', 'auth/invalid-credential'].includes(e.code)) {
@@ -70,12 +70,12 @@ export default function Login() {
                     {error && <div className="erp-login-error">{error}</div>}
 
                     <form onSubmit={handleSubmit}>
-                        <label htmlFor="email">Correo electronico</label>
+                        <label htmlFor="email">Usuario o correo electronico</label>
                         <input
                             id="email"
                             name="email"
-                            type="email"
-                            autoComplete="email"
+                            type="text"
+                            autoComplete="username"
                             required
                             value={email}
                             onChange={(event) => setEmail(event.target.value)}

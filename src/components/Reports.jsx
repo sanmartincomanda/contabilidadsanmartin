@@ -8,6 +8,7 @@ import DashboardGeneral from './DashboardGeneral';
 import { resolveReportIncomeEntries } from '../services/incomeAggregation';
 import { getExpenseCategoryKey, inferPurchaseSubcategory, normalizeExpenseClassification } from '../services/expenseCategories';
 import { getLocalDateString, getLocalMonthString } from '../utils/localDate';
+import { isExpensePayable } from '../services/expenseTransactions';
 import { DEFAULT_COMPANY } from '../services/companies';
 
 // --- ICONOS SVG INLINE ---
@@ -1026,6 +1027,7 @@ const aggregateData = (data) => {
     });
 
     facturasCredito.forEach(item => {
+        if (isExpensePayable(item)) return;
         if (item.id && mirroredFacturaIds.has(item.id)) return;
 
         const month = getMonthString(item, ['fecha', 'date']);
@@ -1176,6 +1178,7 @@ const buildFiscalReportData = (data = {}, period = {}, company = DEFAULT_COMPANY
     }, 0);
 
     const creditPurchases = facturasCredito.reduce((sum, item) => {
+        if (isExpensePayable(item)) return sum;
         if (item.id && mirroredFacturaIds.has(item.id)) return sum;
         const dateString = getDateString(item.fecha || item.date || item.timestamp);
         if (!isDateInRange(dateString, safeStartDate, safeEndDate)) return sum;
