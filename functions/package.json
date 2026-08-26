@@ -9,7 +9,9 @@
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "lint": "node --check index.js",
-    "replay-pending-purchases": "node scripts/processPendingSicarPurchases.js"
+    "replay-pending-purchases": "node scripts/processPendingSicarPurchases.js",
+    "sync-purchase-evidence": "node scripts/syncSicarPurchaseEvidence.js",
+    "test:purchase-evidence": "node --test scripts/syncSicarPurchaseEvidence.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0",
