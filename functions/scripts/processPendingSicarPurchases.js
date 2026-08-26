@@ -441,7 +441,7 @@ async function processPurchaseDocument(docSnapshot) {
         sourceSystem: 'SICAR',
         sourceRecordId: normalized.sourceRecordId,
         timestamp: FieldValue.serverTimestamp(),
-      });
+      }, { merge: true });
     }
 
     if (normalized.paymentRoute === 'credito') {
@@ -470,7 +470,7 @@ async function processPurchaseDocument(docSnapshot) {
         sourceMode: rawData.sourceMode || 'push',
         sourceRecordId: normalized.sourceRecordId,
         timestamp: FieldValue.serverTimestamp(),
-      });
+      }, { merge: true });
     }
 
     batch.set(db.collection('compras').doc(targetDocIds.compraId), {
@@ -496,7 +496,7 @@ async function processPurchaseDocument(docSnapshot) {
       sourceFacturaId: normalized.paymentRoute === 'credito' ? targetDocIds.cuentaPorPagarId : null,
       linkedPayableId: normalized.paymentRoute === 'credito' ? targetDocIds.cuentaPorPagarId : null,
       timestamp: FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
 
     await batch.commit();
 

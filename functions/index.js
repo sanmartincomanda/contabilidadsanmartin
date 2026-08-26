@@ -1329,7 +1329,7 @@ async function createCashPurchase(rawId, normalized, rawData) {
     sourceSystem: 'SICAR',
     sourceRecordId: normalized.sourceRecordId,
     timestamp: FieldValue.serverTimestamp(),
-  });
+  }, { merge: true });
 
   batch.set(firestore.collection('compras').doc(compraId), {
     date: normalized.date,
@@ -1351,8 +1351,10 @@ async function createCashPurchase(rawId, normalized, rawData) {
     sourceMode: rawData.sourceMode || 'push',
     sourceRecordId: normalized.sourceRecordId,
     sourceGastoDiarioId: gastoDiarioId,
+    sourceFacturaId: null,
+    linkedPayableId: null,
     timestamp: FieldValue.serverTimestamp(),
-  });
+  }, { merge: true });
 
   await batch.commit();
 
@@ -1394,7 +1396,7 @@ async function createCreditPurchase(rawId, normalized, rawData) {
     sourceMode: rawData.sourceMode || 'push',
     sourceRecordId: normalized.sourceRecordId,
     timestamp: FieldValue.serverTimestamp(),
-  });
+  }, { merge: true });
 
   batch.set(firestore.collection('compras').doc(compraId), {
     date: normalized.date,
@@ -1414,10 +1416,11 @@ async function createCreditPurchase(rawId, normalized, rawData) {
     sourceSystem: 'SICAR',
     sourceMode: rawData.sourceMode || 'push',
     sourceRecordId: normalized.sourceRecordId,
+    sourceGastoDiarioId: null,
     sourceFacturaId: cuentaPorPagarId,
     linkedPayableId: cuentaPorPagarId,
     timestamp: FieldValue.serverTimestamp(),
-  });
+  }, { merge: true });
 
   await batch.commit();
 
@@ -1452,8 +1455,11 @@ async function createOtherPurchase(rawId, normalized, rawData) {
     sourceSystem: 'SICAR',
     sourceMode: rawData.sourceMode || 'push',
     sourceRecordId: normalized.sourceRecordId,
+    sourceGastoDiarioId: null,
+    sourceFacturaId: null,
+    linkedPayableId: null,
     timestamp: FieldValue.serverTimestamp(),
-  });
+  }, { merge: true });
 
   return {
     route: 'otro',
