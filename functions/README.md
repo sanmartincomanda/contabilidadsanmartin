@@ -2,6 +2,30 @@
 
 Esta carpeta deja lista la integracion entre SICAR/MySQL y Firebase para `CARNES AMPARITO`.
 
+## Fotos de facturas desde CSM Operaciones
+
+La API local de CSM Operaciones guarda la foto y su complemento en:
+
+```text
+C:\SICAR\state\sicar-purchase-accounting
+```
+
+El worker `scripts/syncSicarPurchaseEvidence.js` procesa exclusivamente esa evidencia. No crea compras, no modifica SICAR y no vuelve a generar asientos. Localiza la compra contable mediante el `com_id`, exige que la sucursal coincida, sube la imagen a Storage y actualiza el mismo adjunto en `compras`, `cuentas_por_pagar` o `gastosDiarios`.
+
+La ruta de Storage queda aislada por empresa:
+
+```text
+expense-receipts/{companyId}/sicar_compra_{branchId}_{comId}/{hash}_factura.{ext}
+```
+
+Instalacion en cada servidor, desde PowerShell como Administrador:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Install-SicarPurchaseEvidenceBridge.ps1 -Company amparito -FirebaseKeyPath "C:\ruta\estado-resultados-a0a81-admin.json"
+```
+
+Para Masaya se cambia solamente `-Company masaya`. La llave debe pertenecer al proyecto contable `estado-resultados-a0a81`; no debe reutilizarse la llave de inventario. El instalador protege la configuracion local, registra una tarea bajo `SYSTEM` y ejecuta una prueba sin escrituras antes de dejar el monitor activo.
+
 Ahora existen tres flujos:
 
 - `ingresos`
