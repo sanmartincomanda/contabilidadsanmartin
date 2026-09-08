@@ -1,7 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from './firebase';
-import { query, onSnapshot, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import {
+    query,
+    onSnapshot,
+    getDocs,
+    setDoc,
+    updateDoc,
+    where,
+    orderBy,
+    limit as firestoreLimit,
+} from 'firebase/firestore';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -27,12 +36,64 @@ import { isExpenseCaptureEmail } from './services/companies';
 
 const BRAND_LOGO = '/amparito-logo.jpeg';
 
-const DATA_ENTRY_COLLECTIONS = ['ingresos', 'gastos', 'categorias', 'inventarios', 'compras', 'presupuestos', 'cuentasPorCobrar', 'patrimonio', 'depreciaciones'];
 const ACCOUNTS_PAYABLE_COLLECTIONS = ['cuentas_por_pagar', 'abonos_pagar', 'proveedores'];
 const LIABILITIES_COLLECTIONS = ['pasivos_tarjeta_movimientos'];
 const CATEGORY_COLLECTIONS = ['categorias'];
 const REPORT_COLLECTIONS = ['ingresos', 'gastos', 'inventarios', 'compras', 'presupuestos', 'cuentas_por_pagar', 'depreciaciones'];
 const DASHBOARD_COLLECTIONS = ['ingresos', 'gastos', 'compras', 'cuentas_por_pagar'];
+
+const DATA_ENTRY_COLLECTION_BY_TAB = {
+    Ingresos: 'ingresos',
+    Gastos: 'gastos',
+    Inventario: 'inventarios',
+    Compras: 'compras',
+    Depreciaciones: 'depreciaciones',
+    Presupuesto: 'presupuestos',
+    'Cuentas por Cobrar': 'cuentasPorCobrar',
+    Patrimonio: 'patrimonio',
+};
+
+const DATA_ENTRY_DATE_FIELD_BY_COLLECTION = {
+    ingresos: 'date',
+    gastos: 'date',
+    inventarios: 'month',
+    compras: 'date',
+    depreciaciones: 'month',
+    presupuestos: 'month',
+    cuentasPorCobrar: 'date',
+    patrimonio: 'date',
+};
+
+const getNextMonth = (month) => {
+    const [year, monthNumber] = String(month || '').split('-').map(Number);
+    if (!year || !monthNumber) return '';
+    const nextDate = new Date(Date.UTC(year, monthNumber, 1));
+    return `${nextDate.getUTCFullYear()}-${String(nextDate.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
+const getMonthQueryConditions = (field, month) => {
+    if (!month) return [];
+    if (field === 'month') return [{ field, operator: '==', value: month }];
+
+    const nextMonth = getNextMonth(month);
+    return [
+        { field, operator: '>=', value: `${month}-01` },
+        { field, operator: '<', value: `${nextMonth}-01` },
+    ];
+};
+
+const buildCollectionQuery = (activeCompany, name, config = {}) => {
+    const constraints = (config.conditions || []).map((condition) => (
+        where(condition.field, condition.operator, condition.value)
+    ));
+
+    if (config.orderBy?.field) {
+        constraints.push(orderBy(config.orderBy.field, config.orderBy.direction || 'asc'));
+    }
+    if (config.limit) constraints.push(firestoreLimit(config.limit));
+
+    return query(companyCollection(db, activeCompany, name), ...constraints);
+};
 
 const DEFAULT_REMINDERS = [
     { id: 'r1', texto: 'DGI CUOTA FIJA', diaDelMes: 7, activo: true },
@@ -677,12 +738,20 @@ const hasCollectionData = (currentData, collections = []) => (
     collections.every((c) => Array.isArray(currentData?.[c]))
 );
 
-const useFirestoreCollections = (collections = [], enabled = true, live = true, activeCompany) => {
+const useFirestoreCollections = (
+    collections = [],
+    enabled = true,
+    live = true,
+    activeCompany,
+    queryConfigs = {},
+) => {
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(enabled);
     const [error, setError] = useState(null);
     const dataRef = useRef(data);
     const companyId = activeCompany?.id || '';
+    const collectionsKey = collections.join('|');
+    const queryConfigsKey = JSON.stringify(queryConfigs);
 
     useEffect(() => { dataRef.current = data; }, [data]);
 
@@ -714,7 +783,7 @@ const useFirestoreCollections = (collections = [], enabled = true, live = true, 
 
         const loadOnce = async (name) => {
             try {
-                const snapshot = await getDocs(query(companyCollection(db, activeCompany, name)));
+                const snapshot = await getDocs(buildCollectionQuery(activeCompany, name, queryConfigs[name]));
                 if (!mounted) return;
                 setData(prev => ({ ...prev, [name]: snapshot.docs.map(d => ({ id: d.id, ...d.data() })) }));
             } catch (e) {
@@ -729,7 +798,7 @@ const useFirestoreCollections = (collections = [], enabled = true, live = true, 
         collections.forEach((name) => {
             if (!live) { loadOnce(name); return; }
 
-            const q = query(companyCollection(db, activeCompany, name));
+            const q = buildCollectionQuery(activeCompany, name, queryConfigs[name]);
             unsubscribes.push(
                 onSnapshot(q,
                     (snap) => {
@@ -743,7 +812,7 @@ const useFirestoreCollections = (collections = [], enabled = true, live = true, 
         });
 
         return () => { mounted = false; unsubscribes.forEach(u => u()); };
-    }, [activeCompany, collections, enabled, live]);
+    }, [companyId, collectionsKey, enabled, live, queryConfigsKey]);
 
     return { data, loading, error };
 };
@@ -765,13 +834,59 @@ function AppContent() {
         || currentHostname.endsWith('--formgasto-sanmartinsr.netlify.app');
     const isExpenseCaptureExperience = isExpenseCaptureHost || currentPath === '/captura-gastos';
     const needsCategories = currentPath.startsWith('/maestros/categorias') || currentPath.startsWith('/configuraciones');
+    const [dataEntryScope, setDataEntryScope] = useState(() => {
+        const requestedTab = new URLSearchParams(location.search).get('tab');
+        const tab = DATA_ENTRY_COLLECTION_BY_TAB[requestedTab] ? requestedTab : 'Ingresos';
+        return {
+            tab,
+            filterValue: tab === 'Ingresos' ? getLocalDateString() : getLocalMonthString(),
+            filterType: tab === 'Ingresos' ? 'date' : 'month',
+        };
+    });
+
+    const dataEntryCollections = useMemo(() => (
+        [DATA_ENTRY_COLLECTION_BY_TAB[dataEntryScope.tab] || 'ingresos']
+    ), [dataEntryScope.tab]);
+
+    const dataEntryQueryConfigs = useMemo(() => {
+        const collectionName = dataEntryCollections[0];
+        const dateField = DATA_ENTRY_DATE_FIELD_BY_COLLECTION[collectionName];
+        let conditions = [];
+
+        if (dataEntryScope.filterValue) {
+            conditions = dataEntryScope.filterType === 'date'
+                ? [{ field: dateField, operator: '==', value: dataEntryScope.filterValue }]
+                : getMonthQueryConditions(dateField, dataEntryScope.filterValue);
+        }
+
+        return {
+            [collectionName]: conditions.length
+                ? { conditions }
+                : {
+                    orderBy: { field: dateField, direction: 'desc' },
+                    limit: 300,
+                },
+        };
+    }, [dataEntryCollections, dataEntryScope.filterType, dataEntryScope.filterValue]);
+
+    const dashboardQueryConfigs = useMemo(() => {
+        const currentMonth = getLocalMonthString();
+        return {
+            ingresos: { conditions: getMonthQueryConditions('date', currentMonth) },
+            gastos: { conditions: getMonthQueryConditions('date', currentMonth) },
+            compras: { conditions: getMonthQueryConditions('date', currentMonth) },
+            cuentas_por_pagar: {
+                conditions: [{ field: 'saldo', operator: '>', value: 0.01 }],
+            },
+        };
+    }, []);
 
     const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, !!user && needsCategories, true, activeCompany);
-    const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(DATA_ENTRY_COLLECTIONS, !!user && isAdmin && currentPath === '/ingresar', true, activeCompany);
+    const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(dataEntryCollections, !!user && isAdmin && currentPath === '/ingresar', true, activeCompany, dataEntryQueryConfigs);
     const { data: accountsPayableData, loading: accountsPayableLoading, error: accountsPayableError } = useFirestoreCollections(ACCOUNTS_PAYABLE_COLLECTIONS, !!user && currentPath === '/cuentas-pagar', true, activeCompany);
     const { data: liabilitiesData, loading: liabilitiesLoading, error: liabilitiesError } = useFirestoreCollections(LIABILITIES_COLLECTIONS, !!user && isAdmin && currentPath === '/pasivos', true, activeCompany);
     const { data: reportsData, loading: reportsLoading, error: reportsError } = useFirestoreCollections(REPORT_COLLECTIONS, !!user && isAdmin && currentPath === '/reportes', false, activeCompany);
-    const { data: dashboardData, loading: dashboardLoading } = useFirestoreCollections(DASHBOARD_COLLECTIONS, !!user && isAdmin && currentPath === '/', false, activeCompany);
+    const { data: dashboardData, loading: dashboardLoading } = useFirestoreCollections(DASHBOARD_COLLECTIONS, !!user && isAdmin && currentPath === '/', false, activeCompany, dashboardQueryConfigs);
 
     const categoriesList = categoriesData.categorias || [];
 
@@ -807,7 +922,7 @@ function AppContent() {
                     <Routes>
                         <Route path="/login" element={<Navigate to="/" replace />} />
                         <Route path="/" element={<PrivateRoute element={isAdmin ? (dashboardLoading ? <AppLoadingState /> : <Dashboard data={dashboardData} />) : <Navigate to="/cuentas-pagar" />} />} />
-                        <Route path="/ingresar" element={<PrivateRoute element={isAdmin ? (dataEntryLoading ? <AppLoadingState /> : dataEntryError ? <AppErrorState /> : <DataEntry data={dataEntryData} categories={categoriesList} activeCompany={activeCompany} />) : <Navigate to="/cuentas-pagar" />} />} />
+                        <Route path="/ingresar" element={<PrivateRoute element={isAdmin ? (dataEntryLoading ? <AppLoadingState /> : dataEntryError ? <AppErrorState /> : <DataEntry data={dataEntryData} categories={categoriesList} activeCompany={activeCompany} onQueryScopeChange={setDataEntryScope} />) : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="/gastos-diarios" element={<PrivateRoute element={<GastosDiarios categories={categoriesList} activeCompany={activeCompany} />} />} />
                         <Route path="/conciliacion" element={<PrivateRoute element={isAdmin ? <BankReconciliation activeCompany={activeCompany} /> : <Navigate to="/cuentas-pagar" />} />} />
                         <Route path="/cuentas-pagar" element={<PrivateRoute element={accountsPayableLoading ? <AppLoadingState /> : accountsPayableError ? <AppErrorState /> : <AccountsPayable data={accountsPayableData} activeCompany={activeCompany} />} />} />

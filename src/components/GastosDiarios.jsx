@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
 import {
-    Timestamp, getDocs, doc, writeBatch
+    Timestamp, getDocs, doc, writeBatch, query, where, orderBy, limit
 } from 'firebase/firestore';
 import { DEFAULT_BRANCH_ID, DEFAULT_BRANCH_NAME, fmt } from '../constants';
 import { getLocalDateString } from '../utils/localDate';
@@ -215,7 +215,11 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
     const cargarRegistros = useCallback(async () => {
         setLoading(true);
         try {
-            const snapshot = await getDocs(companyCollection(db, activeCompany, 'gastosDiarios'));
+            const recordsCollection = companyCollection(db, activeCompany, 'gastosDiarios');
+            const recordsQuery = filtroFecha
+                ? query(recordsCollection, where('fecha', '==', filtroFecha))
+                : query(recordsCollection, orderBy('timestamp', 'desc'), limit(200));
+            const snapshot = await getDocs(recordsQuery);
 
             let docs = snapshot.docs.map(d => {
                 const record = { id: d.id, ...d.data(), timestamp: d.data().timestamp || null };
@@ -420,10 +424,12 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                 if (registro.linkedExpenseId) {
                     batch.delete(companyDoc(db, activeCompany, 'gastos', registro.linkedExpenseId));
                 } else {
-                    const gastosSnapshot = await getDocs(companyCollection(db, activeCompany, 'gastos'));
-                    const gastosRelacionados = gastosSnapshot.docs.filter(
-                        d => d.data().gastoDiarioId === registro.id
-                    );
+                    const gastosSnapshot = await getDocs(query(
+                        companyCollection(db, activeCompany, 'gastos'),
+                        where('gastoDiarioId', '==', registro.id),
+                        limit(5)
+                    ));
+                    const gastosRelacionados = gastosSnapshot.docs;
                     for (const gastoDoc of gastosRelacionados) {
                         batch.delete(companyDoc(db, activeCompany, 'gastos', gastoDoc.id));
                     }
@@ -434,10 +440,12 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                 if (registro.linkedPurchaseId) {
                     batch.delete(companyDoc(db, activeCompany, 'compras', registro.linkedPurchaseId));
                 } else {
-                    const comprasSnapshot = await getDocs(companyCollection(db, activeCompany, 'compras'));
-                    const comprasRelacionadas = comprasSnapshot.docs.filter(
-                        item => item.data().sourceGastoDiarioId === registro.id
-                    );
+                    const comprasSnapshot = await getDocs(query(
+                        companyCollection(db, activeCompany, 'compras'),
+                        where('sourceGastoDiarioId', '==', registro.id),
+                        limit(5)
+                    ));
+                    const comprasRelacionadas = comprasSnapshot.docs;
                     for (const compraDoc of comprasRelacionadas) {
                         batch.delete(companyDoc(db, activeCompany, 'compras', compraDoc.id));
                     }
@@ -669,6 +677,12 @@ export default function GastosDiarios({ categories = [], activeCompany }) {
                                     <Icon path={Icons.refresh} className="w-4 h-4" /> Actualizar
                                 </Button>
                             </div>
+
+                            {!filtroFecha && registros.length >= 200 && (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                                    Mostrando los 200 registros mas recientes. Selecciona una fecha para consultar un cierre especifico sin cargar todo el historial.
+                                </div>
+                            )}
 
                             {/* Totales */}
                             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">

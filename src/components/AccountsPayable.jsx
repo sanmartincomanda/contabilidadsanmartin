@@ -16,6 +16,7 @@ import {
 import ReceiptPhotoPicker from './ReceiptPhotoPicker';
 import { getLocalDateString } from '../utils/localDate';
 import { companyCollection, companyDoc } from '../services/companyFirestore';
+import { exportPayablesToExcel } from '../services/payablesExcel';
 import {
     CASH_PAYMENT_METHOD,
     PAYABLE_PAYMENT_METHOD_OPTIONS,
@@ -51,7 +52,8 @@ const Icons = {
     calculator: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z",
     square: "M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z",
     search: "M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z",
-    filter: "M3 4a1 1 0 011-1h16a1 1 0 01.8 1.6l-5.8 7.73V19a1 1 0 01-.55.9l-4 2A1 1 0 019 21v-8.67L3.2 4.6A1 1 0 013 4z"
+    filter: "M3 4a1 1 0 011-1h16a1 1 0 01.8 1.6l-5.8 7.73V19a1 1 0 01-.55.9l-4 2A1 1 0 019 21v-8.67L3.2 4.6A1 1 0 013 4z",
+    download: "M12 3v12m0 0l-4-4m4 4l4-4M5 21h14a2 2 0 002-2v-3M5 21a2 2 0 01-2-2v-3"
 };
 
 // --- ANIMACIONES ---
@@ -362,6 +364,7 @@ export function AccountsPayable({ data, activeCompany }) {
     const isCompactViewport = useCompactViewport();
     const [activeTab, setActiveTab] = useState('Estado de Cuenta');
     const [loading, setLoading] = useState(false);
+    const [exportingExcel, setExportingExcel] = useState(false);
     const [nuevoProveedor, setNuevoProveedor] = useState('');
     const [expandedProvider, setExpandedProvider] = useState(null);
     const [estadoCuentaFilters, setEstadoCuentaFilters] = useState(emptyPayableFilters);
@@ -841,6 +844,31 @@ export function AccountsPayable({ data, activeCompany }) {
             setLoading(false);
         }
     }, [activeCompany, nuevoProveedor]);
+
+    const handleExportFacturas = useCallback(async () => {
+        if (!historialFacturasCredito.length || exportingExcel) return;
+
+        setExportingExcel(true);
+        try {
+            await exportPayablesToExcel({
+                invoices: historialFacturasCredito.map((invoice) => ({
+                    ...invoice,
+                    exportType: isExpensePayable(invoice) ? 'Gasto' : 'Compra',
+                    exportAttachmentUrls: normalizeExpenseAttachments(invoice)
+                        .map((attachment) => attachment.url)
+                        .filter(Boolean),
+                })),
+                companyName: activeCompany?.branchName || activeCompany?.name || DEFAULT_BRANCH_NAME,
+                filters: facturasHistoryFilters,
+                generatedOn: getLocalDateString(),
+            });
+        } catch (error) {
+            console.error('No se pudo exportar las facturas a Excel:', error);
+            alert('No se pudo generar el archivo Excel. Intenta nuevamente.');
+        } finally {
+            setExportingExcel(false);
+        }
+    }, [activeCompany, exportingExcel, facturasHistoryFilters, historialFacturasCredito]);
 
     // --- HELPERS ---
     const getVencimientoInfo = (fechaVenc) => {
@@ -1518,9 +1546,25 @@ export function AccountsPayable({ data, activeCompany }) {
                                 title="Historial de Facturas de Credito"
                                 icon="fileText"
                                 right={
-                                    <div className="text-right">
-                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Saldo filtrado</div>
-                                        <div className="erp-mono text-sm font-black text-[#a81d24]">{fmt(historialFacturasStats.saldo)}</div>
+                                    <div className="flex items-center gap-3">
+                                        <Button
+                                            type="button"
+                                            variant="success"
+                                            onClick={handleExportFacturas}
+                                            disabled={exportingExcel || historialFacturasCredito.length === 0}
+                                            className="flex items-center gap-2 whitespace-nowrap px-3"
+                                            title="Exportar las facturas filtradas a Excel"
+                                        >
+                                            {exportingExcel
+                                                ? <Spinner />
+                                                : <Icon path={Icons.download} className="h-4 w-4" />}
+                                            <span className="hidden sm:inline">{exportingExcel ? 'Generando...' : 'Exportar Excel'}</span>
+                                            <span className="sm:hidden">Excel</span>
+                                        </Button>
+                                        <div className="hidden text-right lg:block">
+                                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Saldo filtrado</div>
+                                            <div className="erp-mono text-sm font-black text-[#a81d24]">{fmt(historialFacturasStats.saldo)}</div>
+                                        </div>
                                     </div>
                                 }
                             >

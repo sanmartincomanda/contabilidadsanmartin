@@ -1720,8 +1720,14 @@ async function processRawSale(rawId, options = {}) {
   }
 }
 
-async function collectReplayCandidates(collectionRef, sourceType) {
-  const snapshot = await collectionRef.get();
+async function collectReplayCandidates(collectionRef, sourceType, options = {}) {
+  const statuses = Array.from(new Set(options.statuses || ['pending']))
+    .filter((status) => ['pending', 'error'].includes(status));
+  const queryLimit = Math.max(1, Math.min(Number(options.limit) || 200, 500));
+  const statusQuery = statuses.length === 1
+    ? collectionRef.where('status', '==', statuses[0])
+    : collectionRef.where('status', 'in', statuses);
+  const snapshot = await statusQuery.limit(queryLimit).get();
 
   return snapshot.docs
     .map((docSnapshot) => {
@@ -1748,8 +1754,18 @@ async function collectReplayCandidates(collectionRef, sourceType) {
 
 async function replayPrivateSicarStaging({ preview = false, requeueErrors = true, limit = 200 }) {
   const cutoverDate = getPrivateCutoverDate();
-  const purchaseCandidates = await collectReplayCandidates(getRawPurchasesCollection(), 'compra');
-  const saleCandidates = await collectReplayCandidates(getRawSalesCollection(), 'venta');
+  const replayLimit = Math.max(1, Math.min(Number(limit) || 200, 500));
+  const replayStatuses = requeueErrors ? ['pending', 'error'] : ['pending'];
+  const [purchaseCandidates, saleCandidates] = await Promise.all([
+    collectReplayCandidates(getRawPurchasesCollection(), 'compra', {
+      statuses: replayStatuses,
+      limit: replayLimit,
+    }),
+    collectReplayCandidates(getRawSalesCollection(), 'venta', {
+      statuses: replayStatuses,
+      limit: replayLimit,
+    }),
+  ]);
   const allCandidates = [...purchaseCandidates, ...saleCandidates];
   const processable = [];
   const ignored = [];
@@ -1768,7 +1784,7 @@ async function replayPrivateSicarStaging({ preview = false, requeueErrors = true
     processable.push(candidate);
   }
 
-  const selected = processable.slice(0, Math.max(1, Math.min(Number(limit) || 200, 500)));
+  const selected = processable.slice(0, replayLimit);
 
   if (!preview) {
     for (const candidate of ignored) {
@@ -1796,6 +1812,7 @@ async function replayPrivateSicarStaging({ preview = false, requeueErrors = true
     ok: true,
     cutoverDate,
     preview,
+    queriedCount: allCandidates.length,
     selectedCount: selected.length,
     ignoredBeforeCutover: ignored.length,
     processedCount: preview ? 0 : results.filter((item) => !item?.skipped).length,

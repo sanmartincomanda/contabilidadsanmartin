@@ -581,6 +581,12 @@ const EditableList = ({
                 </div>
             )}
 
+            {!filterValue && localData.length >= 300 && (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                    Mostrando los 300 registros mas recientes para proteger el consumo de Firebase. Selecciona una fecha o mes para consultar otro periodo.
+                </div>
+            )}
+
             {['compras', 'gastos'].includes(collectionName) && hasData && (
                 <div className="mb-3 flex items-center gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
                     <Icon path={Icons.fileText} className="h-4 w-4" />
@@ -1258,7 +1264,7 @@ const EquityForm = ({ loading, setLoading, onSuccess, activeCompany }) => {
 
 const VALID_TABS = ['Ingresos', 'Gastos', 'Inventario', 'Compras', 'Depreciaciones', 'Presupuesto', 'Cuentas por Cobrar', 'Patrimonio'];
 
-export function DataEntry({ categories, data, activeCompany }) {
+export function DataEntry({ categories, data, activeCompany, onQueryScopeChange }) {
     const [searchParams] = useSearchParams();
     const urlTab = searchParams.get('tab');
 
@@ -1317,6 +1323,17 @@ export function DataEntry({ categories, data, activeCompany }) {
         'Cuentas por Cobrar': { type: 'month', label: 'Filtrar por Mes' },
         Patrimonio: { type: 'month', label: 'Filtrar por Mes' },
     };
+
+    const activeFilterValue = filterMonth[activeTab];
+    const activeFilterType = filterConfig[activeTab].type;
+
+    useEffect(() => {
+        onQueryScopeChange?.({
+            tab: activeTab,
+            filterValue: activeFilterValue,
+            filterType: activeFilterType,
+        });
+    }, [activeFilterType, activeFilterValue, activeTab, onQueryScopeChange]);
 
     const handleSuccess = () => setRefreshKey(prev => prev + 1);
 
