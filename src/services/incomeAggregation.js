@@ -6,7 +6,21 @@ const normalizeDate = (value) => {
     return '';
 };
 
-const normalizeSource = (value) => value === 'sicar' ? 'sicar' : 'manual';
+const normalizeSource = (income) => {
+    const sourceMarkers = [
+        income?.source,
+        income?.sourceSystem,
+        income?.sourceCollection,
+        income?.sourceMode,
+        income?.createdBy,
+        income?.reference,
+        income?.referencia,
+        income?.id,
+    ];
+    return sourceMarkers.some((value) => String(value || '').toLowerCase().includes('sicar'))
+        ? 'sicar'
+        : 'manual';
+};
 const normalizeAmount = (value) => Number(value ?? 0) || 0;
 
 export const getIncomeDate = (income) => normalizeDate(income?.date || income?.fecha || income?.timestamp);
@@ -16,14 +30,14 @@ const normalizeIncomeEntry = (income) => {
     const date = getIncomeDate(income);
     if (!date) return null;
 
-    const source = normalizeSource(income?.source);
+    const source = normalizeSource(income);
 
     return {
         ...income,
         date,
         month: income?.month || date.substring(0, 7),
         amount: getIncomeAmount(income),
-        description: income?.description || income?.detalle || (source === 'sicar' ? 'Ingreso diario SICAR' : 'Ingreso manual'),
+        description: income?.description || income?.descripcion || income?.detalle || (source === 'sicar' ? 'Ingreso diario SICAR' : 'Ingreso manual'),
         reference: income?.reference || income?.referencia || '',
         source,
         sourceLabel: source === 'sicar' ? 'SICAR' : 'MANUAL',
