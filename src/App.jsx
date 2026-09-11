@@ -95,6 +95,31 @@ const buildCollectionQuery = (activeCompany, name, config = {}) => {
     return query(companyCollection(db, activeCompany, name), ...constraints);
 };
 
+const getCollectionQueryConfigs = (config = {}) => (
+    Array.isArray(config.queries) && config.queries.length > 0
+        ? config.queries
+        : [config]
+);
+
+const buildCollectionQueries = (activeCompany, name, config = {}) => (
+    getCollectionQueryConfigs(config).map((queryConfig) => (
+        buildCollectionQuery(activeCompany, name, queryConfig)
+    ))
+);
+
+const mergeQuerySnapshots = (snapshots = []) => {
+    const documentsById = new Map();
+    snapshots.forEach((snapshot) => {
+        snapshot?.docs?.forEach((documentSnapshot) => {
+            documentsById.set(documentSnapshot.id, {
+                id: documentSnapshot.id,
+                ...documentSnapshot.data(),
+            });
+        });
+    });
+    return Array.from(documentsById.values());
+};
+
 const DEFAULT_REMINDERS = [
     { id: 'r1', texto: 'DGI CUOTA FIJA', diaDelMes: 7, activo: true },
     { id: 'r2', texto: 'ALCALDIA', diaDelMes: 7, activo: true },
@@ -783,9 +808,11 @@ const useFirestoreCollections = (
 
         const loadOnce = async (name) => {
             try {
-                const snapshot = await getDocs(buildCollectionQuery(activeCompany, name, queryConfigs[name]));
+                const snapshots = await Promise.all(
+                    buildCollectionQueries(activeCompany, name, queryConfigs[name]).map(getDocs)
+                );
                 if (!mounted) return;
-                setData(prev => ({ ...prev, [name]: snapshot.docs.map(d => ({ id: d.id, ...d.data() })) }));
+                setData(prev => ({ ...prev, [name]: mergeQuerySnapshots(snapshots) }));
             } catch (e) {
                 if (mounted) { console.error(`Error en ${name}:`, e); setError(e); }
             } finally {
@@ -798,17 +825,31 @@ const useFirestoreCollections = (
         collections.forEach((name) => {
             if (!live) { loadOnce(name); return; }
 
-            const q = buildCollectionQuery(activeCompany, name, queryConfigs[name]);
-            unsubscribes.push(
-                onSnapshot(q,
-                    (snap) => {
-                        if (!mounted) return;
-                        setData(prev => ({ ...prev, [name]: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
-                        markLoaded(name);
-                    },
-                    (e) => { console.error(`Error en ${name}:`, e); if (mounted) setError(e); markLoaded(name); }
-                )
-            );
+            const collectionQueries = buildCollectionQueries(activeCompany, name, queryConfigs[name]);
+            const snapshots = new Array(collectionQueries.length);
+            const settledQueries = new Set();
+            const markQuerySettled = (index) => {
+                settledQueries.add(index);
+                if (settledQueries.size === collectionQueries.length) markLoaded(name);
+            };
+
+            collectionQueries.forEach((collectionQuery, index) => {
+                unsubscribes.push(
+                    onSnapshot(collectionQuery,
+                        (snapshot) => {
+                            if (!mounted) return;
+                            snapshots[index] = snapshot;
+                            setData(prev => ({ ...prev, [name]: mergeQuerySnapshots(snapshots) }));
+                            markQuerySettled(index);
+                        },
+                        (e) => {
+                            console.error(`Error en ${name}:`, e);
+                            if (mounted) setError(e);
+                            markQuerySettled(index);
+                        }
+                    )
+                );
+            });
         });
 
         return () => { mounted = false; unsubscribes.forEach(u => u()); };
@@ -851,35 +892,49 @@ function AppContent() {
     const dataEntryQueryConfigs = useMemo(() => {
         const collectionName = dataEntryCollections[0];
         const dateField = DATA_ENTRY_DATE_FIELD_BY_COLLECTION[collectionName];
-        let conditions = [];
+        const buildConfig = (field) => {
+            const conditions = dataEntryScope.filterValue
+                ? (dataEntryScope.filterType === 'date'
+                    ? [{ field, operator: '==', value: dataEntryScope.filterValue }]
+                    : getMonthQueryConditions(field, dataEntryScope.filterValue))
+                : [];
 
-        if (dataEntryScope.filterValue) {
-            conditions = dataEntryScope.filterType === 'date'
-                ? [{ field: dateField, operator: '==', value: dataEntryScope.filterValue }]
-                : getMonthQueryConditions(dateField, dataEntryScope.filterValue);
+            return conditions.length
+                ? { conditions }
+                : { orderBy: { field, direction: 'desc' }, limit: 300 };
+        };
+        const configs = [buildConfig(dateField)];
+
+        if (collectionName === 'ingresos' && activeCompany?.dataMode === 'legacy') {
+            configs.push(buildConfig('fecha'));
         }
 
         return {
-            [collectionName]: conditions.length
-                ? { conditions }
-                : {
-                    orderBy: { field: dateField, direction: 'desc' },
-                    limit: 300,
-                },
+            [collectionName]: configs.length === 1 ? configs[0] : { queries: configs },
         };
-    }, [dataEntryCollections, dataEntryScope.filterType, dataEntryScope.filterValue]);
+    }, [activeCompany?.dataMode, dataEntryCollections, dataEntryScope.filterType, dataEntryScope.filterValue]);
 
     const dashboardQueryConfigs = useMemo(() => {
         const currentMonth = getLocalMonthString();
+        const incomeDateConfig = { conditions: getMonthQueryConditions('date', currentMonth) };
+        const incomeConfig = activeCompany?.dataMode === 'legacy'
+            ? {
+                queries: [
+                    incomeDateConfig,
+                    { conditions: getMonthQueryConditions('fecha', currentMonth) },
+                ],
+            }
+            : incomeDateConfig;
+
         return {
-            ingresos: { conditions: getMonthQueryConditions('date', currentMonth) },
+            ingresos: incomeConfig,
             gastos: { conditions: getMonthQueryConditions('date', currentMonth) },
             compras: { conditions: getMonthQueryConditions('date', currentMonth) },
             cuentas_por_pagar: {
                 conditions: [{ field: 'saldo', operator: '>', value: 0.01 }],
             },
         };
-    }, []);
+    }, [activeCompany?.dataMode]);
 
     const { data: categoriesData } = useFirestoreCollections(CATEGORY_COLLECTIONS, !!user && needsCategories, true, activeCompany);
     const { data: dataEntryData, loading: dataEntryLoading, error: dataEntryError } = useFirestoreCollections(dataEntryCollections, !!user && isAdmin && currentPath === '/ingresar', true, activeCompany, dataEntryQueryConfigs);
