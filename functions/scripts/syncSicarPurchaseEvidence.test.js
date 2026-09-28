@@ -4,12 +4,25 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const test = require('node:test');
 const {
+  buildFixedQuotaAccountingPatch,
+  buildFixedQuotaTreatmentHash,
   buildObjectPath,
   isPathInside,
   matchesBranch,
   matchesBusinessIdentity,
   mergeEvidenceAttachment,
 } = require('./syncSicarPurchaseEvidence');
+
+const fixedQuotaMetadata = {
+  supplierTaxRegime: 'fixed-quota',
+  excludeRecoverableVat: true,
+  accountingSubtotal: 100,
+  accountingTaxTotal: 0,
+  accountingTotal: 100,
+  sicarSubtotal: 100,
+  sicarTaxTotal: 15,
+  sicarTotal: 115,
+};
 
 const amparito = {
   projectId: 'estado-resultados-a0a81',
@@ -102,4 +115,56 @@ test('rechaza rutas fuera de la cola local autorizada', () => {
   const root = path.resolve('C:\\SICAR\\state\\sicar-purchase-accounting');
   assert.equal(isPathInside(root, path.join(root, 'compra_125.jpg')), true);
   assert.equal(isPathInside(root, 'C:\\Windows\\System32\\archivo.jpg'), false);
+});
+
+test('cuota fija reemplaza el total de compra y conserva el total original de SICAR', () => {
+  assert.deepEqual(
+    buildFixedQuotaAccountingPatch('compras', { amount: 115 }, fixedQuotaMetadata),
+    {
+      supplierTaxRegime: 'fixed-quota',
+      excludeRecoverableVat: true,
+      ivaAcreditable: 0,
+      recoverableVat: 0,
+      accountingSubtotal: 100,
+      accountingTaxTotal: 0,
+      accountingTotal: 100,
+      sicarOriginalSubtotal: 100,
+      sicarOriginalTaxTotal: 15,
+      sicarOriginalTotal: 115,
+      accountingTreatmentSource: 'csm-operaciones',
+      amount: 100,
+    }
+  );
+});
+
+test('cuota fija conserva abonos existentes al corregir la cuenta por pagar', () => {
+  const patch = buildFixedQuotaAccountingPatch(
+    'cuentas_por_pagar',
+    { monto: 115, saldo: 95 },
+    fixedQuotaMetadata
+  );
+  assert.equal(patch.monto, 100);
+  assert.equal(patch.saldo, 80);
+  assert.equal(patch.estado, 'pendiente');
+});
+
+test('cuota fija rechaza una correccion menor que los abonos existentes', () => {
+  assert.throws(
+    () => buildFixedQuotaAccountingPatch(
+      'cuentas_por_pagar',
+      { monto: 115, saldo: 5 },
+      fixedQuotaMetadata
+    ),
+    /abonos existentes superan el total contable/i
+  );
+});
+
+test('el hash contable cambia cuando cambia el total autorizado', () => {
+  const original = buildFixedQuotaTreatmentHash(fixedQuotaMetadata);
+  const changed = buildFixedQuotaTreatmentHash({
+    ...fixedQuotaMetadata,
+    accountingSubtotal: 101,
+    accountingTotal: 101,
+  });
+  assert.notEqual(original, changed);
 });

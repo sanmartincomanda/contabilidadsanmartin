@@ -2,7 +2,7 @@
 
 Esta carpeta deja lista la integracion entre SICAR/MySQL y Firebase para `CARNES AMPARITO`.
 
-## Fotos de facturas desde CSM Operaciones
+## Complementos contables desde CSM Operaciones
 
 La API local de CSM Operaciones guarda la foto y su complemento en:
 
@@ -10,7 +10,9 @@ La API local de CSM Operaciones guarda la foto y su complemento en:
 C:\SICAR\state\sicar-purchase-accounting
 ```
 
-El worker `scripts/syncSicarPurchaseEvidence.js` procesa exclusivamente esa evidencia. No crea compras, no modifica SICAR y no vuelve a generar asientos. Localiza la compra contable mediante el `com_id`, exige que la sucursal coincida, sube la imagen a Storage y actualiza el mismo adjunto en `compras`, `cuentas_por_pagar` o `gastosDiarios`.
+El worker `scripts/syncSicarPurchaseEvidence.js` procesa la evidencia y el tratamiento de proveedores de cuota fija. No crea compras ni modifica SICAR. Localiza la compra contable mediante el `com_id`, exige que la sucursal coincida y actualiza los mismos documentos en `compras`, `cuentas_por_pagar` o `gastosDiarios`.
+
+Para cuota fija conserva el total original de SICAR como dato de conciliacion, pero registra en contabilidad el subtotal cobrado por el proveedor, IVA acreditable cero y el saldo real por pagar. El proceso es idempotente y conserva los abonos existentes.
 
 La ruta de Storage queda aislada por empresa:
 

@@ -98,6 +98,85 @@ function normalizeMoney(value) {
   return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : null;
 }
 
+function getFixedQuotaTreatment(metadata) {
+  const fixedQuota = metadata?.supplierTaxRegime === 'fixed-quota'
+    && metadata?.excludeRecoverableVat === true;
+  if (!fixedQuota) return null;
+
+  const subtotal = normalizeMoney(metadata.accountingSubtotal);
+  const taxTotal = normalizeMoney(metadata.accountingTaxTotal);
+  const total = normalizeMoney(metadata.accountingTotal);
+  const sicarSubtotal = normalizeMoney(metadata.sicarSubtotal ?? metadata.subtotal);
+  const sicarTaxTotal = normalizeMoney(metadata.sicarTaxTotal ?? metadata.taxes);
+  const sicarTotal = normalizeMoney(metadata.sicarTotal ?? metadata.total);
+  if ([subtotal, taxTotal, total, sicarSubtotal, sicarTaxTotal, sicarTotal].some((value) => value === null)) {
+    throw new Error('El complemento de cuota fija no contiene totales contables completos.');
+  }
+  if (subtotal < 0 || total < 0 || taxTotal !== 0 || total !== subtotal) {
+    throw new Error('Los totales contables de cuota fija no son validos.');
+  }
+
+  return {
+    supplierTaxRegime: 'fixed-quota',
+    excludeRecoverableVat: true,
+    subtotal,
+    recoverableVat: 0,
+    total,
+    sicarSubtotal,
+    sicarTaxTotal,
+    sicarTotal,
+  };
+}
+
+function buildFixedQuotaAccountingPatch(collectionName, data, metadata) {
+  const treatment = getFixedQuotaTreatment(metadata);
+  if (!treatment) return null;
+
+  const patch = {
+    supplierTaxRegime: treatment.supplierTaxRegime,
+    excludeRecoverableVat: true,
+    ivaAcreditable: 0,
+    recoverableVat: 0,
+    accountingSubtotal: treatment.subtotal,
+    accountingTaxTotal: 0,
+    accountingTotal: treatment.total,
+    sicarOriginalSubtotal: treatment.sicarSubtotal,
+    sicarOriginalTaxTotal: treatment.sicarTaxTotal,
+    sicarOriginalTotal: treatment.sicarTotal,
+    accountingTreatmentSource: 'csm-operaciones',
+  };
+
+  if (collectionName === 'compras') {
+    patch.amount = treatment.total;
+  } else if (collectionName === 'gastosDiarios') {
+    patch.monto = treatment.total;
+  } else if (collectionName === 'cuentas_por_pagar') {
+    const previousAmount = normalizeMoney(data?.monto);
+    const previousBalance = normalizeMoney(data?.saldo);
+    const paid = previousAmount !== null && previousBalance !== null
+      ? Math.max(0, Math.round((previousAmount - previousBalance + Number.EPSILON) * 100) / 100)
+      : 0;
+    if (paid > treatment.total) {
+      throw new Error('Los abonos existentes superan el total contable de cuota fija; requiere revision manual.');
+    }
+    const balance = Math.max(0, Math.round((treatment.total - paid + Number.EPSILON) * 100) / 100);
+    const currentStatus = normalizeComparable(data?.estado);
+    patch.monto = treatment.total;
+    patch.saldo = balance;
+    patch.estado = balance === 0
+      ? 'pagado'
+      : (['pagado', 'paid'].includes(currentStatus) ? 'pendiente' : (data?.estado || 'pendiente'));
+  }
+
+  return patch;
+}
+
+function buildFixedQuotaTreatmentHash(metadata) {
+  const treatment = getFixedQuotaTreatment(metadata);
+  if (!treatment) return '';
+  return createHash('sha256').update(JSON.stringify(treatment)).digest('hex');
+}
+
 function isPathInside(rootDirectory, candidatePath) {
   const relative = path.relative(path.resolve(rootDirectory), path.resolve(candidatePath || ''));
   return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -124,7 +203,11 @@ function listMetadataFiles(queueDirectory, limit, deliveryKey, force) {
     .filter((entry) => {
       if (force) return true;
       try {
-        return readMetadata(entry.filePath).accountingDeliveries?.[deliveryKey]?.status !== 'done';
+        const metadata = readMetadata(entry.filePath);
+        const delivery = metadata.accountingDeliveries?.[deliveryKey];
+        if (delivery?.status !== 'done') return true;
+        const treatmentHash = buildFixedQuotaTreatmentHash(metadata);
+        return Boolean(treatmentHash && treatmentHash !== delivery.treatmentHash);
       } catch {
         return true;
       }
@@ -447,6 +530,21 @@ async function attachEvidence(db, targets, attachment, preview) {
   return targets.map((target) => target.ref.path);
 }
 
+async function applyFixedQuotaTreatment(db, targets, metadata, preview) {
+  const applicable = targets
+    .map(({ ref, data }) => ({ ref, patch: buildFixedQuotaAccountingPatch(ref.parent.id, data, metadata) }))
+    .filter(({ patch }) => Boolean(patch));
+  if (!applicable.length || preview) return applicable.map(({ ref }) => ref.path);
+
+  const batch = db.batch();
+  const appliedAt = admin.firestore.FieldValue.serverTimestamp();
+  applicable.forEach(({ ref, patch }) => {
+    batch.set(ref, { ...patch, accountingTreatmentAppliedAt: appliedAt }, { merge: true });
+  });
+  await batch.commit();
+  return applicable.map(({ ref }) => ref.path);
+}
+
 function recordFailure(metadataPath, metadata, deliveryKey, error) {
   const previous = metadata.accountingDeliveries?.[deliveryKey] || {};
   const message = String(error?.message || error || 'Error desconocido').slice(0, 500);
@@ -464,24 +562,32 @@ function recordFailure(metadataPath, metadata, deliveryKey, error) {
 
 async function processMetadataFile(db, config, metadataPath, options) {
   const metadata = readMetadata(metadataPath);
-  if (!metadata.invoiceSupport?.localPath) return { status: 'ignored', reason: 'without_photo' };
+  const hasEvidence = Boolean(metadata.invoiceSupport?.localPath);
+  const treatmentHash = buildFixedQuotaTreatmentHash(metadata);
+  if (!hasEvidence && !treatmentHash) return { status: 'ignored', reason: 'without_accounting_changes' };
   if ((metadata.branchId || metadata.branchName) && !matchesBranch(metadata, config)) {
-    throw new Error('La evidencia pertenece a otra empresa o sucursal.');
+    throw new Error('El complemento contable pertenece a otra empresa o sucursal.');
   }
 
   const deliveryKey = getDeliveryKey(config);
   const existingDelivery = metadata.accountingDeliveries?.[deliveryKey];
-  const localPath = path.resolve(metadata.invoiceSupport.localPath);
-  if (!isPathInside(config.queueDirectory, localPath)) {
-    throw new Error('La foto esta fuera del directorio autorizado.');
-  }
-  if (!fs.existsSync(localPath)) {
-    if (existingDelivery?.status === 'done') return { status: 'unchanged', sourceRecordId: metadata.sourceRecordId };
-    throw new Error('No se encontro la foto local pendiente.');
+  let localPath = '';
+  let contentHash = '';
+  if (hasEvidence) {
+    localPath = path.resolve(metadata.invoiceSupport.localPath);
+    if (!isPathInside(config.queueDirectory, localPath)) {
+      throw new Error('La foto esta fuera del directorio autorizado.');
+    }
+    if (!fs.existsSync(localPath)) {
+      if (existingDelivery?.status === 'done' && !treatmentHash) return { status: 'unchanged', sourceRecordId: metadata.sourceRecordId };
+      throw new Error('No se encontro la foto local pendiente.');
+    }
+    contentHash = createHash('sha256').update(fs.readFileSync(localPath)).digest('hex');
   }
 
-  const contentHash = createHash('sha256').update(fs.readFileSync(localPath)).digest('hex');
-  if (!options.force && existingDelivery?.status === 'done' && existingDelivery.contentHash === contentHash) {
+  const evidenceCurrent = !hasEvidence || existingDelivery?.contentHash === contentHash;
+  const treatmentCurrent = !treatmentHash || existingDelivery?.treatmentHash === treatmentHash;
+  if (!options.force && existingDelivery?.status === 'done' && evidenceCurrent && treatmentCurrent) {
     return { status: 'unchanged', sourceRecordId: metadata.sourceRecordId };
   }
 
@@ -490,15 +596,20 @@ async function processMetadataFile(db, config, metadataPath, options) {
     throw new Error(`La compra SICAR ${metadata.sourceRecordId} aun no existe en el sistema contable.`);
   }
 
-  const attachment = await uploadEvidence(config, metadata, localPath, contentHash, options.preview);
-  const targetPaths = await attachEvidence(db, targets, attachment, options.preview);
+  const attachment = hasEvidence
+    ? await uploadEvidence(config, metadata, localPath, contentHash, options.preview)
+    : null;
+  const evidencePaths = attachment ? await attachEvidence(db, targets, attachment, options.preview) : [];
+  const treatmentPaths = treatmentHash ? await applyFixedQuotaTreatment(db, targets, metadata, options.preview) : [];
+  const targetPaths = [...new Set([...evidencePaths, ...treatmentPaths])];
   if (!options.preview) {
     metadata.accountingDeliveries = {
       ...(metadata.accountingDeliveries || {}),
       [deliveryKey]: {
         status: 'done',
-        contentHash,
-        attachment,
+        ...(contentHash ? { contentHash } : {}),
+        ...(treatmentHash ? { treatmentHash } : {}),
+        ...(attachment ? { attachment } : {}),
         targetPaths,
         deliveredAt: new Date().toISOString(),
         lastError: null,
@@ -511,6 +622,8 @@ async function processMetadataFile(db, config, metadataPath, options) {
     status: options.preview ? 'preview' : 'done',
     sourceRecordId: String(metadata.sourceRecordId),
     targetCount: targetPaths.length,
+    evidenceApplied: Boolean(attachment),
+    fixedQuotaApplied: Boolean(treatmentHash),
   };
 }
 
@@ -567,6 +680,9 @@ module.exports = {
   isPathInside,
   matchesBranch,
   matchesBusinessIdentity,
+  buildFixedQuotaAccountingPatch,
+  buildFixedQuotaTreatmentHash,
+  getFixedQuotaTreatment,
   mergeEvidenceAttachment,
   normalizeDate,
   normalizeMoney,
